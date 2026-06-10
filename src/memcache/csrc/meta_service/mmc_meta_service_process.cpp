@@ -125,6 +125,7 @@ int MmcMetaServiceProcess::Setup(const mmc_meta_service_config_t &config)
     const auto oldConfig = config_;
     const auto oldIsSetupConfig = isSetupConfig_;
     config_ = config;
+    ResolveAllUrlDomains();
     isSetupConfig_ = true;
     if (ValidateConfig() != 0) {
         // recover old config
@@ -189,6 +190,22 @@ int MmcMetaServiceProcess::LoadConfig()
         return -1;
     }
     return 0;
+}
+
+void MmcMetaServiceProcess::ResolveAllUrlDomains()
+{
+    MMC_LOG_INFO("start resolving all URL domains.");
+    std::string discoveryURL = config_.discoveryURL;
+    std::string configStoreURL = config_.configStoreURL;
+    std::string httpURL = config_.httpURL;
+
+    discoveryURL = Configuration::ResolveUrlField(discoveryURL, "discoveryURL");
+    configStoreURL = Configuration::ResolveUrlField(configStoreURL, "configStoreURL");
+    httpURL = Configuration::ResolveUrlField(httpURL, "httpURL");
+
+    SafeCopy(discoveryURL, config_.discoveryURL, sizeof(config_.discoveryURL));
+    SafeCopy(configStoreURL, config_.configStoreURL, sizeof(config_.configStoreURL));
+    SafeCopy(httpURL, config_.httpURL, sizeof(config_.httpURL));
 }
 
 int MmcMetaServiceProcess::ValidateConfig() const

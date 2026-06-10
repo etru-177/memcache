@@ -46,6 +46,7 @@ private:
     static bool CheckIsRunning();
     int LoadConfig();
     int ValidateConfig() const;
+    void ResolveAllUrlDomains();
     static int ExtractIpPortFromUrl(const std::string &url, std::string &ip, uint16_t &port);
     static void RegisterSignal();
     static void SignalInterruptHandler(const int signal);

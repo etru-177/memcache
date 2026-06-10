@@ -112,6 +112,9 @@ bool Configuration::Setup(const local_config *config)
     res &= SetWithTypeAutoConvert(ConfConstant::OCK_MMC_HCOM_TLS_KEY_PATH.first, config->hcom_tls_key_path);
     res &= SetWithTypeAutoConvert(ConfConstant::OCK_MMC_HCOM_TLS_KEY_PASS_PATH.first, config->hcom_tls_key_pass_path);
     res &= SetWithTypeAutoConvert(ConfConstant::OCK_MMC_HCOM_TLS_DECRYPTER_PATH.first, config->hcom_tls_decrypter_path);
+    if (res) {
+        ResolveAllUrlDomains();
+    }
     return res;
 }
 
@@ -150,6 +153,8 @@ bool Configuration::LoadFromFile(const std::string &filePath)
         return false;
     }
     SAFE_DELETE(kvParser);
+
+    ResolveAllUrlDomains();
     return true;
 }
 
@@ -718,6 +723,41 @@ MemUnit Configuration::ParseMemUnit(const std::string &unit)
     }
 
     return MemUnit::UNKNOWN;
+}
+
+std::string Configuration::ResolveUrlField(const std::string &url, const std::string &fieldName)
+{
+    const std::string name = fieldName.empty() ? std::string("(unknown)") : fieldName;
+    if (url.empty()) {
+        return {};
+    }
+    UrlParser parser;
+    const std::string resolvedUrl = parser.ResolveDomainToIp(url);
+    if (!resolvedUrl.empty() && resolvedUrl != url) {
+        MMC_LOG_INFO("Resolved domain for " << name << ": " << url << " -> " << resolvedUrl);
+        return resolvedUrl;
+    }
+    return url;
+}
+
+void Configuration::ResolveAllUrlDomains()
+{
+    MMC_LOG_INFO("start resolving all URL domains.");
+    static constexpr const char *kUrlKeys[] = {
+        ConfConstant::OCK_MMC_META_SERVICE_URL.first,
+        ConfConstant::OCK_MMC_META_SERVICE_CONFIG_STORE_URL.first,
+        ConfConstant::OCK_MMC_META_SERVICE_HTTP_URL.first,
+        ConfConstant::OKC_MMC_LOCAL_SERVICE_BM_IP_PORT.first,
+        ConfConstant::OKC_MMC_LOCAL_SERVICE_BM_HCOM_URL.first,
+    };
+    for (const char *key : kUrlKeys) {
+        const std::string url = GetString(std::make_pair(key, ""));
+        const std::string resolvedUrl = ResolveUrlField(url, key);
+        if (resolvedUrl.empty() || resolvedUrl == url) {
+            continue;
+        }
+        Set(key, resolvedUrl);
+    }
 }
 
 } // namespace mmc

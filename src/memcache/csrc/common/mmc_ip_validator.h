@@ -14,11 +14,16 @@
 #define MMC_IP_VALIDATOR_H
 
 #include <arpa/inet.h>
+#include <netdb.h>
 #include <string>
 #include <vector>
+#include <cstdint>
+#include <cstdlib>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <unordered_map>
+#include "mmc_logger.h"
 
 namespace ock {
 namespace mmc {
@@ -50,7 +55,7 @@ public:
         if (!initialized_) {
             return {};
         }
-        return ip_;
+        return host_;
     }
 
     [[nodiscard]] uint16_t GetPort()
@@ -138,6 +143,58 @@ public:
         return {reinterpret_cast<const sockaddr *>(&peerStorage_), sizeof(sockaddr_in)};
     }
 
+    [[nodiscard]] std::string ResolveDomainToIp(const std::string &url)
+    {
+        addrinfo hints {};
+        hints.ai_family = AF_UNSPEC;
+        hints.ai_socktype = SOCK_STREAM;
+
+        addrinfo *result = nullptr;
+        if (!ParseUrl(url)) {
+            MMC_LOG_ERROR("Failed to parse URL: " << url);
+            return {};
+        }
+        if (getaddrinfo(host_.c_str(), nullptr, &hints, &result) != 0 || result == nullptr) {
+            MMC_LOG_ERROR("Failed to resolve domain: " << host_);
+            return {};
+        }
+
+        std::string resolved_ip;
+        for (addrinfo *cur = result; cur != nullptr; cur = cur->ai_next) {
+            if (cur->ai_family == AF_INET) {
+                auto *addr4 = reinterpret_cast<sockaddr_in *>(cur->ai_addr);
+                char ip_str[INET_ADDRSTRLEN] {};
+                if (inet_ntop(AF_INET, &addr4->sin_addr, ip_str, sizeof(ip_str)) != nullptr) {
+                    resolved_ip = ip_str;
+                    is_ipv6_ = false;
+                }
+                break;
+            }
+            if (cur->ai_family == AF_INET6) {
+                auto *addr6 = reinterpret_cast<sockaddr_in6 *>(cur->ai_addr);
+                char ip_str[INET6_ADDRSTRLEN] {};
+                if (inet_ntop(AF_INET6, &addr6->sin6_addr, ip_str, sizeof(ip_str)) != nullptr) {
+                    resolved_ip = ip_str;
+                    is_ipv6_ = true;
+                }
+                break;
+            }
+        }
+        freeaddrinfo(result);
+        if (resolved_ip.empty()) {
+            MMC_LOG_ERROR("Failed to resolve IP for domain: " << host_);
+            return {};
+        }
+        host_ = resolved_ip;
+        std::string out_url = protocol_;
+        if (is_ipv6_) {
+            out_url += "[" + resolved_ip + "]:" + std::to_string(port_);
+        } else {
+            out_url += resolved_ip + ":" + std::to_string(port_);
+        }
+        return out_url;
+    }
+
 private:
     static std::vector<std::string> GetSupportedProtocols()
     {
@@ -187,15 +244,15 @@ private:
         if (host.front() == '[' && host.back() == ']') {
             constexpr size_t kLeftBracketLen = 1;   // 左括号 '[' 长度
             constexpr size_t kRightBracketLen = 1;  // 右括号 ']' 长度
-            ip_ = host.substr(kLeftBracketLen, host.length() - kLeftBracketLen - kRightBracketLen);
+            host_ = host.substr(kLeftBracketLen, host.length() - kLeftBracketLen - kRightBracketLen);
             is_ipv6_ = true;
         } else {
-            ip_ = host;
+            host_ = host;
             // 检查是否是IPv6地址（包含冒号）
             is_ipv6_ = (host.find(':') != std::string::npos);
         }
 
-        if (ip_.empty()) {
+        if (host_.empty()) {
             return false;
         }
         return true;
@@ -209,7 +266,7 @@ private:
             auto *addr6 = reinterpret_cast<struct sockaddr_in6 *>(&storage_);
             addr_len_ = sizeof(struct sockaddr_in6);
             address_family_ = AF_INET6;
-            if (inet_pton(AF_INET6, ip_.c_str(), &addr6->sin6_addr) != 1) {
+            if (inet_pton(AF_INET6, host_.c_str(), &addr6->sin6_addr) != 1) {
                 return false;
             }
             addr6->sin6_family = AF_INET6;
@@ -219,7 +276,7 @@ private:
         auto *addr4 = reinterpret_cast<struct sockaddr_in *>(&storage_);
         addr_len_ = sizeof(struct sockaddr_in);
         address_family_ = AF_INET;
-        if (inet_pton(AF_INET, ip_.c_str(), &addr4->sin_addr) != 1) {
+        if (inet_pton(AF_INET, host_.c_str(), &addr4->sin_addr) != 1) {
             return false;
         }
         addr4->sin_family = AF_INET;
@@ -228,7 +285,7 @@ private:
     }
 
     std::mutex mutex_{};
-    std::string ip_;
+    std::string host_;
     std::string protocol_;
     uint16_t port_ = 0;
     int address_family_ = 0;
