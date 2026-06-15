@@ -82,7 +82,7 @@ bool Configuration::Setup(const local_config *config)
                                   config->write_thread_pool_size);
     res &= SetWithTypeAutoConvert(ConfConstant::OCK_MMC_CLIENT_AGGREGATE_IO.first, config->aggregate_io);
     res &= SetWithTypeAutoConvert(ConfConstant::OCK_MMC_CLIENT_AGGREGATE_NUM.first, config->aggregate_num);
-    res &= SetWithTypeAutoConvert(ConfConstant::OCK_MMC_UBS_IO_ENABLE.first, config->ubs_io_enable);
+    res &= SetWithTypeAutoConvert(ConfConstant::OCK_MMC_LOCAL_SERVICE_SSD_SIZE.first, config->local_ssd_size);
 
     res &= SetWithTypeAutoConvert(ConfConstant::OCK_MMC_TLS_ENABLE.first, config->tls_enable);
     res &= SetWithTypeAutoConvert(ConfConstant::OCK_MMC_TLS_CA_PATH.first, config->tls_ca_path);
@@ -329,12 +329,14 @@ bool Configuration::SetWithStrAutoConvert(const std::string &key, const std::str
     if (key == ConfConstant::OKC_MMC_LOCAL_SERVICE_DRAM_SIZE.first ||
         key == ConfConstant::OKC_MMC_LOCAL_SERVICE_MAX_DRAM_SIZE.first ||
         key == ConfConstant::OKC_MMC_LOCAL_SERVICE_HBM_SIZE.first ||
-        key == ConfConstant::OKC_MMC_LOCAL_SERVICE_MAX_HBM_SIZE.first) {
+        key == ConfConstant::OKC_MMC_LOCAL_SERVICE_MAX_HBM_SIZE.first ||
+        key == ConfConstant::OCK_MMC_LOCAL_SERVICE_SSD_SIZE.first ||
+        key == ConfConstant::OCK_MMC_CLIENT_BATCH_CHUNK_SIZE.first) {
         auto memSize = ParseMemSize(tempValue);
         if (memSize == UINT64_MAX) {
-            std::cerr << "DRAM or HBM value (" << tempValue << ") is invalid, "
-                      << "please check 'ock.mmc.local_service.dram.size' "
-                      << "or 'ock.mmc.local_service.hbm.size'" << std::endl;
+            std::cerr << "Memory size value (" << tempValue << ") is invalid." << std::endl <<
+                         "please check 'ock.mmc.local_service.dram.size' 'ock.mmc.local_service.hbm.size'" <<
+                         "or 'ock.mmc.local_service.ssd.size'" << std::endl;
             return false;
         }
         mUInt64Items.insert(std::make_pair(key, memSize));

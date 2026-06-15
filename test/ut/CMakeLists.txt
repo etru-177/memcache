@@ -23,7 +23,11 @@ file(GLOB_RECURSE UT_SOURCE_FILES *.cpp
         ${PROJECT_MMC_SRC_BASE}/csrc/mmc_service.cpp
 )
 
+set(TEST_SRC_INCLUDE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/testcase/memcache/include)
+
 include_directories(
+        ${TEST_SRC_INCLUDE_PATH}
+        ${PROJECT_MMC_SRC_BASE}/csrc/under_api/mf_smem
         ${PROJECT_SMEM_SRC_BASE}/include/host
         ${PROJECT_SMEM_SRC_BASE}/csrc
         ${PROJECT_SMEM_SRC_BASE}/csrc/net
@@ -44,7 +48,6 @@ include_directories(
         ${PROJECT_MMC_SRC_BASE}/csrc/entities
         ${PROJECT_MMC_SRC_BASE}/csrc/local_service
         ${PROJECT_MMC_SRC_BASE}/csrc/proto
-        ${PROJECT_MMC_SRC_BASE}/csrc/under_api/mf_smem
         ${PROJECT_MMC_SRC_BASE}/csrc/under_api/ubs_io
         ${PROJECT_MMC_SRC_BASE}/../util/csrc
         ${ASCEND_CANN_PACKAGE_PATH}/aarch64-linux/include/
@@ -100,4 +103,5 @@ add_subdirectory(testcase/memcache/csrc/config)
 add_subdirectory(testcase/memcache/csrc/entities)
 add_subdirectory(testcase/memcache/csrc/log)
 add_subdirectory(testcase/memcache/csrc/under_api)
+add_subdirectory(testcase/memcache/csrc/integration)
 add_subdirectory(testcase/memcache/csrc/)

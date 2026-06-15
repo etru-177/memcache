@@ -37,7 +37,7 @@ public:
     virtual void MultiLevelElimination(const uint16_t evictThresholdHigh, const uint16_t evictThresholdLow,
                                        const std::vector<MediaType> &needEvictList,
                                        const std::vector<uint16_t> &nowMemoryThresholds,
-                                       std::function<EvictResult(const Key &, const Value &)> moveFunc) = 0;
+                                       std::function<EvictResult(const Key &, const Value &, MediaType)> moveFunc) = 0;
 
     static MmcRef<MmcMetaContainer<Key, Value>> Create(std::function<MediaType(const Value &)> GetTypeFunc);
 };

@@ -77,7 +77,7 @@ constexpr auto OCK_MMC_CLIENT_WRITE_THREAD_POOL_SIZE = std::make_pair("ock.mmc.c
 constexpr auto OCK_MMC_CLIENT_BATCH_CHUNK_SIZE = std::make_pair("ock.mmc.client.batch_option.chunk.size", "8MB");
 constexpr auto OCK_MMC_CLIENT_BATCH_CHUNK_COUNT = std::make_pair("ock.mmc.client.batch_option.chunk.count", 3);
 
-constexpr auto OCK_MMC_UBS_IO_ENABLE = std::make_pair("ock.mmc.ubs_io.enable", false);
+constexpr auto OCK_MMC_LOCAL_SERVICE_SSD_SIZE = std::make_pair("ock.mmc.local_service.ssd.size", "0");
 } // namespace ConfConstant
 
 constexpr int MIN_LOG_ROTATION_FILE_SIZE = 1;
@@ -108,6 +108,7 @@ constexpr int MAX_BATCH_CHUNK_COUNT = 64;
 
 constexpr uint64_t MAX_DRAM_SIZE = 1024ULL * 1024ULL * 1024ULL * 1024ULL; // 1TB
 constexpr uint64_t MAX_HBM_SIZE = 1024ULL * 1024ULL * 1024ULL * 1024ULL;  // 1TB
+constexpr uint64_t MAX_SSD_SIZE = 100ULL * 1024ULL * 1024ULL * 1024ULL * 1024ULL; // 100TB
 
 constexpr uint64_t KB_MEM_BYTES = 1024ULL;
 constexpr uint64_t MB_MEM_BYTES = 1024ULL * 1024ULL;

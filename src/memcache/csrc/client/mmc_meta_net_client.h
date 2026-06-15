@@ -33,6 +33,8 @@ using ClientReplicateHandler = std::function<int32_t(
     const std::vector<uint32_t> &ops, const std::vector<std::string> &keys, const std::vector<MmcMemBlobDesc> &blobs)>;
 using ClientBlobCopyHandler = std::function<int32_t(const std::string& key, const MmcMemBlobDesc &src,
                                                     const MmcMemBlobDesc &dst)>;
+using ClientBlobDeleteHandler = std::function<int32_t(const std::string& key,
+                                                    const MmcMemBlobDesc &blob)>;
 class MetaNetClient : public MmcReferable {
 public:
     explicit MetaNetClient(const std::string &serverUrl, const std::string &inputName = "");
@@ -120,11 +122,13 @@ public:
     bool Status();
 
     void RegisterRetryHandler(const ClientRetryHandler &retryHandler, const ClientReplicateHandler &replicateHandler,
-                              const ClientBlobCopyHandler &blobCopyHandler)
+                              const ClientBlobCopyHandler &blobCopyHandler,
+                              const ClientBlobDeleteHandler &blobDeleteHandler = nullptr)
     {
         retryHandler_ = retryHandler;
         replicateHandler_ = replicateHandler;
         blobCopyHandler_ = blobCopyHandler;
+        blobDeleteHandler_ = blobDeleteHandler;
     }
 
 private:
@@ -132,6 +136,7 @@ private:
     Result HandlePing(const NetContextPtr &context);
     Result HandleLinkBroken(const NetLinkPtr &link);
     Result HandleBlobCopy(const NetContextPtr &context);
+    Result HandleBlobDelete(const NetContextPtr &context);
 
 private:
     NetEnginePtr engine_;
@@ -143,6 +148,7 @@ private:
     ClientRetryHandler retryHandler_ = nullptr;
     ClientReplicateHandler replicateHandler_ = nullptr;
     ClientBlobCopyHandler blobCopyHandler_ = nullptr;
+    ClientBlobDeleteHandler blobDeleteHandler_ = nullptr;
     std::string serverUrl_;
 
     /* not hot used variables */

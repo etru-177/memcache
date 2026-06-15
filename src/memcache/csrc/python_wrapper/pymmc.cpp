@@ -152,8 +152,8 @@ void DefineMmcStructModule(py::module_ &m)
             .def_readwrite("aggregate_num", &local_config::aggregate_num, R"pbdoc(
              Aggregate number.
          )pbdoc")
-            .def_readwrite("ubs_io_enable", &local_config::ubs_io_enable, R"pbdoc(
-             Enable UBS_IO.
+            .def_readwrite("local_ssd_size", &local_config::local_ssd_size, R"pbdoc(
+             SSD local size (0 means disabled).
          )pbdoc")
             .def_readwrite("tls_enable", &local_config::tls_enable, R"pbdoc(
              Enable TLS for metaservice.
@@ -422,10 +422,6 @@ void DefineMmcStructModule(py::module_ &m)
             .def_readwrite("evict_threshold_low", &mmc_meta_service_config_t::evictThresholdLow,
                            R"pbdoc(
                     Eviction low threshold in percentage.
-                )pbdoc")
-            .def_readwrite("ubs_io_enable", &mmc_meta_service_config_t::ubsIoEnable,
-                           R"pbdoc(
-                    Enable UBS_IO.
                 )pbdoc")
             .def_property(
                 "tls_enable", [](const mmc_meta_service_config_t &config) { return config.accTlsConfig.tlsEnable; },

@@ -44,7 +44,6 @@ mmc_meta_service_config_t create_default_meta_config()
     config.evictThresholdLow = 80U;
     config.accTlsConfig.tlsEnable = false;
     config.configStoreTlsConfig.tlsEnable = false;
-    config.ubsIoEnable = false;
     config.metricsReportIntervalSeconds = 0U;
     return config;
 }
@@ -63,7 +62,6 @@ std::string meta_config_to_string(const mmc_meta_service_config_t &config)
     oss << "  log_rotation_file_count: " << config.logRotationFileCount << "\n";
     oss << "  evict_threshold_high: " << config.evictThresholdHigh << "\n";
     oss << "  evict_threshold_low: " << config.evictThresholdLow << "\n";
-    oss << "  ubs_io_enable: " << (config.ubsIoEnable ? "true" : "false") << "\n";
     oss << "  tls_enable: " << (config.accTlsConfig.tlsEnable ? "true" : "false") << "\n";
     oss << "  tls_ca_path: " << config.accTlsConfig.caPath << "\n";
     oss << "  tls_ca_crl_path: " << config.accTlsConfig.crlPath << "\n";
@@ -103,7 +101,7 @@ local_config create_default_local_config()
     cfg.write_thread_pool_size = 4UL;
     cfg.aggregate_io = true;
     cfg.aggregate_num = 122UL;
-    cfg.ubs_io_enable = false;
+    cfg.local_ssd_size = 0;
     cfg.tls_enable = false;
     cfg.config_store_tls_enable = false;
     cfg.hcom_tls_enable = false;
@@ -130,7 +128,7 @@ std::string local_config_to_string(const local_config &config)
     oss << "  write_thread_pool_size: " << config.write_thread_pool_size << "\n";
     oss << "  aggregate_io: " << (config.aggregate_io ? "true" : "false") << "\n";
     oss << "  aggregate_num: " << config.aggregate_num << "\n";
-    oss << "  ubs_io_enable: " << (config.ubs_io_enable ? "true" : "false") << "\n";
+    oss << "  local_ssd_size: " << config.local_ssd_size << "\n";
     oss << "  tls_enable: " << (config.tls_enable ? "true" : "false") << "\n";
     oss << "  tls_ca_path: " << config.tls_ca_path << "\n";
     oss << "  tls_ca_crl_path: " << config.tls_ca_crl_path << "\n";

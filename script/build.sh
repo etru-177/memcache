@@ -14,6 +14,7 @@ export BUILD_TESTS=${2:-OFF}
 export BUILD_OPEN_ABI=${3:-OFF}
 export BUILD_PYTHON=${4:-ON}
 export ENABLE_PTRACER=${5:-ON}
+export INCREMENTAL=${6:-OFF}
 
 readonly SCRIPT_FULL_PATH=$(dirname $(readlink -f "$0"))
 readonly PROJECT_FULL_PATH=$(dirname "$SCRIPT_FULL_PATH")
@@ -40,8 +41,10 @@ CURRENT_DIR=$(pwd)
 cd ${ROOT_PATH}/..
 PROJ_DIR=$(pwd)
 
-rm -rf ./build ./output
-mkdir -p "${PROJ_DIR}/output"
+if [ "${INCREMENTAL}" != "ON" ]; then
+    rm -rf ./build ./output
+    mkdir -p "${PROJ_DIR}/output"
+fi
 mkdir -p "${PROJ_DIR}/build"
 
 if [ "${BUILD_PYTHON}" != "ON" ]; then

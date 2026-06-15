@@ -24,7 +24,7 @@ namespace mmc {
 std::map<std::string, MmcRef<MmcUbsIoProxy>> MmcUbsIoProxyFactory::instances_;
 std::mutex MmcUbsIoProxyFactory::instanceMutex_;
 
-Result MmcUbsIoProxy::InitUbsIo(int32_t deviceId)
+Result MmcUbsIoProxy::InitUbsIo(int32_t deviceId, uint64_t ssdSize)
 {
     std::lock_guard<std::mutex> lock(mutex_);
     if (started_) {
@@ -34,17 +34,20 @@ Result MmcUbsIoProxy::InitUbsIo(int32_t deviceId)
 
     Result result = DlUbsioApi::LoadLibrary();
     if (result != MMC_OK) {
-        MMC_LOG_ERROR("Failed to load ubsio library, error: " << result);
+        MMC_LOG_ERROR("Failed to load ubsio library, deviceId=" << deviceId << ", ssdSize=" << ssdSize
+                       << ", error: " << result);
         return result;
     }
-    result = DlUbsioApi::UbsioClientInit(deviceId);
+    result = DlUbsioApi::UbsioClientInit(deviceId, ssdSize);
     if (result != MMC_OK) {
-        MMC_LOG_ERROR("Failed to init ubsio, error: " << result);
+        MMC_LOG_ERROR("Failed to init ubsio, deviceId=" << deviceId << ", ssdSize=" << ssdSize
+                       << ", error: " << result);
         DlUbsioApi::CleanupLibrary();
         return result;
     }
 
     started_ = true;
+    MMC_LOG_INFO("InitUbsIo success, deviceId=" << deviceId << ", ssdSize=" << ssdSize);
     return MMC_OK;
 }
 
@@ -53,6 +56,7 @@ void MmcUbsIoProxy::DestroyUbsIo()
     if (started_) {
         DlUbsioApi::CleanupLibrary();
         started_ = false;
+        MMC_LOG_INFO("DestroyUbsIo completed");
     }
 }
 
@@ -66,6 +70,9 @@ Result MmcUbsIoProxy::Put(const std::string &key, void *buf, size_t length)
     TP_TRACE_BEGIN(TP_MMC_UBS_IO_PUT);
     int32_t ret = DlUbsioApi::UbsioPut(key.c_str(), buf, length, flags);
     TP_TRACE_END(TP_MMC_UBS_IO_PUT, ret);
+    if (ret != MMC_OK) {
+        MMC_LOG_ERROR("ubsIo Put failed, key=" << key << ", ret=" << ret);
+    }
     return ret;
 }
 
@@ -79,6 +86,9 @@ Result MmcUbsIoProxy::Get(const std::string &key, void *buf, size_t length)
     TP_TRACE_BEGIN(TP_MMC_UBS_IO_GET);
     int32_t ret = DlUbsioApi::UbsioGet(key.c_str(), buf, length, flags);
     TP_TRACE_END(TP_MMC_UBS_IO_GET, ret);
+    if (ret != MMC_OK) {
+        MMC_LOG_ERROR("ubsIo Get failed, key=" << key << ", ret=" << ret);
+    }
     return ret;
 }
 
@@ -103,6 +113,9 @@ Result MmcUbsIoProxy::Delete(const std::string &key)
     TP_TRACE_BEGIN(TP_MMC_UBS_IO_DELETE);
     int32_t ret = DlUbsioApi::UbsioDelete(key.c_str(), flags);
     TP_TRACE_END(TP_MMC_UBS_IO_DELETE, ret);
+    if (ret != MMC_OK) {
+        MMC_LOG_ERROR("ubsIo Delete failed, key=" << key << ", ret=" << ret);
+    }
     return ret;
 }
 

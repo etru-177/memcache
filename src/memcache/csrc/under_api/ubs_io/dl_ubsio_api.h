@@ -23,7 +23,7 @@
 namespace ock {
 namespace mmc {
 
-using ubsio_client_initFunc = int32_t (*)(int32_t);
+using ubsio_client_init_func = int32_t (*)(int32_t, uint64_t);
 using ubsio_putFunc = int32_t (*)(const char *, void *, size_t, uint32_t);
 using ubsio_getFunc = int32_t (*)(const char *, void *, size_t, uint32_t);
 using ubsio_existFunc = bool (*)(const char *, uint32_t);
@@ -43,12 +43,12 @@ public:
     static Result LoadLibrary();
     static void CleanupLibrary();
 
-    static inline Result UbsioClientInit(int32_t deviceId)
+    static inline Result UbsioClientInit(int32_t deviceId, uint64_t ssdSize)
     {
         if (pUbsioClientInit == nullptr) {
             return MMC_NOT_INITIALIZED;
         }
-        return pUbsioClientInit(deviceId);
+        return pUbsioClientInit(deviceId, ssdSize);
     }
 
     static inline Result UbsioPut(const char *key, void *buf, size_t length, uint32_t flags)
@@ -157,7 +157,7 @@ private:
     static void *ubsioHandle;
     static const std::string gUbsioLibName;
 
-    static ubsio_client_initFunc pUbsioClientInit;
+    static ubsio_client_init_func pUbsioClientInit;
     static ubsio_putFunc pUbsioPut;
     static ubsio_getFunc pUbsioGet;
     static ubsio_existFunc pUbsioExist;

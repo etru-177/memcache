@@ -60,16 +60,8 @@ Result MmcMetaService::Start(const mmc_meta_service_config_t &options)
         MMC_RETURN_ERROR(metaBackUpMgrPtr_->Start(defaultPtr), "metaBackUpMgr start failed");
     }
 
-    if (options.ubsIoEnable) {
-        MmcUbsIoProxyPtr ubsIoProxy = MmcUbsIoProxyFactory::GetInstance("ubsIoProxyDefault");
-        MMC_ASSERT_RETURN(ubsIoProxy != nullptr, MMC_MALLOC_FAILED);
-        ubsIoProxyPtr_ = ubsIoProxy;
-        MMC_RETURN_ERROR(ubsIoProxy->InitUbsIo(), "Failed to init ubsIo of meta service");
-    }
-
     metaMgrProxy_ = MmcMakeRef<MmcMetaMgrProxy>(metaNetServer_).Get();
-    MMC_RETURN_ERROR(metaMgrProxy_->Start(MMC_DATA_TTL_MS, options.evictThresholdHigh,
-        options.evictThresholdLow, options.ubsIoEnable),
+    MMC_RETURN_ERROR(metaMgrProxy_->Start(MMC_DATA_TTL_MS, options.evictThresholdHigh, options.evictThresholdLow),
         "Failed to start meta mgr proxy of meta service " << name_);
 
     NetEngineOptions configStoreOpt{};
@@ -182,10 +174,6 @@ void MmcMetaService::Stop()
     metaBackUpMgrPtr_->Stop();
     metaMgrProxy_->Stop();
     metaNetServer_->Stop();
-    if (options_.ubsIoEnable && ubsIoProxyPtr_ != nullptr) {
-        ubsIoProxyPtr_->DestroyUbsIo();
-        ubsIoProxyPtr_ = nullptr;
-    }
     confStore_ = nullptr;
     metadata_.clear();
     ock::smem::StoreFactory::DestroyStore(options_.configStoreURL);

@@ -10,6 +10,7 @@
  * See the Mulan PSL v2 for more details.
 */
 #include "mmc_global_allocator.h"
+#include "mmc_blob_allocator.h"
 #include "mmc_ref.h"
 #include "gtest/gtest.h"
 #include <iostream>
@@ -43,7 +44,7 @@ void TestMmcGlobalAllocator::TearDown()
 TEST_F(TestMmcGlobalAllocator, AllocOne)
 {
     MmcGlobalAllocatorPtr allocator = MmcMakeRef<MmcGlobalAllocator>();
-    uint64_t size = SIZE_32K * 10;
+    uint64_t size = SIZE_32K * 10U;
     for (int i = 0; i < 10; i++) {
         MmcLocation loc;
         MmcLocalMemlInitInfo info;
@@ -89,7 +90,7 @@ TEST_F(TestMmcGlobalAllocator, AllocOne)
 TEST_F(TestMmcGlobalAllocator, AllocMulti)
 {
     MmcGlobalAllocatorPtr allocator = MmcMakeRef<MmcGlobalAllocator>();
-    uint64_t size = SIZE_32K * 10;
+    uint64_t size = SIZE_32K * 10U;
     for (int i = 0; i < 10; i++) {
         MmcLocation loc;
         MmcLocalMemlInitInfo info;
@@ -136,7 +137,7 @@ TEST_F(TestMmcGlobalAllocator, AllocMulti)
 TEST_F(TestMmcGlobalAllocator, AllocCrossRank)
 {
     MmcGlobalAllocatorPtr allocator = MmcMakeRef<MmcGlobalAllocator>();
-    uint64_t size = SIZE_32K * 10;
+    uint64_t size = SIZE_32K * 10U;
     for (int i = 0; i < 10; i++) {
         MmcLocation loc;
         MmcLocalMemlInitInfo info;
@@ -177,7 +178,7 @@ TEST_F(TestMmcGlobalAllocator, AllocCrossRank)
 TEST_F(TestMmcGlobalAllocator, FreeOne)
 {
     MmcGlobalAllocatorPtr allocator = MmcMakeRef<MmcGlobalAllocator>();
-    uint64_t size = SIZE_32K * 10;
+    uint64_t size = SIZE_32K * 10U;
     for (int i = 0; i < 10; i++) {
         MmcLocation loc;
         MmcLocalMemlInitInfo info;
@@ -235,7 +236,7 @@ TEST_F(TestMmcGlobalAllocator, FreeOne)
 TEST_F(TestMmcGlobalAllocator, FreeCrossRank)
 {
     MmcGlobalAllocatorPtr allocator = MmcMakeRef<MmcGlobalAllocator>();
-    uint64_t size = SIZE_32K * 10;
+    uint64_t size = SIZE_32K * 10U;
     for (int i = 0; i < 10; i++) {
         MmcLocation loc;
         MmcLocalMemlInitInfo info;
@@ -296,7 +297,7 @@ TEST_F(TestMmcGlobalAllocator, FreeCrossRank)
 TEST_F(TestMmcGlobalAllocator, MountUnmount)
 {
     MmcGlobalAllocatorPtr allocator = MmcMakeRef<MmcGlobalAllocator>();
-    uint64_t size = SIZE_32K * 10;
+    uint64_t size = SIZE_32K * 10U;
     for (int i = 0; i < 10; i++) {
         if (i == 6) {
             continue;
@@ -396,7 +397,7 @@ TEST_F(TestMmcGlobalAllocator, AllocWhenEmpty)
 TEST_F(TestMmcGlobalAllocator, MountDuplicateLocation)
 {
     MmcGlobalAllocatorPtr allocator = MmcMakeRef<MmcGlobalAllocator>();
-    uint64_t size = SIZE_32K * 10;
+    uint64_t size = SIZE_32K * 10U;
 
     MmcLocation loc;
     MmcLocalMemlInitInfo info;
@@ -415,7 +416,7 @@ TEST_F(TestMmcGlobalAllocator, MountDuplicateLocation)
 TEST_F(TestMmcGlobalAllocator, UnmountInUseLocation)
 {
     MmcGlobalAllocatorPtr allocator = MmcMakeRef<MmcGlobalAllocator>();
-    uint64_t size = SIZE_32K * 10;
+    uint64_t size = SIZE_32K * 10U;
 
     MmcLocation loc;
     loc.mediaType_ = MEDIA_DRAM;
@@ -456,7 +457,7 @@ TEST_F(TestMmcGlobalAllocator, StopInvalidLocation)
 TEST_F(TestMmcGlobalAllocator, ReBuild)
 {
     MmcGlobalAllocatorPtr allocator = MmcMakeRef<MmcGlobalAllocator>();
-    uint64_t size = SIZE_32K * 10;
+    uint64_t size = SIZE_32K * 10U;
 
     MmcLocation loc;
     MmcLocalMemlInitInfo info;
@@ -525,7 +526,7 @@ TEST_F(TestMmcGlobalAllocator, ReBuild)
 TEST_F(TestMmcGlobalAllocator, AllocForce)
 {
     MmcGlobalAllocatorPtr allocator = MmcMakeRef<MmcGlobalAllocator>();
-    uint64_t size = SIZE_32K * 10;
+    uint64_t size = SIZE_32K * 10U;
     for (int i = 0; i < 10; i++) {
         MmcLocation loc;
         MmcLocalMemlInitInfo info;
@@ -585,7 +586,7 @@ TEST_F(TestMmcGlobalAllocator, AllocForce)
 TEST_F(TestMmcGlobalAllocator, AllocRandom)
 {
     MmcGlobalAllocatorPtr allocator = MmcMakeRef<MmcGlobalAllocator>();
-    uint64_t size = SIZE_32K * 10;
+    uint64_t size = SIZE_32K * 10U;
     for (int i = 0; i < 10; i++) {
         MmcLocation loc;
         MmcLocalMemlInitInfo info;
@@ -651,4 +652,250 @@ TEST_F(TestMmcGlobalAllocator, AllocRandom)
         EXPECT_EQ(blobs1[i]->Gva(), size * blobs1[i]->Rank() + SIZE_32K);
     }
     EXPECT_FALSE(isEqual);
+}
+
+// ==================== MmcSsdBlobAllocator unit tests ====================
+
+TEST_F(TestMmcGlobalAllocator, SsdAllocOne)
+{
+    uint64_t capacity = SIZE_32K * 100U;
+    auto ssdAllocator = MmcMakeRef<MmcSsdBlobAllocator>(0, capacity);
+    ssdAllocator->Start();
+
+    auto blob = ssdAllocator->Alloc(SIZE_32K);
+    ASSERT_NE(blob, nullptr);
+    EXPECT_EQ(blob->Rank(), 0u);
+    EXPECT_EQ(blob->Size(), SIZE_32K);
+    EXPECT_EQ(blob->Type(), static_cast<uint16_t>(MEDIA_SSD));
+    EXPECT_EQ(blob->Gva(), 0u); // SSD 无实际 BM 地址
+
+    auto [cap, used] = ssdAllocator->GetUsageInfo();
+    EXPECT_EQ(cap, capacity);
+    EXPECT_EQ(used, SIZE_32K);
+}
+
+TEST_F(TestMmcGlobalAllocator, SsdAllocOverflow)
+{
+    uint64_t capacity = SIZE_32K * 2;
+    auto ssdAllocator = MmcMakeRef<MmcSsdBlobAllocator>(0, capacity);
+    ssdAllocator->Start();
+
+    // 分配接近容量上限
+    auto blob1 = ssdAllocator->Alloc(capacity);
+    ASSERT_NE(blob1, nullptr);
+
+    // 再次分配应失败（剩余空间不足 4K 对齐）
+    auto blob2 = ssdAllocator->Alloc(SIZE_32K);
+    EXPECT_EQ(blob2, nullptr);
+}
+
+TEST_F(TestMmcGlobalAllocator, SsdAllocWhenStopped)
+{
+    uint64_t capacity = SIZE_32K * 100U;
+    auto ssdAllocator = MmcMakeRef<MmcSsdBlobAllocator>(0, capacity);
+    // 不调用 Start
+
+    auto blob = ssdAllocator->Alloc(SIZE_32K);
+    EXPECT_EQ(blob, nullptr);
+
+    EXPECT_FALSE(ssdAllocator->CanAlloc(SIZE_32K));
+}
+
+TEST_F(TestMmcGlobalAllocator, SsdRelease)
+{
+    uint64_t capacity = SIZE_32K * 100U;
+    auto ssdAllocator = MmcMakeRef<MmcSsdBlobAllocator>(0, capacity);
+    ssdAllocator->Start();
+
+    auto blob = ssdAllocator->Alloc(SIZE_32K);
+    ASSERT_NE(blob, nullptr);
+
+    auto ret = ssdAllocator->Release(blob);
+    EXPECT_EQ(ret, MMC_OK);
+
+    // 释放后容量应恢复
+    auto [cap, used] = ssdAllocator->GetUsageInfo();
+    EXPECT_EQ(used, 0u);
+
+    // 可以再次分配
+    auto blob2 = ssdAllocator->Alloc(SIZE_32K);
+    ASSERT_NE(blob2, nullptr);
+}
+
+TEST_F(TestMmcGlobalAllocator, SsdReleaseNull)
+{
+    auto ssdAllocator = MmcMakeRef<MmcSsdBlobAllocator>(0, SIZE_32K * 100);
+    ssdAllocator->Start();
+
+    auto ret = ssdAllocator->Release(nullptr);
+    EXPECT_NE(ret, MMC_OK);
+}
+
+TEST_F(TestMmcGlobalAllocator, SsdCanAlloc)
+{
+    uint64_t capacity = SIZE_32K * 10U;
+    auto ssdAllocator = MmcMakeRef<MmcSsdBlobAllocator>(0, capacity);
+    ssdAllocator->Start();
+
+    // 初始足够
+    EXPECT_TRUE(ssdAllocator->CanAlloc(SIZE_32K));
+    EXPECT_TRUE(ssdAllocator->CanAlloc(SIZE_32K * 10U));
+
+    // 大于容量
+    EXPECT_FALSE(ssdAllocator->CanAlloc(capacity + SIZE_32K));
+}
+
+TEST_F(TestMmcGlobalAllocator, SsdBuildFromBlobs)
+{
+    uint64_t capacity = SIZE_32K * 100U;
+    auto ssdAllocator = MmcMakeRef<MmcSsdBlobAllocator>(0, capacity);
+
+    std::map<std::string, MmcMemBlobDesc> blobMap;
+    blobMap["key1"] = MmcMemBlobDesc{0, 0, SIZE_32K, MEDIA_SSD};
+    blobMap["key2"] = MmcMemBlobDesc{0, 0, SIZE_32K * 2, MEDIA_SSD};
+
+    auto ret = ssdAllocator->BuildFromBlobs(blobMap);
+    EXPECT_EQ(ret, MMC_OK);
+
+    ssdAllocator->Start();
+
+    auto [cap, used] = ssdAllocator->GetUsageInfo();
+    EXPECT_EQ(used, SIZE_32K + SIZE_32K * 2);
+}
+
+TEST_F(TestMmcGlobalAllocator, SsdBuildFromBlobsMismatchRank)
+{
+    uint64_t capacity = SIZE_32K * 100U;
+    auto ssdAllocator = MmcMakeRef<MmcSsdBlobAllocator>(0, capacity);
+
+    std::map<std::string, MmcMemBlobDesc> blobMap;
+    blobMap["key1"] = MmcMemBlobDesc{1, 0, SIZE_32K, MEDIA_SSD}; // rank 不匹配
+
+    auto ret = ssdAllocator->BuildFromBlobs(blobMap);
+    EXPECT_EQ(ret, MMC_OK);
+    EXPECT_TRUE(blobMap.empty()); // 不匹配的条目被移除
+}
+
+TEST_F(TestMmcGlobalAllocator, SsdBuildFromBlobsWhenStarted)
+{
+    uint64_t capacity = SIZE_32K * 100U;
+    auto ssdAllocator = MmcMakeRef<MmcSsdBlobAllocator>(0, capacity);
+    ssdAllocator->Start();
+
+    std::map<std::string, MmcMemBlobDesc> blobMap;
+    auto ret = ssdAllocator->BuildFromBlobs(blobMap);
+    EXPECT_NE(ret, MMC_OK); // started 状态下不能 rebuild
+}
+
+// ==================== GlobalAllocator Mount MEDIA_SSD routing tests ====================
+
+TEST_F(TestMmcGlobalAllocator, MountSsdMediaType)
+{
+    MmcGlobalAllocatorPtr allocator = MmcMakeRef<MmcGlobalAllocator>();
+    MmcLocation loc{0, MEDIA_SSD};
+    MmcLocalMemlInitInfo info{0, SIZE_32K * 100};
+
+    auto ret = allocator->Mount(loc, info);
+    EXPECT_EQ(ret, MMC_OK);
+    allocator->Start(loc);
+
+    // 通过 GlobalAllocator 在 SSD 上分配
+    AllocOptions allocOpt{SIZE_32K, 1, MEDIA_SSD, {0}, 0};
+    std::vector<MmcMemBlobPtr> blobs;
+    ret = allocator->Alloc(allocOpt, blobs);
+    EXPECT_EQ(ret, MMC_OK);
+    EXPECT_EQ(blobs.size(), 1u);
+    EXPECT_EQ(blobs[0]->Type(), static_cast<uint16_t>(MEDIA_SSD));
+    EXPECT_EQ(blobs[0]->Gva(), 0u); // SSD 无实际 BM 地址
+}
+
+TEST_F(TestMmcGlobalAllocator, MountDramStillUsesBlobAllocator)
+{
+    MmcGlobalAllocatorPtr allocator = MmcMakeRef<MmcGlobalAllocator>();
+    MmcLocation loc{0, MEDIA_DRAM};
+    // 使用非零 bmAddr 确保 DRAM blob 的 gva ≠ 0，与 SSD (gva=0) 区分
+    MmcLocalMemlInitInfo info{SIZE_32K * 1000, SIZE_32K * 100};
+
+    auto ret = allocator->Mount(loc, info);
+    EXPECT_EQ(ret, MMC_OK);
+    allocator->Start(loc);
+
+    AllocOptions allocOpt{SIZE_32K, 1, MEDIA_DRAM, {0}, 0};
+    std::vector<MmcMemBlobPtr> blobs;
+    ret = allocator->Alloc(allocOpt, blobs);
+    EXPECT_EQ(ret, MMC_OK);
+    EXPECT_EQ(blobs.size(), 1u);
+    EXPECT_EQ(blobs[0]->Type(), static_cast<uint16_t>(MEDIA_DRAM));
+    EXPECT_GE(blobs[0]->Gva(), SIZE_32K * 1000u); // DRAM gva 基于 bmAddr+offset
+}
+
+TEST_F(TestMmcGlobalAllocator, FreeSsdThroughGlobal)
+{
+    MmcGlobalAllocatorPtr allocator = MmcMakeRef<MmcGlobalAllocator>();
+    MmcLocation loc{0, MEDIA_SSD};
+    MmcLocalMemlInitInfo info{0, SIZE_32K * 100};
+    allocator->Mount(loc, info);
+    allocator->Start(loc);
+
+    AllocOptions allocOpt{SIZE_32K, 1, MEDIA_SSD, {0}, 0};
+    std::vector<MmcMemBlobPtr> blobs;
+    auto ret = allocator->Alloc(allocOpt, blobs);
+    ASSERT_EQ(ret, MMC_OK);
+
+    ret = allocator->Free(blobs[0]);
+    EXPECT_EQ(ret, MMC_OK);
+
+    // 确认释放后可以再分配同样大小
+    blobs.clear();
+    ret = allocator->Alloc(allocOpt, blobs);
+    EXPECT_EQ(ret, MMC_OK);
+    EXPECT_EQ(blobs.size(), 1u);
+}
+
+TEST_F(TestMmcGlobalAllocator, SsdCanUnmountWhenEmpty)
+{
+    MmcGlobalAllocatorPtr allocator = MmcMakeRef<MmcGlobalAllocator>();
+    MmcLocation loc{0, MEDIA_SSD};
+    MmcLocalMemlInitInfo info{0, SIZE_32K * 100};
+    allocator->Mount(loc, info);
+    allocator->Start(loc);
+
+    // 未分配时可直接 unmount
+    auto ret = allocator->Unmount(loc);
+    EXPECT_EQ(ret, MMC_OK);
+}
+
+TEST_F(TestMmcGlobalAllocator, SsdCannotUnmountWhenInUse)
+{
+    MmcGlobalAllocatorPtr allocator = MmcMakeRef<MmcGlobalAllocator>();
+    MmcLocation loc{0, MEDIA_SSD};
+    MmcLocalMemlInitInfo info{0, SIZE_32K * 100};
+    allocator->Mount(loc, info);
+    allocator->Start(loc);
+
+    AllocOptions allocOpt{SIZE_32K, 1, MEDIA_SSD, {0}, 0};
+    std::vector<MmcMemBlobPtr> blobs;
+    allocator->Alloc(allocOpt, blobs);
+
+    auto ret = allocator->Unmount(loc);
+    EXPECT_EQ(ret, MMC_INVALID_PARAM); // 有分配时不能 unmount
+}
+
+TEST_F(TestMmcGlobalAllocator, GetUsedInfoIncludesSsd)
+{
+    MmcGlobalAllocatorPtr allocator = MmcMakeRef<MmcGlobalAllocator>();
+    MmcLocation ssdLoc{0, MEDIA_SSD};
+    MmcLocalMemlInitInfo ssdInfo{0, SIZE_32K * 100};
+    allocator->Mount(ssdLoc, ssdInfo);
+    allocator->Start(ssdLoc);
+
+    AllocOptions allocOpt{SIZE_32K, 1, MEDIA_SSD, {0}, 0};
+    std::vector<MmcMemBlobPtr> blobs;
+    allocator->Alloc(allocOpt, blobs);
+
+    uint64_t totalSize[MEDIA_NONE] = {0};
+    uint64_t usedSize[MEDIA_NONE] = {0};
+    allocator->GetUsedInfo(totalSize, usedSize);
+    EXPECT_EQ(totalSize[MEDIA_SSD], SIZE_32K * 100);
+    EXPECT_EQ(usedSize[MEDIA_SSD], SIZE_32K);
 }

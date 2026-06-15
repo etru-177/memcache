@@ -22,7 +22,7 @@ std::mutex DlUbsioApi::gMutex;
 void *DlUbsioApi::ubsioHandle = nullptr;
 const std::string DlUbsioApi::gUbsioLibName = "libubsio_kvc.so";
 
-ubsio_client_initFunc DlUbsioApi::pUbsioClientInit = nullptr;
+ubsio_client_init_func DlUbsioApi::pUbsioClientInit = nullptr;
 ubsio_putFunc DlUbsioApi::pUbsioPut = nullptr;
 ubsio_getFunc DlUbsioApi::pUbsioGet = nullptr;
 ubsio_existFunc DlUbsioApi::pUbsioExist = nullptr;
@@ -51,7 +51,7 @@ Result DlUbsioApi::LoadLibrary()
     }
 
     /* load sym */
-    DL_LOAD_SYM(pUbsioClientInit, ubsio_client_initFunc, ubsioHandle, "UbsioKvCacheInit");
+    DL_LOAD_SYM(pUbsioClientInit, ubsio_client_init_func, ubsioHandle, "UbsioKvCacheInit");
     DL_LOAD_SYM(pUbsioPut, ubsio_putFunc, ubsioHandle, "UbsioKvCachePut");
     DL_LOAD_SYM(pUbsioGet, ubsio_getFunc, ubsioHandle, "UbsioKvCacheGet");
     DL_LOAD_SYM(pUbsioExist, ubsio_existFunc, ubsioHandle, "UbsioKvCacheExist");

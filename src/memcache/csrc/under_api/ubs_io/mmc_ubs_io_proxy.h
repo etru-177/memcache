@@ -33,7 +33,7 @@ public:
     MmcUbsIoProxy(const MmcUbsIoProxy&) = delete;
     MmcUbsIoProxy& operator=(const MmcUbsIoProxy&) = delete;
 
-    Result InitUbsIo(int32_t deviceId = -1);
+    Result InitUbsIo(int32_t deviceId = -1, uint64_t ssdSize = 0);
     void DestroyUbsIo();
     Result Put(const std::string &key, void *buf, size_t length);
     Result Get(const std::string &key, void *buf, size_t length);

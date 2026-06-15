@@ -56,7 +56,6 @@ typedef struct {
     uint16_t evictThresholdLow;
     mmc_tls_config accTlsConfig;
     mmc_tls_config configStoreTlsConfig;
-    bool ubsIoEnable;
     uint32_t metricsReportIntervalSeconds;
 } mmc_meta_service_config_t;
 
@@ -73,13 +72,13 @@ typedef struct {
     uint64_t localMaxDRAMSize;
     uint64_t localHBMSize;
     uint64_t localMaxHBMSize;
+    uint64_t localSsdSize;
     uint32_t flags;
     mmc_tls_config accTlsConfig;
     int32_t logLevel;
     ExternalLog logFunc;
     mmc_tls_config hcomTlsConfig;
     mmc_tls_config configStoreTlsConfig;
-    bool ubsIoEnable;
 } mmc_local_service_config_t;
 
 typedef struct {
@@ -94,7 +93,6 @@ typedef struct {
     int32_t logLevel;
     ExternalLog logFunc;
     mmc_tls_config tlsConfig;
-    bool ubsIoEnable;
     char dataOpType[PROTOCOL_SIZE];
     uint64_t batchChunkSize;
     uint32_t batchChunkCount;

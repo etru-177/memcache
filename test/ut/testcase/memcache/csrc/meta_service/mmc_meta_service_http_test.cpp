@@ -57,7 +57,7 @@ constexpr int kHttpWaitRetryCount = 50;
 constexpr int kHttpWaitIntervalMs = 20;
 constexpr int kHttpLogRotationFileCount = 20;
 constexpr int kHttpEvictThresholdHigh = 70;
-constexpr int kHttpEvictThresholdLow = 60;
+constexpr int kHttpEvictThresholdLow = 60U;
 constexpr size_t kBytesPerKilobyte = 1024;
 constexpr size_t kKilobytesPerMegabyte = 1024;
 constexpr size_t kHttpLogRotationFileSizeMb = 2;
@@ -182,7 +182,7 @@ void MmcMetaServiceHttpTest::StartService()
         metaServiceConfig_.evictThresholdLow = kHttpEvictThresholdLow;
         metaServiceConfig_.haEnable = false;
         metaServiceConfig_.accTlsConfig.tlsEnable = false;
-        metaServiceConfig_.ubsIoEnable = false;
+        // mmc_meta_service_config_t no longer has localSsdSize
 
         const std::string discoveryUrl = std::string(kHttpTcpUrlPrefix) + std::to_string(discoveryPort_);
         const std::string configStoreUrl = std::string(kHttpTcpUrlPrefix) + std::to_string(configStorePort_);
@@ -472,8 +472,13 @@ TEST_F(MmcMetaServiceHttpTest, MetricsContract)
     const MmcMetaMetricSnapshot snapshot = MmcMetaMetricManager::GetInstance().GetSnapshot();
     std::ostringstream expectedSummary;
     expectedSummary
-        << "keys=" << kHttpExpectedBlobCount << " evict=" << snapshot.evictCount << " hbm_used=" << SIZE_32K << "/"
-        << kHttpSegmentCapacityBytes << " dram_used=" << kHttpZeroUsedBytes << "/" << kHttpSegmentCapacityBytes
+        << "keys=" << kHttpExpectedBlobCount << " evict=" << snapshot.evictCount
+        << " evict_to_ssd=" << snapshot.evictToSsdCount
+        << " ssd_evict_delete=" << snapshot.ssdEvictDeleteCount
+        << " rewarm=" << snapshot.rewarmCount << " rewarm_fail=" << snapshot.rewarmFailCount
+        << " hbm_used=" << SIZE_32K << "/" << kHttpSegmentCapacityBytes
+        << " dram_used=" << kHttpZeroUsedBytes << "/" << kHttpSegmentCapacityBytes
+        << " ssd_used=" << kHttpZeroUsedBytes << "/" << kHttpZeroUsedBytes
         << " alloc_req=" << snapshot.allocRequestCount << " alloc_success=" << snapshot.allocSuccessCount
         << " alloc_fail=" << snapshot.allocFailureCount << " batch_alloc_req=" << snapshot.batchAllocRequestCount
         << " batch_alloc_success=" << snapshot.batchAllocSuccessCount

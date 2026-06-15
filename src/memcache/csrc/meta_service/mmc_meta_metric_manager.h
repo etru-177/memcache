@@ -100,6 +100,10 @@ struct MmcMetaMetricSnapshot {
     uint64_t unmountSuccessCount{0};
     uint64_t unmountFailureCount{0};
     uint64_t evictCount{0};
+    uint64_t evictToSsdCount{0};
+    uint64_t ssdEvictDeleteCount{0};
+    uint64_t rewarmCount{0};
+    uint64_t rewarmFailCount{0};
     uint64_t keyCount{0};
 };
 
@@ -129,6 +133,22 @@ public:
     void IncrementEvictCounter()
     {
         evictCounter_++;
+    }
+    void IncrementEvictToSsdCounter()
+    {
+        evictToSsdCounter_++;
+    }
+    void IncrementSsdEvictDeleteCounter()
+    {
+        ssdEvictDeleteCounter_++;
+    }
+    void IncrementRewarmCounter()
+    {
+        rewarmCounter_++;
+    }
+    void IncrementRewarmFailCounter()
+    {
+        rewarmFailCounter_++;
     }
     void SetKeyCount(const size_t count)
     {
@@ -198,6 +218,10 @@ private:
     prometheus::simpleapi::counter_metric_t unmountSuccessCounter_;
     prometheus::simpleapi::counter_metric_t unmountFailureCounter_;
     prometheus::simpleapi::counter_metric_t evictCounter_;
+    prometheus::simpleapi::counter_metric_t evictToSsdCounter_;
+    prometheus::simpleapi::counter_metric_t ssdEvictDeleteCounter_;
+    prometheus::simpleapi::counter_metric_t rewarmCounter_;
+    prometheus::simpleapi::counter_metric_t rewarmFailCounter_;
     prometheus::simpleapi::gauge_metric_t keyCountGauge_;
 };
 

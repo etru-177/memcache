@@ -15,8 +15,10 @@
 #include "gtest/gtest.h"
 #include "common/mmc_functions.h"
 #include "mmc.h"
+#include "mmc_configuration.h"
 
 using namespace testing;
+using namespace ock::mmc;
 using ock::mmc::SafeCopy;
 
 class TestLocalConfigUtils : public testing::Test {
@@ -47,7 +49,7 @@ TEST_F(TestLocalConfigUtils, CreateDefaultLocalConfigReturnsExpectedDefaults)
     EXPECT_EQ(config.write_thread_pool_size, 4u);
     EXPECT_TRUE(config.aggregate_io);
     EXPECT_EQ(config.aggregate_num, 122u);
-    EXPECT_FALSE(config.ubs_io_enable);
+    EXPECT_EQ(config.local_ssd_size, 0);
 
     EXPECT_FALSE(config.tls_enable);
     EXPECT_STREQ(config.tls_ca_path, "");
@@ -76,6 +78,16 @@ TEST_F(TestLocalConfigUtils, CreateDefaultLocalConfigReturnsExpectedDefaults)
     EXPECT_STREQ(config.hcom_tls_decrypter_path, "");
 }
 
+// SetWithTypeAutoConvert writes localSsdSize=1GB → expect stored
+TEST_F(TestLocalConfigUtils, SetWithTypeAutoConvertSsdSize)
+{
+    Configuration configuration;
+    configuration.AddStrConf({ConfConstant::OCK_MMC_LOCAL_SERVICE_SSD_SIZE.first, "0"}, VNoCheck::Create(), 0);
+    ASSERT_TRUE(configuration.SetWithTypeAutoConvert(ConfConstant::OCK_MMC_LOCAL_SERVICE_SSD_SIZE.first,
+                                                     std::string("1GB")));
+    ASSERT_EQ(configuration.GetString(ConfConstant::OCK_MMC_LOCAL_SERVICE_SSD_SIZE), "1GB");
+}
+
 TEST_F(TestLocalConfigUtils, LocalConfigToStringReturnsExpectedFormat)
 {
     local_config config{};
@@ -96,7 +108,7 @@ TEST_F(TestLocalConfigUtils, LocalConfigToStringReturnsExpectedFormat)
     config.write_thread_pool_size = 34UL;
     config.aggregate_io = false;
     config.aggregate_num = 78UL;
-    config.ubs_io_enable = true;
+    config.local_ssd_size = 1;
     config.tls_enable = true;
     SafeCopy("/tls/ca.pem", config.tls_ca_path, sizeof(config.tls_ca_path));
     SafeCopy("/tls/ca.crl", config.tls_ca_crl_path, sizeof(config.tls_ca_crl_path));
@@ -138,7 +150,7 @@ TEST_F(TestLocalConfigUtils, LocalConfigToStringReturnsExpectedFormat)
                                  "  write_thread_pool_size: 34\n"
                                  "  aggregate_io: false\n"
                                  "  aggregate_num: 78\n"
-                                 "  ubs_io_enable: true\n"
+                                 "  local_ssd_size: 1\n"
                                  "  tls_enable: true\n"
                                  "  tls_ca_path: /tls/ca.pem\n"
                                  "  tls_ca_crl_path: /tls/ca.crl\n"

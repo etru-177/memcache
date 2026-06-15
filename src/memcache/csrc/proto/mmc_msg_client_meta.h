@@ -937,6 +937,63 @@ struct RemoveAllRequest : MsgBase {
         return MMC_OK;
     }
 };
+
+struct BlobDeleteRequest : MsgBase {
+    std::string key_;
+    uint32_t rank_;
+    MmcMemBlobDesc blob_;
+
+    BlobDeleteRequest() : MsgBase{0, LM_BLOB_DELETE_REQ, 0}, rank_{0} {}
+    BlobDeleteRequest(const std::string &key, uint32_t rank, const MmcMemBlobDesc &blob)
+        : MsgBase{0, LM_BLOB_DELETE_REQ, 0}, key_(key), rank_(rank), blob_(blob) {}
+
+    Result Serialize(NetMsgPacker &packer) const override
+    {
+        packer.Serialize(msgVer);
+        packer.Serialize(msgId);
+        packer.Serialize(destRankId);
+        packer.Serialize(key_);
+        packer.Serialize(rank_);
+        packer.Serialize(blob_);
+        return MMC_OK;
+    }
+
+    Result Deserialize(NetMsgUnpacker &packer) override
+    {
+        packer.Deserialize(msgVer);
+        packer.Deserialize(msgId);
+        packer.Deserialize(destRankId);
+        packer.Deserialize(key_);
+        packer.Deserialize(rank_);
+        packer.Deserialize(blob_);
+        return MMC_OK;
+    }
+};
+
+struct BlobDeleteResponse : MsgBase {
+    Result ret_ = MMC_ERROR;
+
+    BlobDeleteResponse() : MsgBase{0, LM_BLOB_DELETE_RSP, 0} {}
+    explicit BlobDeleteResponse(const Result &ret) : MsgBase{0, LM_BLOB_DELETE_RSP, 0}, ret_(ret) {}
+
+    Result Serialize(NetMsgPacker &packer) const override
+    {
+        packer.Serialize(msgVer);
+        packer.Serialize(msgId);
+        packer.Serialize(destRankId);
+        packer.Serialize(ret_);
+        return MMC_OK;
+    }
+
+    Result Deserialize(NetMsgUnpacker &packer) override
+    {
+        packer.Deserialize(msgVer);
+        packer.Deserialize(msgId);
+        packer.Deserialize(destRankId);
+        packer.Deserialize(ret_);
+        return MMC_OK;
+    }
+};
 } // namespace mmc
 } // namespace ock
 #endif // MF_HYBRID_MMC_MSG_CLIENT_META_H

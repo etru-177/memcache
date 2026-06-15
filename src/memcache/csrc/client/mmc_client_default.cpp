@@ -16,7 +16,6 @@
 #include "mmc_bm_proxy.h"
 #include "mmc_montotonic.h"
 #include "mmc_ptracer.h"
-#include "dl_acl_api.h"
 
 namespace ock {
 namespace mmc {
@@ -41,21 +40,6 @@ Result MmcClientDefault::Start(const mmc_client_config_t &config)
     bmProxy_ = MmcBmProxyFactory::GetInstance("bmProxyDefault");
     MMC_ASSERT_RETURN(bmProxy_ != nullptr, MMC_MALLOC_FAILED);
     rankId_ = bmProxy_->RankId();
-
-    ubsIoEnable_ = config.ubsIoEnable;
-    if (ubsIoEnable_) {
-        ubsIoProxy_ = MmcUbsIoProxyFactory::GetInstance("ubsIoProxyDefault");
-        MMC_ASSERT_RETURN(ubsIoProxy_ != nullptr, MMC_MALLOC_FAILED);
-
-        char *path = std::getenv("ASCEND_HOME_PATH");
-        MMC_ASSERT_RETURN(path != nullptr, MMC_ERROR);
-
-        std::string libPath = std::string(path).append("/lib64");
-        auto result = DlAclApi::LoadLibrary(libPath);
-        if (result != MMC_OK) {
-            return result;
-        }
-    }
 
     threadPool_ = MmcMakeRef<MmcThreadPool>("client_pool", 1);
     MMC_ASSERT_RETURN(threadPool_ != nullptr, MMC_MALLOC_FAILED);
@@ -317,43 +301,9 @@ Result MmcClientDefault::Get(const std::string &key, const MmcBufferArray &bufAr
     MMC_RETURN_ERROR(metaNetClient_->SyncCall(request, response, rpcRetryTimeOut_),
                      "client " << name_ << " get " << key << " failed");
     if (response.numBlobs_ == 0 || response.blobs_.empty()) {
-        if (!ubsIoEnable_) {
-            MMC_LOG_ERROR("client " << name_ << " get " << key << " failed, numblob is:"
-                        << static_cast<uint64_t>(response.numBlobs_));
-            return MMC_ERROR;
-        } else {
-            const auto dataPtr = new (std::nothrow) char[bufArr.TotalSize()];
-            if (dataPtr == nullptr) {
-                MMC_LOG_ERROR("client " << name_ << " get " << key << " failed, Failed to allocate dynamic memory "
-                                << "allocate size:" << bufArr.TotalSize());
-                return {};
-            }
-            mmc_buffer buffer = {
-                .addr = reinterpret_cast<uintptr_t>(dataPtr),
-                .type = MEDIA_DRAM,
-                .offset = 0,
-                .len = bufArr.TotalSize(),
-            };
-            Result ret = ubsIoProxy_->Get(key, dataPtr, bufArr.TotalSize());
-            if (ret != MMC_OK) {
-                delete[] dataPtr;
-                return MMC_ERROR;
-            }
-            mmc_put_options options{MEDIA_DRAM, NATIVE_AFFINITY, 1, {}};
-            std::fill_n(options.preferredLocalServiceIDs, MAX_BLOB_COPIES, -1);
-            ret = Put(key.c_str(), &buffer, options, 0);
-            delete[] dataPtr;
-            if (ret != MMC_OK) {
-                return ret;
-            }
-            operateId = GenerateOperateId(rankId_);
-            request.operateId_ = operateId;
-            MMC_RETURN_ERROR(metaNetClient_->SyncCall(request, response, rpcRetryTimeOut_),
-                             "client " << name_ << " get " << key << " failed");
-            if (response.numBlobs_ == 0 || response.blobs_.empty()) {
-                return MMC_ERROR;
-            }
-        }
+        MMC_LOG_ERROR("client " << name_ << " get " << key << " failed, numblob is:"
+                    << static_cast<uint64_t>(response.numBlobs_));
+        return MMC_ERROR;
     }
     auto &blob = response.blobs_[0];
     auto ret = bmProxy_->BatchGet(bufArr, blob);
@@ -428,10 +378,8 @@ Result MmcClientDefault::BatchGet(const std::vector<std::string> &keys, const st
         const auto &blobs = response.blobs_[i];
         uint8_t numBlobs = response.numBlobs_[i];
         if (numBlobs <= 0 || blobs.empty() || blobs.size() != numBlobs) {
-            if (!ubsIoEnable_) {
-                MMC_LOG_ERROR("client " << name_ << " batch get failed for key " << keys[i]
-                                        << ", blob:" << std::to_string(numBlobs) << ", size:" << blobs.size());
-            }
+            MMC_LOG_ERROR("client " << name_ << " batch get failed for key " << keys[i]
+                                    << ", blob:" << std::to_string(numBlobs) << ", size:" << blobs.size());
             continue;
         }
         if (bufArr.TotalSize() != blobs[0].size_) {
@@ -464,23 +412,6 @@ Result MmcClientDefault::BatchGet(const std::vector<std::string> &keys, const st
     if (!copyDesc.sizes.empty()) {
         auto future = SubmitGetTask(copyDesc, mediaType, !(startKeyIndex == 0));
         futures.push_back(std::make_tuple(startKeyIndex, (keys.size() - 1), std::move(future)));
-    }
-
-    std::vector<std::string> ubsIoKeys;
-    std::vector<void*> bufs;
-    std::vector<std::string> fallbackKeys;
-    std::vector<mmc_buffer> fallbackBuffers;
-    if (ubsIoEnable_) {
-        UbsIoBatchGetData batchGetData{
-            keys,
-            bufArrs,
-            batchResult,
-            ubsIoKeys,
-            bufs,
-            fallbackKeys,
-            fallbackBuffers
-        };
-        ProcessUbsIoBatchGetWithHBM(batchGetData);
     }
 
     TP_TRACE_BEGIN(TP_MMC_LOCAL_GET_WAIT_FUTURE);
@@ -739,8 +670,8 @@ void MmcClientDefault::SyncUpdateState(BatchUpdateRequest &updateRequest)
                                 << updateRequest.keys_.size() << ", ret size:" << updateResponse.results_.size());
     } else {
         for (size_t i = 0; i < updateRequest.keys_.size() && i < updateRequest.keys_.size(); ++i) {
-            if (updateResponse.results_[i] != MMC_OK && !ubsIoEnable_) {
-                MMC_LOG_ERROR("client " << name_ << " batch put update for key " << updateRequest.keys_[i]
+            if (updateResponse.results_[i] != MMC_OK) {
+                MMC_LOG_ERROR("client " << name_ << " batch update for key " << updateRequest.keys_[i]
                                         << " failed:" << updateResponse.results_[i]);
             }
         }

@@ -144,7 +144,7 @@ private:
                                Result operationResult);
     Result ExecuteConcurrently(const std::vector<void *> &gvas, const std::vector<void *> &buffers,
                                const std::vector<size_t> &sizes, bool isPut, MediaType mediaType, size_t chunkSize);
-    // UBS IO相关数据结构
+    // UBS IO相关数据结构，保留供后续 SSD→DRAM 回暖使用
     struct UbsIoBatchGetData {
         const std::vector<std::string> &keys;
         const std::vector<MmcBufferArray> &bufArrs;
@@ -162,7 +162,6 @@ private:
     static MmcClientDefault *gClientHandler;
     std::mutex mutex_;
     bool started_ = false;
-    bool ubsIoEnable_ = false;
     MetaNetClientPtr metaNetClient_;
     MmcBmProxyPtr bmProxy_;
     MmcUbsIoProxyPtr ubsIoProxy_;

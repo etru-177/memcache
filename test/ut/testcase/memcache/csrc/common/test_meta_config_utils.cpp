@@ -41,7 +41,6 @@ TEST_F(TestMetaConfigUtils, CreateDefaultMetaConfigReturnsExpectedDefaults)
     EXPECT_EQ(config.logRotationFileCount, 50);
     EXPECT_EQ(config.evictThresholdHigh, 90U);
     EXPECT_EQ(config.evictThresholdLow, 80U);
-    EXPECT_FALSE(config.ubsIoEnable);
 
     EXPECT_FALSE(config.accTlsConfig.tlsEnable);
     EXPECT_STREQ(config.accTlsConfig.caPath, "");
@@ -75,7 +74,6 @@ TEST_F(TestMetaConfigUtils, MetaConfigToStringReturnsExpectedFormat)
     config.logRotationFileCount = 7L;
     config.evictThresholdHigh = 95U;
     config.evictThresholdLow = 70U;
-    config.ubsIoEnable = true;
 
     config.accTlsConfig.tlsEnable = true;
     SafeCopy("/tls/ca.pem", config.accTlsConfig.caPath, sizeof(config.accTlsConfig.caPath));
@@ -107,7 +105,6 @@ TEST_F(TestMetaConfigUtils, MetaConfigToStringReturnsExpectedFormat)
                                  "  log_rotation_file_count: 7\n"
                                  "  evict_threshold_high: 95\n"
                                  "  evict_threshold_low: 70\n"
-                                 "  ubs_io_enable: true\n"
                                  "  tls_enable: true\n"
                                  "  tls_ca_path: /tls/ca.pem\n"
                                  "  tls_ca_crl_path: /tls/ca.crl\n"

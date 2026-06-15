@@ -355,7 +355,7 @@ inline void NetEngine::RegRequestReceivedHandler(int16_t opCode, const NetReqRec
 
     std::lock_guard<std::mutex> guard(mutex_);
     reqReceivedHandlers_[opCode] = h;
-    gHandlerSize++;
+    gHandlerSize = std::max(gHandlerSize, static_cast<int16_t>(opCode + 1));
 }
 
 inline void NetEngine::RegRequestSentHandler(int16_t opCode, const NetReqSentHandler &h)

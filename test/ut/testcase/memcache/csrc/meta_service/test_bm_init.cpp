@@ -62,10 +62,10 @@ TEST_F(TestBmInit, Init)
     metaServiceConfig.logRotationFileSize = 2 * 1024 * 1024;
     metaServiceConfig.logRotationFileCount = 20;
     metaServiceConfig.evictThresholdHigh = 70;
-    metaServiceConfig.evictThresholdLow = 60;
+    metaServiceConfig.evictThresholdLow = 60U;
     metaServiceConfig.haEnable = true;
     metaServiceConfig.accTlsConfig.tlsEnable = false;
-    metaServiceConfig.ubsIoEnable = false;
+    // mmc_meta_service_config_t no longer has localSsdSize
     UrlStringToChar(metaUrl, metaServiceConfig.discoveryURL);
     UrlStringToChar(bmUrl, metaServiceConfig.configStoreURL);
     auto metaServiceDefault = MmcMakeRef<MmcMetaService>("testMetaService");
@@ -73,7 +73,7 @@ TEST_F(TestBmInit, Init)
     ASSERT_TRUE(metaServicePtr->Start(metaServiceConfig) == MMC_OK);
 
     mmc_local_service_config_t localServiceConfig1 = {
-        "", 0, 0, 1, "", "", 0, "device_sdma", 0, 0, 104857600, 104857600, 0, {}, 0, nullptr, {}, {}, false};
+        "", 0, 0, 1, "", "", 0, "device_sdma", 0, 0, 104857600, 104857600, 0, 0, {}, 0, nullptr, {}, {}};
     localServiceConfig1.logLevel = INFO_LEVEL;
     localServiceConfig1.accTlsConfig.tlsEnable = false;
     UrlStringToChar(metaUrl, localServiceConfig1.discoveryURL);

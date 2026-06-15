@@ -87,7 +87,7 @@ TEST_F(TestUbsIoEnabled, ClientInitWithUbsIoEnabled)
 {
     mmc_client_config_t clientConfig{};
     clientConfig.logLevel = INFO_LEVEL;
-    clientConfig.ubsIoEnable = true;
+
     clientConfig.readThreadPoolNum = UT_READ_POOL_NUM;
     clientConfig.writeThreadPoolNum = UT_WRITE_POOL_NUM;
     int32_t ret = mmcc_init(&clientConfig);
@@ -107,20 +107,19 @@ TEST_F(TestUbsIoEnabled, PutAndGetWithUbsIoFallback)
     metaServiceConfig.logRotationFileSize = 2 * 1024 * 1024;
     metaServiceConfig.logRotationFileCount = 20;
     metaServiceConfig.accTlsConfig.tlsEnable = false;
-    metaServiceConfig.evictThresholdHigh = 80;
-    metaServiceConfig.evictThresholdLow = 60;
+    metaServiceConfig.evictThresholdHigh = 80U;
+    metaServiceConfig.evictThresholdLow = 60U;
     metaServiceConfig.haEnable = false;
-    metaServiceConfig.ubsIoEnable = true;
     UrlStringToChar(metaUrl, metaServiceConfig.discoveryURL);
     UrlStringToChar(bmUrl, metaServiceConfig.configStoreURL);
     mmc_meta_service_t meta_service = mmcs_meta_service_start(&metaServiceConfig);
     ASSERT_TRUE(meta_service != nullptr);
 
-    uint64_t totalSize = SIZE_32K * 10;
+    uint64_t totalSize = SIZE_32K * 10U;
 
     mmc_local_service_config_t localServiceConfig = {
         "", 0, 0,  1, "",      "", 0,  "device_sdma", totalSize, totalSize, totalSize, totalSize,
-        0, {}, 0, nullptr, {}, {}, false};
+        0, 0, {}, 0, nullptr, {}, {}};
     localServiceConfig.logLevel = INFO_LEVEL;
     localServiceConfig.accTlsConfig.tlsEnable = false;
     UrlStringToChar(metaUrl, localServiceConfig.discoveryURL);
@@ -133,7 +132,7 @@ TEST_F(TestUbsIoEnabled, PutAndGetWithUbsIoFallback)
     clientConfig.logLevel = INFO_LEVEL;
     clientConfig.tlsConfig.tlsEnable = false;
     clientConfig.rankId = 0;
-    clientConfig.ubsIoEnable = true;
+
     clientConfig.readThreadPoolNum = UT_READ_POOL_NUM;
     clientConfig.writeThreadPoolNum = UT_WRITE_POOL_NUM;
     UrlStringToChar(metaUrl, clientConfig.discoveryURL);
@@ -187,20 +186,19 @@ TEST_F(TestUbsIoEnabled, BatchGetWithUbsIoFallback)
     metaServiceConfig.logRotationFileSize = 2 * 1024 * 1024;
     metaServiceConfig.logRotationFileCount = 20;
     metaServiceConfig.accTlsConfig.tlsEnable = false;
-    metaServiceConfig.evictThresholdHigh = 80;
-    metaServiceConfig.evictThresholdLow = 60;
+    metaServiceConfig.evictThresholdHigh = 80U;
+    metaServiceConfig.evictThresholdLow = 60U;
     metaServiceConfig.haEnable = false;
-    metaServiceConfig.ubsIoEnable = true;
     UrlStringToChar(metaUrl, metaServiceConfig.discoveryURL);
     UrlStringToChar(bmUrl, metaServiceConfig.configStoreURL);
     mmc_meta_service_t meta_service = mmcs_meta_service_start(&metaServiceConfig);
     ASSERT_TRUE(meta_service != nullptr);
 
-    uint64_t totalSize = SIZE_32K * 10;
+    uint64_t totalSize = SIZE_32K * 10U;
 
     mmc_local_service_config_t localServiceConfig = {
         "", 0, 0,  1, "",      "", 0,  "device_sdma", totalSize, totalSize, totalSize, totalSize,
-        0, {}, 0, nullptr, {}, {}, false};
+        0, 0, {}, 0, nullptr, {}, {}};
     localServiceConfig.logLevel = INFO_LEVEL;
     localServiceConfig.accTlsConfig.tlsEnable = false;
     UrlStringToChar(metaUrl, localServiceConfig.discoveryURL);
@@ -213,7 +211,7 @@ TEST_F(TestUbsIoEnabled, BatchGetWithUbsIoFallback)
     clientConfig.logLevel = INFO_LEVEL;
     clientConfig.tlsConfig.tlsEnable = false;
     clientConfig.rankId = 0;
-    clientConfig.ubsIoEnable = true;
+
     clientConfig.readThreadPoolNum = UT_READ_POOL_NUM;
     clientConfig.writeThreadPoolNum = UT_WRITE_POOL_NUM;
     UrlStringToChar(metaUrl, clientConfig.discoveryURL);
@@ -284,20 +282,20 @@ TEST_F(TestUbsIoEnabled, ExistOperationsWithUbsIo)
     metaServiceConfig.logRotationFileSize = 2 * 1024 * 1024;
     metaServiceConfig.logRotationFileCount = 20;
     metaServiceConfig.accTlsConfig.tlsEnable = false;
-    metaServiceConfig.evictThresholdHigh = 80;
-    metaServiceConfig.evictThresholdLow = 60;
+    metaServiceConfig.evictThresholdHigh = 80U;
+    metaServiceConfig.evictThresholdLow = 60U;
     metaServiceConfig.haEnable = false;
-    metaServiceConfig.ubsIoEnable = true;
+    // localSsdSize removed from mmc_meta_service_config_t
     UrlStringToChar(metaUrl, metaServiceConfig.discoveryURL);
     UrlStringToChar(bmUrl, metaServiceConfig.configStoreURL);
     mmc_meta_service_t meta_service = mmcs_meta_service_start(&metaServiceConfig);
     ASSERT_TRUE(meta_service != nullptr);
 
-    uint64_t totalSize = SIZE_32K * 10;
+    uint64_t totalSize = SIZE_32K * 10U;
 
     mmc_local_service_config_t localServiceConfig = {
         "", 0, 0,  1, "",      "", 0,  "device_sdma", totalSize, totalSize, totalSize, totalSize,
-        0, {}, 0, nullptr, {}, {}, false};
+        0, 0, {}, 0, nullptr, {}, {}};
     localServiceConfig.logLevel = INFO_LEVEL;
     localServiceConfig.accTlsConfig.tlsEnable = false;
     UrlStringToChar(metaUrl, localServiceConfig.discoveryURL);
@@ -310,7 +308,7 @@ TEST_F(TestUbsIoEnabled, ExistOperationsWithUbsIo)
     clientConfig.logLevel = INFO_LEVEL;
     clientConfig.tlsConfig.tlsEnable = false;
     clientConfig.rankId = 0;
-    clientConfig.ubsIoEnable = true;
+
     clientConfig.readThreadPoolNum = UT_READ_POOL_NUM;
     clientConfig.writeThreadPoolNum = UT_WRITE_POOL_NUM;
     UrlStringToChar(metaUrl, clientConfig.discoveryURL);
@@ -362,20 +360,20 @@ TEST_F(TestUbsIoEnabled, QueryOperationsWithUbsIo)
     metaServiceConfig.logRotationFileSize = 2 * 1024 * 1024;
     metaServiceConfig.logRotationFileCount = 20;
     metaServiceConfig.accTlsConfig.tlsEnable = false;
-    metaServiceConfig.evictThresholdHigh = 80;
-    metaServiceConfig.evictThresholdLow = 60;
+    metaServiceConfig.evictThresholdHigh = 80U;
+    metaServiceConfig.evictThresholdLow = 60U;
     metaServiceConfig.haEnable = false;
-    metaServiceConfig.ubsIoEnable = true;
+    // localSsdSize removed from mmc_meta_service_config_t
     UrlStringToChar(metaUrl, metaServiceConfig.discoveryURL);
     UrlStringToChar(bmUrl, metaServiceConfig.configStoreURL);
     mmc_meta_service_t meta_service = mmcs_meta_service_start(&metaServiceConfig);
     ASSERT_TRUE(meta_service != nullptr);
 
-    uint64_t totalSize = SIZE_32K * 10;
+    uint64_t totalSize = SIZE_32K * 10U;
 
     mmc_local_service_config_t localServiceConfig = {
         "", 0, 0,  1, "",      "", 0,  "device_sdma", totalSize, totalSize, totalSize, totalSize,
-        0, {}, 0, nullptr, {}, {}, false};
+        0, 0, {}, 0, nullptr, {}, {}};
     localServiceConfig.logLevel = INFO_LEVEL;
     localServiceConfig.accTlsConfig.tlsEnable = false;
     UrlStringToChar(metaUrl, localServiceConfig.discoveryURL);
@@ -388,7 +386,7 @@ TEST_F(TestUbsIoEnabled, QueryOperationsWithUbsIo)
     clientConfig.logLevel = INFO_LEVEL;
     clientConfig.tlsConfig.tlsEnable = false;
     clientConfig.rankId = 0;
-    clientConfig.ubsIoEnable = true;
+
     clientConfig.readThreadPoolNum = UT_READ_POOL_NUM;
     clientConfig.writeThreadPoolNum = UT_WRITE_POOL_NUM;
     UrlStringToChar(metaUrl, clientConfig.discoveryURL);
@@ -443,10 +441,10 @@ TEST_F(TestUbsIoEnabled, UbsIoFallbackWhenMemcacheFull)
     metaServiceConfig.logRotationFileSize = 2 * 1024 * 1024;
     metaServiceConfig.logRotationFileCount = 20;
     metaServiceConfig.accTlsConfig.tlsEnable = false;
-    metaServiceConfig.evictThresholdHigh = 80;
-    metaServiceConfig.evictThresholdLow = 60;
+    metaServiceConfig.evictThresholdHigh = 80U;
+    metaServiceConfig.evictThresholdLow = 60U;
     metaServiceConfig.haEnable = false;
-    metaServiceConfig.ubsIoEnable = true;
+    // localSsdSize removed from mmc_meta_service_config_t
     UrlStringToChar(metaUrl, metaServiceConfig.discoveryURL);
     UrlStringToChar(bmUrl, metaServiceConfig.configStoreURL);
     mmc_meta_service_t meta_service = mmcs_meta_service_start(&metaServiceConfig);
@@ -456,7 +454,7 @@ TEST_F(TestUbsIoEnabled, UbsIoFallbackWhenMemcacheFull)
 
     mmc_local_service_config_t localServiceConfig = {
         "", 0, 0,  1, "",      "", 0,  "device_sdma", totalSize, totalSize, totalSize, totalSize,
-        0, {}, 0, nullptr, {}, {}, false};
+        0, 0, {}, 0, nullptr, {}, {}};
     localServiceConfig.logLevel = INFO_LEVEL;
     localServiceConfig.accTlsConfig.tlsEnable = false;
     UrlStringToChar(metaUrl, localServiceConfig.discoveryURL);
@@ -469,7 +467,7 @@ TEST_F(TestUbsIoEnabled, UbsIoFallbackWhenMemcacheFull)
     clientConfig.logLevel = INFO_LEVEL;
     clientConfig.tlsConfig.tlsEnable = false;
     clientConfig.rankId = 0;
-    clientConfig.ubsIoEnable = true;
+
     clientConfig.readThreadPoolNum = UT_READ_POOL_NUM;
     clientConfig.writeThreadPoolNum = UT_WRITE_POOL_NUM;
     UrlStringToChar(metaUrl, clientConfig.discoveryURL);
@@ -527,20 +525,20 @@ TEST_F(TestUbsIoEnabled, UbsIoDisabledCompare)
     metaServiceConfig.logRotationFileSize = 2 * 1024 * 1024;
     metaServiceConfig.logRotationFileCount = 20;
     metaServiceConfig.accTlsConfig.tlsEnable = false;
-    metaServiceConfig.evictThresholdHigh = 80;
-    metaServiceConfig.evictThresholdLow = 60;
+    metaServiceConfig.evictThresholdHigh = 80U;
+    metaServiceConfig.evictThresholdLow = 60U;
     metaServiceConfig.haEnable = false;
-    metaServiceConfig.ubsIoEnable = false;
+    // localSsdSize removed from mmc_meta_service_config_t
     UrlStringToChar(metaUrl, metaServiceConfig.discoveryURL);
     UrlStringToChar(bmUrl, metaServiceConfig.configStoreURL);
     mmc_meta_service_t meta_service = mmcs_meta_service_start(&metaServiceConfig);
     ASSERT_TRUE(meta_service != nullptr);
 
-    uint64_t totalSize = SIZE_32K * 10;
+    uint64_t totalSize = SIZE_32K * 10U;
 
     mmc_local_service_config_t localServiceConfig = {
         "", 0, 0,  1, "",      "", 0,  "device_sdma", totalSize, totalSize, totalSize, totalSize,
-        0, {}, 0, nullptr, {}, {}, false};
+        0, 0, {}, 0, nullptr, {}, {}};
     localServiceConfig.logLevel = INFO_LEVEL;
     localServiceConfig.accTlsConfig.tlsEnable = false;
     UrlStringToChar(metaUrl, localServiceConfig.discoveryURL);
@@ -553,7 +551,7 @@ TEST_F(TestUbsIoEnabled, UbsIoDisabledCompare)
     clientConfig.logLevel = INFO_LEVEL;
     clientConfig.tlsConfig.tlsEnable = false;
     clientConfig.rankId = 0;
-    clientConfig.ubsIoEnable = false;
+
     clientConfig.readThreadPoolNum = UT_READ_POOL_NUM;
     clientConfig.writeThreadPoolNum = UT_WRITE_POOL_NUM;
     UrlStringToChar(metaUrl, clientConfig.discoveryURL);

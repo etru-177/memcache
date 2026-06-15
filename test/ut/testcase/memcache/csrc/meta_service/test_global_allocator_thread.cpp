@@ -47,7 +47,7 @@ void TestMmcGlobalAllocatorThread::TearDown()
 // 被测试的线程函数
 int AllocatorTest(const int worldSize, const int rankId, MmcGlobalAllocatorPtr allocator)
 {
-    uint64_t size = SIZE_32K * 10;
+    uint64_t size = SIZE_32K * 10U;
     MmcLocation loc;
     MmcLocalMemlInitInfo info;
     loc.mediaType_ = MEDIA_DRAM;

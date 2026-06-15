@@ -82,7 +82,7 @@ TEST_F(TestLocks, WriteLock)
     std::atomic<bool> writerOccupied(false);
     std::atomic<bool> readerBlocked(true);
 
-    std::thread writer([&] {
+    std::thread writer([&rwLock, &writerOccupied] {
         WriteLock lock(rwLock);
         writerOccupied = true;
         std::cout << "writerOccupied" << std::endl;
@@ -93,7 +93,7 @@ TEST_F(TestLocks, WriteLock)
         std::this_thread::yield();
     }
 
-    std::thread reader([&] {
+    std::thread reader([&rwLock, &readerBlocked] {
         std::cout << "before get ReadLock, readerBlocked:" << readerBlocked << std::endl;
         ReadLock lock(rwLock);
         readerBlocked = false;

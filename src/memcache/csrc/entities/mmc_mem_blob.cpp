@@ -14,23 +14,34 @@ namespace ock {
 namespace mmc {
 
 const StateTransTable MmcMemBlob::stateTransTable_ = BlobStateMachine::GetGlobalTransTable();
+SsdPreFreeHandler MmcMemBlob::ssdPreFreeHandler_ = nullptr;
+
+void MmcMemBlob::SsdPreFree(const std::string& key, const MmcMemBlobDesc& desc)
+{
+    if (ssdPreFreeHandler_ != nullptr && desc.mediaType_ == MEDIA_SSD) {
+        ssdPreFreeHandler_(key, desc);
+    }
+}
 
 Result MmcMemBlob::UpdateState(const std::string &key, uint32_t rankId, uint32_t operateId, BlobActionResult ret)
 {
     auto curStateIter = stateTransTable_.find(state_);
     if (curStateIter == stateTransTable_.end()) {
         MMC_LOG_ERROR("Cannot update state:" << ret << "! The current state " << state_
-                                             << " is not in the stateTransTable! key:" << key);
+                                             << " is not in the stateTransTable! key:" << key
+                                             << ", gva=" << gva_ << ", type=" << mediaType_);
         return MMC_UNMATCHED_STATE;
     }
 
     const auto retIter = curStateIter->second.find(ret);
     if (retIter == curStateIter->second.end()) {
-        MMC_LOG_ERROR("Cannot find " << ret << "from " << state_ << "! key:" << key);
+        MMC_LOG_ERROR("Cannot find " << ret << "from " << state_ << "! key:" << key
+                                     << ", gva=" << gva_ << ", type=" << mediaType_);
         return MMC_UNMATCHED_RET;
     }
 
-    MMC_LOG_DEBUG("update [" << key << "] state from " << state_ << " to " << retIter->second.state_);
+    MMC_LOG_DEBUG("update [" << key << "] state from " << state_ << " to " << retIter->second.state_
+                             << ", gva=" << gva_ << ", type=" << mediaType_);
 
     auto oldState = state_;
     state_ = retIter->second.state_;
@@ -38,7 +49,8 @@ Result MmcMemBlob::UpdateState(const std::string &key, uint32_t rankId, uint32_t
         auto res = retIter->second.action_(metaLeaseManager_, rankId, operateId);
         if (res != MMC_OK) {
             MMC_LOG_ERROR("Blob update current state is " << std::to_string(state_) << " by ret(" << std::to_string(ret)
-                                                          << ") failed! key" << key << ", res=" << res);
+                                                          << ") failed! key=" << key << ", gva=" << gva_
+                                                          << ", type=" << mediaType_ << ", res=" << res);
             return res;
         }
     }
@@ -49,6 +61,10 @@ Result MmcMemBlob::UpdateState(const std::string &key, uint32_t rankId, uint32_t
             MMC_LOG_ERROR("backup failed " << bakRet << " for key:" << key);
             // 备份失败是可以容忍的，不应该打断update流程
         }
+    }
+
+    if (state_ == READABLE) {
+        NotifyReadable();
     }
 
     return MMC_OK;

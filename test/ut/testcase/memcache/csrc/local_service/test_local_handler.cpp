@@ -9,14 +9,15 @@
  * MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
  * See the Mulan PSL v2 for more details.
 */
+
+#include <dlfcn.h>
+#include <iostream>
+#include <memory>
 #include "mmc_meta_manager.h"
 #include "mmc_bm_proxy.h"
 #include "mmc_ref.h"
 #include "smem_bm.h"
 #include "gtest/gtest.h"
-#include <dlfcn.h>
-#include <iostream>
-#include <memory>
 
 namespace {
 using MockGetLastCreate2OptionFn = const smem_bm_create_option_t *(*)();
@@ -97,7 +98,7 @@ TEST_F(TestLocalHandler, Init)
     MmcLocalMemlInitInfo locInfo{100, 1000};
 
     uint64_t defaultTtl = 2000;
-    MmcRef<MmcMetaManager> metaMng = MmcMakeRef<MmcMetaManager>(defaultTtl, 70, 60, false);
+    MmcRef<MmcMetaManager> metaMng = MmcMakeRef<MmcMetaManager>(defaultTtl, 70U, 60U);
     metaMng->Start();
     std::map<std::string, MmcMemBlobDesc> blobMap;
     metaMng->Mount(loc, locInfo, blobMap);
@@ -111,7 +112,7 @@ TEST_F(TestLocalHandler, Alloc)
     MmcLocalMemlInitInfo locInfo{0, 1000000};
 
     uint64_t defaultTtl = 2000;
-    MmcRef<MmcMetaManager> metaMng = MmcMakeRef<MmcMetaManager>(defaultTtl, 70, 60, false);
+    MmcRef<MmcMetaManager> metaMng = MmcMakeRef<MmcMetaManager>(defaultTtl, 70U, 60U);
     metaMng->Start();
     std::map<std::string, MmcMemBlobDesc> blobMap;
     metaMng->Mount(loc, locInfo, blobMap);

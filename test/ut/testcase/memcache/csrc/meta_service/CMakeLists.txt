@@ -113,3 +113,14 @@ ADD_UNIT_TEST(test_ubs_io_enabled
         BUILD_FLAGS -fpermissive --coverage
         DEPENDS mock_ubsio
 )
+
+# MmcMetaService unit test — verify MetaService no longer holds ubsIoProxy
+file(GLOB_RECURSE meta_service_unit_src
+        ${CMAKE_CURRENT_SOURCE_DIR}/test_meta_service.cpp
+)
+ADD_UNIT_TEST(test_meta_service_unit
+        FILES ${meta_service_unit_src} ${TEST_SRC_PATHS}/ut_main.cpp
+        INCLUDE_PATHS ${TEST_INCLUDE_PATHS}
+        LINK_LIBRARIES ${TEST_DEPEND_LIBS}
+        BUILD_FLAGS -fpermissive --coverage
+)

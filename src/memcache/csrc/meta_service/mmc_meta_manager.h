@@ -16,6 +16,7 @@
 #include <thread>
 #include <list>
 #include <mutex>
+#include <atomic>
 
 #include "mmc_global_allocator.h"
 #include "mmc_mem_obj_meta.h"
@@ -24,7 +25,6 @@
 #include "mmc_meta_net_server.h"
 #include "mmc_interval_map.h"
 #include "mmc_thread_pool.h"
-#include "mmc_ubs_io_proxy.h"
 
 namespace ock {
 namespace mmc {
@@ -86,11 +86,12 @@ struct MmcMemMetaDesc {
 };
 
 class MmcMetaManager : public MmcReferable {
+    friend class TestMmcMetaManager;
 public:
     explicit MmcMetaManager(uint64_t defaultTtl, uint16_t evictThresholdHigh,
-                            uint16_t evictThresholdLow, bool ubsIoEnable)
+                            uint16_t evictThresholdLow)
         : defaultTtlMs_(defaultTtl), evictThresholdHigh_(evictThresholdHigh),
-          evictThresholdLow_(evictThresholdLow), ubsIoEnable_(ubsIoEnable)
+          evictThresholdLow_(evictThresholdLow)
     {}
 
     ~MmcMetaManager() override
@@ -105,10 +106,6 @@ public:
             MMC_LOG_INFO("MmcMetaMgrProxyDefault already started");
             return MMC_OK;
         }
-        if (ubsIoEnable_) {
-            ubsIoProxy_ = MmcUbsIoProxyFactory::GetInstance("ubsIoProxyDefault");
-            MMC_ASSERT_RETURN(ubsIoProxy_ != nullptr, MMC_MALLOC_FAILED);
-        }
         globalAllocator_ = MmcMakeRef<MmcGlobalAllocator>();
         MMC_ASSERT_RETURN(globalAllocator_ != nullptr, MMC_MALLOC_FAILED);
         auto GetTypeFunc = [](const MmcMemObjMetaPtr &objMeta) -> MediaType { return objMeta->GetBlobType(); };
@@ -117,6 +114,16 @@ public:
         threadPool_ = MmcMakeRef<MmcThreadPool>("metamgr_pool", METAMGR_POOL_BASE);
         MMC_ASSERT_RETURN(threadPool_ != nullptr, MMC_MALLOC_FAILED);
         MMC_RETURN_ERROR(threadPool_->Start(), "thread pool start failed");
+        // P4: 注册 FreeBlobs 的 SSD 预释放回调，在释放 SSD blob 前通过 RPC 删除远端数据
+        MmcMemBlob::ssdPreFreeHandler_ = [this](const std::string &key, const MmcMemBlobDesc &desc) {
+            threadPool_->Enqueue([this, key, desc]() {
+                Result ret = BlobDeleteRpc(key, desc);
+                if (ret != MMC_OK) {
+                    MMC_LOG_WARN("BlobDeleteRpc failed for key: " << key << ", rank: " << desc.rank_
+                                                                   << ", ret: " << ret);
+                }
+            });
+        };
         started_ = true;
         return MMC_OK;
     }
@@ -127,10 +134,8 @@ public:
         if (!started_) {
             return;
         }
-        if (ubsIoEnable_ && ubsIoProxy_ != nullptr) {
-            ubsIoProxy_ = nullptr;
-        }
         threadPool_->Destroy();
+        MmcMemBlob::ssdPreFreeHandler_ = nullptr;
         started_ = false;
         MMC_LOG_INFO("Stop MmcMetaManager");
     }
@@ -198,6 +203,19 @@ public:
     Result ExistKey(const std::string &key);
 
     /**
+     * @brief Rewarm blob from SSD to DRAM (P5: SSD→DRAM回温)
+     * @param key           [in] key of the meta object
+     * @param objMeta       [in] meta object (already looked up, lock held)
+     * @param guard         [in/out] lock on objMeta, may be unlocked/relocked for RPC
+     */
+    Result RewarmBlob(const std::string &key, const MmcMemObjMetaPtr &objMeta,
+                      std::unique_lock<std::mutex> &guard, const MmcMemBlobDesc &srcDesc,
+                      MediaType dstMediaType, MmcMemBlobPtr &dstBlob);
+
+    void TriggerAsyncRewarm(const std::string &key, const MmcMemObjMetaPtr &objMeta,
+                            const MmcMemBlobDesc &srcDesc);
+
+    /**
      * @brief Get blob query info with key
      * @param key            [in] key of the meta object
      * @param queryInfo      [out] the query info of the meta object
@@ -237,19 +255,24 @@ public:
     }
 
 private:
+    Result FillObjMetaWithRewarm(const std::string &key, uint64_t operateId, MmcBlobFilterPtr filterPtr,
+                                 const MmcMemObjMetaPtr &memObj, MmcMemMetaDesc &objMeta);
+
     Result CopyBlob(const std::string& key, const MmcMemObjMetaPtr &objMeta,
                     const MmcMemBlobDesc &srcBlob, const MmcLocation &dstLoc);
 
     Result RebuildMeta(std::map<std::string, MmcMemBlobDesc> &blobMap);
 
-    void PushRemoveList(const std::string &key, const MmcMemObjMetaPtr &meta);
+    void PushRemoveList(const std::string &key, const MmcMemObjMetaPtr &meta,
+                        const MmcBlobFilterPtr &filter = nullptr);
 
-    EvictResult EvictCallBackFunction(const std::string &key, const MmcMemObjMetaPtr &objMeta);
+    EvictResult EvictCallBackFunction(const std::string &key, const MmcMemObjMetaPtr &objMeta, MediaType srcMediaType);
+
+    Result BlobDeleteRpc(const std::string &key, const MmcMemBlobDesc &blob);
 
 private:
     std::mutex mutex_;
     bool started_ = false;
-    bool ubsIoEnable_ = false;
     std::atomic<bool> evictCheck_{false}; /* if the worker started */
 
     MmcRef<MmcMetaContainer<std::string, MmcMemObjMetaPtr>> metaContainer_;
@@ -262,7 +285,6 @@ private:
     uint16_t evictThresholdLow_;
     MetaNetServerPtr metaNetServer_;
     MmcThreadPoolPtr threadPool_;
-    MmcUbsIoProxyPtr ubsIoProxy_;
 
     struct GvaMapInfo {
         std::string key_;

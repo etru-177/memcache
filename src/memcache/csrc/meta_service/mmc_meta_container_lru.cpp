@@ -122,7 +122,6 @@ public:
         for (MediaType type = MEDIA_HBM; type != MEDIA_NONE; type = MoveDown(type)) {
             lruLists_[type].clear();
         }
-
         return MMC_OK;
     }
 
@@ -161,18 +160,23 @@ public:
         for (const auto &pair : metaMap_) {
             keys.push_back(pair.first);
         }
+        MMC_LOG_DEBUG("Retrieved all keys, count=" << keys.size());
     }
 
     Result Promote(const Key &key)
     {
         ock::mf::ReadGuard lockGuard(metaLock_);
         auto iter = metaMap_.find(key);
-        if (iter != metaMap_.end() && iter->second.mediaType_ != MEDIA_NONE) {
-            UpdateLRU(iter->first, iter->second);
+        if (iter == metaMap_.end()) {
+            MMC_LOG_ERROR("Promote: Key " << key << " not found in MmcMetaContainer. ErrCode: " << MMC_UNMATCHED_KEY);
+            return MMC_UNMATCHED_KEY;
+        }
+        if (iter->second.mediaType_ == MEDIA_NONE) {
+            MMC_LOG_WARN("Skipped promotion for key=" << key << ", mediaType is NONE (key in transition)");
             return MMC_OK;
         }
-        MMC_LOG_ERROR("Promote: Key " << key << " not found in MmcMetaContainer. ErrCode: " << MMC_UNMATCHED_KEY);
-        return MMC_UNMATCHED_KEY;
+        UpdateLRU(iter->first, iter->second);
+        return MMC_OK;
     }
 
     Result InsertLru(const Key &key, MediaType type)
@@ -181,18 +185,23 @@ public:
         auto iter = metaMap_.find(key);
         if (iter != metaMap_.end()) {
             ock::mf::WriteGuard lockGuard(lruLock_);
+            if (iter->second.mediaType_ != MEDIA_NONE) {
+                lruLists_[iter->second.mediaType_].erase(iter->second.lruIter_);
+                iter->second.mediaType_ = MEDIA_NONE;
+            }
             if (type != MEDIA_NONE) {
                 lruLists_[type].push_front(key);
                 iter->second.mediaType_ = type;
                 iter->second.lruIter_ = lruLists_[type].begin();
             }
+            MMC_LOG_DEBUG("Inserted LRU entry, key=" << key << ", type=" << type);
             return MMC_OK;
         }
         MMC_LOG_ERROR("insert lru: Key " << key << " not found. ErrCode: " << MMC_UNMATCHED_KEY);
         return MMC_UNMATCHED_KEY;
     }
 
-    bool EvictOneLeastRecentlyUsed(std::function<EvictResult(const Key &, const Value &)> moveFunc,
+    bool EvictOneLeastRecentlyUsed(std::function<EvictResult(const Key &, const Value &, MediaType)> moveFunc,
                                    const MediaType mediaType)
     {
         if (mediaType == MEDIA_NONE) {
@@ -220,7 +229,7 @@ public:
         Value &value = mapIter->second.value_;
 
         // 3、回调处理key，value
-        EvictResult res = moveFunc(key, value);
+        EvictResult res = moveFunc(key, value, mediaType);
         if (res == EvictResult::REMOVE) {
             metaMap_.erase(mapIter);
             lruLists_[mediaType].erase(iter);
@@ -240,7 +249,7 @@ public:
     void MultiLevelElimination(const uint16_t evictThresholdHigh, const uint16_t evictThresholdLow,
                                const std::vector<MediaType> &needEvictList,
                                const std::vector<uint16_t> &nowMemoryThresholds,
-                               std::function<EvictResult(const Key &, const Value &)> moveFunc)
+                               std::function<EvictResult(const Key &, const Value &, MediaType)> moveFunc)
     {
         for (size_t i = 0; i < needEvictList.size(); ++i) {
             auto mediaType = needEvictList[i];

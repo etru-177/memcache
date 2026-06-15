@@ -25,6 +25,7 @@
 #include <vector>
 
 #include "mmc_logger.h"
+#include "mmc_ptracer.h"
 
 namespace ock {
 namespace mmc {

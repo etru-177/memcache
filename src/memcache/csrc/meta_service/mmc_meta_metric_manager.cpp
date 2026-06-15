@@ -91,6 +91,10 @@ MmcMetaMetricManager::MmcMetaMetricManager()
       unmountSuccessCounter_("memcache_unmount_successes_total", "Total number of Unmount successes"),
       unmountFailureCounter_("memcache_unmount_failures_total", "Total number of Unmount failures"),
       evictCounter_("memcache_evict_operations_total", "Total number of eviction operations"),
+      evictToSsdCounter_("memcache_evict_to_ssd_total", "Total number of eviction to SSD operations"),
+      ssdEvictDeleteCounter_("memcache_ssd_evict_delete_total", "Total number of SSD eviction delete operations"),
+      rewarmCounter_("memcache_rewarm_total", "Total number of SSD->DRAM rewarm operations"),
+      rewarmFailCounter_("memcache_rewarm_failed_total", "Total number of failed SSD->DRAM rewarm operations"),
       keyCountGauge_("memcache_stored_keys", "Current number of stored keys")
 {}
 
@@ -156,6 +160,10 @@ MmcMetaMetricSnapshot MmcMetaMetricManager::GetSnapshot() const
     snapshot.unmountSuccessCount = static_cast<uint64_t>(unmountSuccessCounter_.value());
     snapshot.unmountFailureCount = static_cast<uint64_t>(unmountFailureCounter_.value());
     snapshot.evictCount = static_cast<uint64_t>(evictCounter_.value());
+    snapshot.evictToSsdCount = static_cast<uint64_t>(evictToSsdCounter_.value());
+    snapshot.ssdEvictDeleteCount = static_cast<uint64_t>(ssdEvictDeleteCounter_.value());
+    snapshot.rewarmCount = static_cast<uint64_t>(rewarmCounter_.value());
+    snapshot.rewarmFailCount = static_cast<uint64_t>(rewarmFailCounter_.value());
     snapshot.keyCount = static_cast<uint64_t>(keyCountGauge_.value());
     return snapshot;
 }

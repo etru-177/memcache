@@ -38,7 +38,7 @@ public:
 
     Result InitBm();
 
-    Result InitUbsIo(int32_t deviceId);
+    Result InitUbsIo(int32_t deviceId, uint64_t ssdSize);
 
     Result DestroyBm();
 
@@ -46,6 +46,8 @@ public:
                             const std::vector<MmcMemBlobDesc> &blobs);
 
     Result CopyBlob(const std::string& key, const MmcMemBlobDesc &src, const MmcMemBlobDesc &dst);
+
+    Result BlobDelete(const std::string& key, const MmcMemBlobDesc &blob);
 
     const std::string &Name() const override;
 

@@ -16,16 +16,18 @@ CURRENT_DIR=$(pwd)
 BUILD_MODE="RELEASE"
 BUILD_PYTHON="ON"
 BUILD_TEST="OFF"
+INCREMENTAL="OFF"
 
 show_help() {
     echo "Usage: $0 [options]"
     echo "Options:"
     echo "  --build_mode <mode>     Set build mode (RELEASE/DEBUG/ASAN), default: RELEASE"
     echo "  --build_test <ON/OFF>   Enable/disable package test utilities, default: OFF"
+    echo "  --incremental           Enable incremental build (skip clean), default: OFF"
     echo "  --help                  Show this help message"
     echo ""
     echo "Example:"
-    echo "  $0 --build_mode DEBUG"
+    echo "  $0 --build_mode DEBUG --incremental"
     echo ""
 }
 
@@ -38,6 +40,10 @@ while [[ "$#" -gt 0 ]]; do
         --build_test)
             BUILD_TEST="$2"
             shift 2
+            ;;
+        --incremental)
+            INCREMENTAL="ON"
+            shift 1
             ;;
         --help)
             show_help
@@ -57,7 +63,7 @@ echo "BUILD_PYTHON: $BUILD_PYTHON"
 
 cd "${ROOT_PATH}"
 
-bash build.sh "${BUILD_MODE}" OFF OFF "${BUILD_PYTHON}" ON
+bash build.sh "${BUILD_MODE}" OFF OFF "${BUILD_PYTHON}" ON "${INCREMENTAL}"
 
 bash run_pkg_maker/make_run.sh "${BUILD_TEST}"
 

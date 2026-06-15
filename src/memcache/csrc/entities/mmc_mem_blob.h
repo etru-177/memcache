@@ -12,6 +12,8 @@
 #ifndef MEM_FABRIC_MMC_MEM_BLOB_H
 #define MEM_FABRIC_MMC_MEM_BLOB_H
 
+#include <condition_variable>
+
 #include "nlohmann/json.hpp"
 
 #include "mmc_blob_state.h"
@@ -23,6 +25,8 @@
 
 namespace ock {
 namespace mmc {
+
+using SsdPreFreeHandler = std::function<void(const std::string& key, const MmcMemBlobDesc& desc)>;
 struct MemObjQueryInfo {
     uint64_t size_;
     uint16_t prot_;
@@ -86,11 +90,6 @@ public:
      */
     Result UpdateState(const std::string &key, uint32_t rankId, uint32_t operateId, BlobActionResult ret);
 
-    /**
-     * @brief Update the state of the blob
-     *
-     * @param ret     [in] BlobActionResult
-     */
     Result UpdateState(BlobActionResult ret);
 
     /**
@@ -167,6 +166,21 @@ public:
     Result Backup(const std::string &key);
 
     Result BackupRemove(const std::string &key);
+
+    static void SsdPreFree(const std::string& key, const MmcMemBlobDesc& desc);
+
+    static SsdPreFreeHandler ssdPreFreeHandler_;
+    mutable std::condition_variable cv_; /* P7: 回温完成时唤醒等待中的并发 Get() */
+
+    // P7: 等待 blob 状态变为 READABLE
+    template<typename Rep, typename Period>
+    bool WaitUntilReadable(std::unique_lock<std::mutex> &guard, const std::chrono::duration<Rep, Period> &timeout)
+    {
+        return cv_.wait_for(guard, timeout, [this]() { return state_ == READABLE; });
+    }
+
+    // P7: 通知等待者 blob 已变为 READABLE
+    void NotifyReadable() { cv_.notify_all(); }
 
 private:
     /**

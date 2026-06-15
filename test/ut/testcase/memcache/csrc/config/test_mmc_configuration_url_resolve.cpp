@@ -53,7 +53,7 @@ local_config CreateLocalConfigForUrlResolveTest()
     config.write_thread_pool_size = 4UL;
     config.aggregate_io = false;
     config.aggregate_num = 1UL;
-    config.ubs_io_enable = false;
+    config.local_ssd_size = 0;
     config.tls_enable = false;
     config.config_store_tls_enable = false;
     config.hcom_tls_enable = false;

@@ -442,6 +442,7 @@ Result MmcRestApiFacade::BuildMetricsSummary(bool serviceReady, std::string &res
     const MmcMetaMetricSnapshot metricSnapshot = metricManager.GetSnapshot();
     RestUsageSnapshot hbmUsage;
     RestUsageSnapshot dramUsage;
+    RestUsageSnapshot ssdUsage;
     ret = BuildUsageFromMedium(segments, kLowerMediumHbm, hbmUsage);
     if (ret != MMC_OK) {
         return ret;
@@ -450,10 +451,17 @@ Result MmcRestApiFacade::BuildMetricsSummary(bool serviceReady, std::string &res
     if (ret != MMC_OK) {
         return ret;
     }
+    // SSD usage 可能为空（未配置 SSD），不阻塞流程
+    BuildUsageFromMedium(segments, kLowerMediumSsd, ssdUsage);
 
     std::ostringstream oss;
-    oss << "keys=" << keys.size() << " evict=" << metricSnapshot.evictCount << " hbm_used=" << BuildUsedText(hbmUsage)
-        << " dram_used=" << BuildUsedText(dramUsage) << " alloc_req=" << metricSnapshot.allocRequestCount
+    oss << "keys=" << keys.size() << " evict=" << metricSnapshot.evictCount
+        << " evict_to_ssd=" << metricSnapshot.evictToSsdCount
+        << " ssd_evict_delete=" << metricSnapshot.ssdEvictDeleteCount
+        << " rewarm=" << metricSnapshot.rewarmCount << " rewarm_fail=" << metricSnapshot.rewarmFailCount
+        << " hbm_used=" << BuildUsedText(hbmUsage)
+        << " dram_used=" << BuildUsedText(dramUsage) << " ssd_used=" << BuildUsedText(ssdUsage)
+        << " alloc_req=" << metricSnapshot.allocRequestCount
         << " alloc_success=" << metricSnapshot.allocSuccessCount << " alloc_fail=" << metricSnapshot.allocFailureCount
         << " batch_alloc_req=" << metricSnapshot.batchAllocRequestCount
         << " batch_alloc_success=" << metricSnapshot.batchAllocSuccessCount
@@ -587,6 +595,14 @@ Result MmcRestApiFacade::BuildPrometheusMetrics(bool serviceReady, std::string &
                            metricSnapshot.unmountSuccessCount, metricSnapshot.unmountFailureCount);
     AppendMetricHeader(oss, "memcache_evict_operations_total", "Total number of evict operations", "counter");
     AppendMetricValue(oss, "memcache_evict_operations_total", metricSnapshot.evictCount);
+    AppendMetricHeader(oss, "memcache_evict_to_ssd_total", "Total number of eviction to SSD", "counter");
+    AppendMetricValue(oss, "memcache_evict_to_ssd_total", metricSnapshot.evictToSsdCount);
+    AppendMetricHeader(oss, "memcache_ssd_evict_delete_total", "Total number of SSD eviction deletes", "counter");
+    AppendMetricValue(oss, "memcache_ssd_evict_delete_total", metricSnapshot.ssdEvictDeleteCount);
+    AppendMetricHeader(oss, "memcache_rewarm_total", "Total number of rewarm operations", "counter");
+    AppendMetricValue(oss, "memcache_rewarm_total", metricSnapshot.rewarmCount);
+    AppendMetricHeader(oss, "memcache_rewarm_failed_total", "Total number of failed rewarm operations", "counter");
+    AppendMetricValue(oss, "memcache_rewarm_failed_total", metricSnapshot.rewarmFailCount);
     AppendMetricHeader(oss, "memcache_stored_keys", "Total number of stored keys", "gauge");
     AppendMetricValue(oss, "memcache_stored_keys", keys.size());
 

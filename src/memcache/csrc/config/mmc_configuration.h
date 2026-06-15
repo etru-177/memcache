@@ -186,6 +186,7 @@ public:
                       VUInt64Range::Create(OCK_MMC_METRICS_REPORT_INTERVAL_SECONDS.first, MIN_INTERVAL_SECONDS,
                                            MAX_INTERVAL_SECONDS),
                       0);
+        AddStrConf(OCK_MMC_LOCAL_SERVICE_SSD_SIZE, VNoCheck::Create(), 0);
         AddBoolConf(OCK_MMC_META_HA_ENABLE, VStrEnum::Create(OCK_MMC_META_HA_ENABLE.first, BOOL_ENUM_STR), 0);
         AddStrConf(OCK_MMC_LOG_LEVEL, VStrEnum::Create(OCK_MMC_LOG_LEVEL.first, LOG_LEVEL_ENUM_STR), 0);
         AddStrConf(OCK_MMC_LOG_PATH, VStrLength::Create(OCK_MMC_LOG_PATH.first, PATH_MAX_LEN), 0);
@@ -225,7 +226,6 @@ public:
         AddStrConf(OCK_MMC_CS_TLS_DECRYPTER_PATH,
                    VStrLength::Create(OCK_MMC_CS_TLS_DECRYPTER_PATH.first, TLS_PATH_MAX_LEN), 0);
 
-        AddBoolConf(OCK_MMC_UBS_IO_ENABLE, VNoCheck::Create(), 0);
     }
 
     void GetMetaServiceConfig(mmc_meta_service_config_t &config)
@@ -249,7 +249,6 @@ public:
         config.metricsReportIntervalSeconds = GetUInt64(ConfConstant::OCK_MMC_METRICS_REPORT_INTERVAL_SECONDS);
         GetAccTlsConfig(config.accTlsConfig);
         GetConfigStoreTlsConfig(config.configStoreTlsConfig);
-        config.ubsIoEnable = GetBool(ConfConstant::OCK_MMC_UBS_IO_ENABLE);
     }
 };
 
@@ -294,6 +293,7 @@ public:
         AddStrConf(OKC_MMC_LOCAL_SERVICE_MAX_DRAM_SIZE, VNoCheck::Create(), 0);
         AddStrConf(OKC_MMC_LOCAL_SERVICE_HBM_SIZE, VNoCheck::Create(), 0);
         AddStrConf(OKC_MMC_LOCAL_SERVICE_MAX_HBM_SIZE, VNoCheck::Create(), 0);
+        AddStrConf(OCK_MMC_LOCAL_SERVICE_SSD_SIZE, VNoCheck::Create(), 0);
 
         // HCOM TLS config
         AddStrConf(OKC_MMC_LOCAL_SERVICE_BM_HCOM_URL, VNoCheck::Create(), 0);
@@ -323,7 +323,6 @@ public:
             0);
         AddIntConf(OCK_MMC_CLIENT_AGGREGATE_NUM,
                    VIntRange::Create(OCK_MMC_CLIENT_AGGREGATE_NUM.first, 1, MAX_AGGREGATE_NUM), 0);
-        AddBoolConf(OCK_MMC_UBS_IO_ENABLE, VNoCheck::Create(), 0);
         AddStrConf(OCK_MMC_CLIENT_BATCH_CHUNK_SIZE, VNoCheck::Create(), 0);
         AddIntConf(OCK_MMC_CLIENT_BATCH_CHUNK_COUNT,
                    VIntRange::Create(OCK_MMC_CLIENT_BATCH_CHUNK_COUNT.first, 1, MAX_BATCH_CHUNK_COUNT), 0);
@@ -343,6 +342,7 @@ public:
             GetUInt64(ConfConstant::OKC_MMC_LOCAL_SERVICE_MAX_DRAM_SIZE.first, config.localDRAMSize);
         config.localHBMSize = GetUInt64(ConfConstant::OKC_MMC_LOCAL_SERVICE_HBM_SIZE.first, 0);
         config.localMaxHBMSize = GetUInt64(ConfConstant::OKC_MMC_LOCAL_SERVICE_MAX_HBM_SIZE.first, config.localHBMSize);
+        config.localSsdSize = GetUInt64(ConfConstant::OCK_MMC_LOCAL_SERVICE_SSD_SIZE.first, 0);
         auto protocol = std::string(config.dataOpType);
         std::string logLevelStr = GetString(ConfConstant::OCK_MMC_LOG_LEVEL);
         StringToUpper(logLevelStr);
@@ -350,7 +350,6 @@ public:
         GetAccTlsConfig(config.accTlsConfig);
         GetHcomTlsConfig(config.hcomTlsConfig);
         GetConfigStoreTlsConfig(config.configStoreTlsConfig);
-        config.ubsIoEnable = GetBool(ConfConstant::OCK_MMC_UBS_IO_ENABLE);
     }
 
     void GetClientConfig(mmc_client_config_t &config)
@@ -370,7 +369,6 @@ public:
         StringToUpper(logLevelStr);
         config.logLevel = MmcOutLogger::Instance().GetLogLevel(logLevelStr);
         GetAccTlsConfig(config.tlsConfig);
-        config.ubsIoEnable = GetBool(ConfConstant::OCK_MMC_UBS_IO_ENABLE);
         SafeCopy(GetString(ConfConstant::OKC_MMC_LOCAL_SERVICE_PROTOCOL), config.dataOpType, PROTOCOL_SIZE);
     }
 
@@ -436,6 +434,12 @@ public:
             MMC_LOG_ERROR("ock.mmc.local_service.max.hbm.size(" << config.localMaxHBMSize
                                                                 << ") is smaller than ock.mmc.local_service.hbm.size("
                                                                 << config.localHBMSize << ");");
+            return MMC_INVALID_PARAM;
+        }
+
+        if (config.localSsdSize > MAX_SSD_SIZE) {
+            MMC_LOG_ERROR("ock.mmc.local_service.ssd.size(" << config.localSsdSize
+                                                            << ") exceeds (" << MAX_SSD_SIZE << ")");
             return MMC_INVALID_PARAM;
         }
 

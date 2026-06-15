@@ -246,11 +246,25 @@ Result MetaNetServer::HandleBatchUpdate(const NetContextPtr &context)
     context->GetRequest<BatchUpdateRequest>(req);
 
     auto &metaMgrProxy = metaService_->GetMetaMgrProxy();
+    MMC_LOG_DEBUG("HandleBatchUpdate recv, keysCnt=" << req.keys_.size() << ", operateId=" << req.operateId_);
     TP_TRACE_BEGIN(TP_MMC_META_BATCH_UPDATE);
     auto ret = metaMgrProxy->BatchUpdateState(req, resp);
     TP_TRACE_END(TP_MMC_META_BATCH_UPDATE, ret);
     (void)ret;
-    MMC_LOG_DEBUG("HandleBatchUpdate keys (size " << req.keys_.size() << ") finish: " << Join(req.keys_));
+
+    // 统计响应中的失败数量
+    size_t failCnt = 0;
+    for (auto r : resp.results_) {
+        if (r != MMC_OK) failCnt++;
+    }
+    if (failCnt > 0) {
+        MMC_LOG_WARN("HandleBatchUpdate done, keysCnt=" << req.keys_.size() << ", failCnt=" << failCnt
+                                                        << "/" << resp.results_.size() << ", ret=" << ret
+                                                        << ", keys=" << Join(req.keys_));
+    } else {
+        MMC_LOG_DEBUG("HandleBatchUpdate done, keysCnt=" << req.keys_.size() << ", all ok"
+                                                         << ", keys=" << Join(req.keys_));
+    }
 
     return context->Reply(req.msgId, resp);
 }

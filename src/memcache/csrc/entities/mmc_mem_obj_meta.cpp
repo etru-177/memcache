@@ -82,6 +82,8 @@ std::vector<MmcMemBlobPtr> MmcMemObjMeta::FreeBlobs(const std::string &key, MmcG
         if (ret != MMC_OK) {
             MMC_LOG_ERROR("remove op, meta update failed:" << ret);
         }
+        // P4: 释放 SSD blob 前异步通过 RPC 删除远端数据
+        MmcMemBlob::SsdPreFree(key, blobs[i]->GetDesc());
         ret = allocator->Free(blobs[i]);
         if (ret != MMC_OK) {
             MMC_LOG_ERROR("Error in free blobs! failed:" << ret);

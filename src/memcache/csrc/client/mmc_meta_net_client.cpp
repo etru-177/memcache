@@ -58,6 +58,8 @@ Result MetaNetClient::Start(const NetEngineOptions &config)
                                       std::bind(&MetaNetClient::HandleMetaReplicate, this, std::placeholders::_1));
     client->RegRequestReceivedHandler(LOCAL_META_OPCODE_REQ::LM_BLOB_COPY_REQ,
                                       std::bind(&MetaNetClient::HandleBlobCopy, this, std::placeholders::_1));
+    client->RegRequestReceivedHandler(LOCAL_META_OPCODE_REQ::LM_BLOB_DELETE_REQ,
+                                      std::bind(&MetaNetClient::HandleBlobDelete, this, std::placeholders::_1));
     client->RegRequestReceivedHandler(LOCAL_META_OPCODE_REQ::LM_REMOVE_ALL_REQ, nullptr);
     client->RegLinkBrokenHandler(std::bind(&MetaNetClient::HandleLinkBroken, this, std::placeholders::_1));
     /* start engine */
@@ -164,6 +166,23 @@ Result MetaNetClient::HandleLinkBroken(const NetLinkPtr &link)
         sleep(2ULL);
     }
     return MMC_ERROR;
+}
+
+Result MetaNetClient::HandleBlobDelete(const NetContextPtr &context)
+{
+    BlobDeleteRequest req;
+    BlobDeleteResponse resp;
+    context->GetRequest<BlobDeleteRequest>(req);
+    if (blobDeleteHandler_ != nullptr) {
+        resp.ret_ = blobDeleteHandler_(req.key_, req.blob_);
+        if (resp.ret_ != MMC_OK) {
+            MMC_LOG_ERROR("blobDelete failed, ret:" << resp.ret_ << ", key:" << req.key_);
+        }
+    } else {
+        MMC_LOG_ERROR("blobDeleteHandler_ is nullptr");
+        resp.ret_ = MMC_ERROR;
+    }
+    return context->Reply(req.msgId, resp);
 }
 } // namespace mmc
 } // namespace ock

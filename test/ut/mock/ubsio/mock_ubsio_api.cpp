@@ -26,9 +26,10 @@ std::vector<void*> gAllocatedBuffers;
 std::mutex gBufferMutex;
 
 // 初始化函数
-extern "C" int32_t UbsioKvCacheInit(int32_t deviceId)
+extern "C" int32_t UbsioKvCacheInit(int32_t deviceId, uint64_t ssdSize)
 {
     (void)deviceId;
+    (void)ssdSize;
     return 0;
 }
 

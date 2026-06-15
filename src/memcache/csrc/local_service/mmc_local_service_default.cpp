@@ -37,14 +37,6 @@ Result MmcLocalServiceDefault::Start(const mmc_local_service_config_t &config)
     }
     MMC_RETURN_ERROR(InitBm(), "Failed to init bm of local service " << name_);
 
-    if (options_.ubsIoEnable) {
-        if (InitUbsIo(config.deviceId) != MMC_OK) {
-            MMC_LOG_ERROR("Failed to init ubsIo of local service " << name_);
-            DestroyBm();
-            return MMC_ERROR;
-        }
-    }
-
     metaNetClient_ = MetaNetClientFactory::GetInstance(this->options_.discoveryURL, "MetaClientCommon").Get();
     MMC_ASSERT_RETURN(metaNetClient_.Get() != nullptr, MMC_NEW_OBJECT_FAILED);
     if (!metaNetClient_->Status()) {
@@ -63,6 +55,17 @@ Result MmcLocalServiceDefault::Start(const mmc_local_service_config_t &config)
             return MMC_ERROR;
         }
     }
+
+    if (options_.localSsdSize > 0) {
+        if (InitUbsIo(config.deviceId, options_.localSsdSize) != MMC_OK) {
+            MMC_LOG_ERROR("Failed to init ubsIo of local service " << name_);
+            DestroyBm();
+            metaNetClient_->Stop();
+            return MMC_ERROR;
+        }
+    } else {
+        MMC_LOG_INFO("SSD disabled (localSsdSize=0), rank=" << options_.rankId);
+    }
     pid_ = getpid();
 
     if (RegisterBm() != MMC_OK) {
@@ -76,7 +79,8 @@ Result MmcLocalServiceDefault::Start(const mmc_local_service_config_t &config)
         std::bind(&MmcLocalServiceDefault::UpdateMetaBackup, this, std::placeholders::_1, std::placeholders::_2,
                   std::placeholders::_3),
         std::bind(&MmcLocalServiceDefault::CopyBlob, this, std::placeholders::_1, std::placeholders::_2,
-                  std::placeholders::_3));
+                  std::placeholders::_3),
+        std::bind(&MmcLocalServiceDefault::BlobDelete, this, std::placeholders::_1, std::placeholders::_2));
     started_ = true;
     MMC_LOG_INFO("Started LocalService (" << name_ << ") server " << options_.discoveryURL
                                           << ", rank: " << options_.rankId);
@@ -175,23 +179,42 @@ Result MmcLocalServiceDefault::RegisterBm()
         }
         type = MoveDown(type);
     }
+    if (ubsIoProxyPtr_ != nullptr) {
+        req.mediaType_.emplace_back(MEDIA_SSD);
+        req.addr_.emplace_back(0);
+        req.capacity_.emplace_back(options_.localSsdSize);
+        MMC_LOG_INFO("mmc local register SSD capacity:" << options_.localSsdSize);
+    } else if (options_.localSsdSize > 0) {
+        MMC_LOG_ERROR("SSD configured (localSsdSize=" << options_.localSsdSize
+                       << ") but ubsIo proxy not initialized, rank=" << options_.rankId);
+    }
     req.blobMap_.clear();
 
     Response resp;
     std::unique_lock<std::mutex> lockGuard(blobMutex_);
-    auto chunk_start = blobMap_.begin();
+    auto it = blobMap_.begin();
     const auto end = blobMap_.end();
+    int count = 0;
 
-    while (chunk_start != end) {
-        auto chunk_end = chunk_start;
-        std::advance(chunk_end, std::min(blobRebuildSendMaxCount, static_cast<int>(std::distance(chunk_start, end))));
+    while (it != end) {
+        if (it->second.mediaType_ == MEDIA_SSD &&
+            ubsIoProxyPtr_ != nullptr &&
+            ubsIoProxyPtr_->Exist(it->first) != MMC_OK) {
+            MMC_LOG_WARN("SSD blob " << it->first << " no longer exists on SSD, removing from rebuild");
+            ++it;
+            continue;
+        }
+        req.blobMap_.insert({it->first, it->second});
+        ++it;
+        ++count;
 
-        req.blobMap_.insert(chunk_start, chunk_end);
-        MMC_LOG_INFO("mmc meta blob rebuild count " << req.blobMap_.size());
-        MMC_RETURN_ERROR(SyncCallMeta(req, resp, TIMEOUT_THIRTY), "bm register failed, bmRankId=" << req.rank_);
-        MMC_RETURN_ERROR(resp.ret_, "bm register failed, bmRankId=" << req.rank_ << ", retCode=" << resp.ret_);
-        chunk_start = chunk_end;
-        req.blobMap_.clear();
+        if (count >= blobRebuildSendMaxCount || it == end) {
+            MMC_LOG_INFO("mmc meta blob rebuild count " << req.blobMap_.size());
+            MMC_RETURN_ERROR(SyncCallMeta(req, resp, TIMEOUT_THIRTY), "bm register failed, bmRankId=" << req.rank_);
+            MMC_RETURN_ERROR(resp.ret_, "bm register failed, bmRankId=" << req.rank_ << ", retCode=" << resp.ret_);
+            req.blobMap_.clear();
+            count = 0;
+        }
     }
     lockGuard.unlock();
     MMC_RETURN_ERROR(SyncCallMeta(req, resp, TIMEOUT_THIRTY), "bm register failed, bmRankId=" << req.rank_);
@@ -200,12 +223,12 @@ Result MmcLocalServiceDefault::RegisterBm()
     return MMC_OK;
 }
 
-Result MmcLocalServiceDefault::InitUbsIo(int32_t deviceId)
+Result MmcLocalServiceDefault::InitUbsIo(int32_t deviceId, uint64_t ssdSize)
 {
     MmcUbsIoProxyPtr ubsIoProxy = MmcUbsIoProxyFactory::GetInstance("ubsIoProxyDefault");
     MMC_ASSERT_RETURN(ubsIoProxy != nullptr, MMC_ERROR);
     ubsIoProxyPtr_ = ubsIoProxy;
-    return ubsIoProxy->InitUbsIo(deviceId);
+    return ubsIoProxy->InitUbsIo(deviceId, ssdSize);
 }
 
 Result MmcLocalServiceDefault::UpdateMetaBackup(const std::vector<uint32_t> &ops, const std::vector<std::string> &keys,
@@ -249,8 +272,26 @@ Result MmcLocalServiceDefault::CopyBlob(const std::string& key, const MmcMemBlob
         return MMC_ERROR;
     }
 
-    if (dst.mediaType_ == MEDIA_SSD) {
-        if (!options_.ubsIoEnable || ubsIoProxyPtr_ == nullptr) {
+    if (src.mediaType_ == MEDIA_SSD) {
+        if (options_.localSsdSize == 0 || ubsIoProxyPtr_ == nullptr) {
+            MMC_LOG_ERROR("ubsIo proxy is null, src=" << src << ", dst=" << dst);
+            return MMC_ERROR;
+        }
+        if (src.size_ > dst.size_) {
+            MMC_LOG_ERROR("src size " << src.size_ << " exceeds dst size " << dst.size_
+                          << ", key=" << key);
+            return MMC_ERROR;
+        }
+        TP_TRACE_BEGIN(TP_MMC_LOCAL_UBS_IO_GET);
+        Result ret = ubsIoProxyPtr_->Get(key, reinterpret_cast<void*>(dst.gva_), src.size_);
+        TP_TRACE_END(TP_MMC_LOCAL_UBS_IO_GET, ret);
+        if (ret != MMC_OK) {
+            MMC_LOG_ERROR("ubsIo get failed:" << ret << ", src=" << src << ", dst=" << dst);
+            return MMC_ERROR;
+        }
+        MMC_LOG_DEBUG("CopyBlob SSD->DRAM ok, key=" << key << ", size=" << src.size_);
+    } else if (dst.mediaType_ == MEDIA_SSD) {
+        if (options_.localSsdSize == 0 || ubsIoProxyPtr_ == nullptr) {
             MMC_LOG_ERROR("ubsIo proxy is null, src=" << src << ", dst=" << dst);
             return MMC_ERROR;
         }
@@ -265,13 +306,39 @@ Result MmcLocalServiceDefault::CopyBlob(const std::string& key, const MmcMemBlob
             MMC_LOG_ERROR("ubsIo put failed:" << ret << ", src=" << src << ", dst=" << dst);
             return MMC_ERROR;
         }
+        MMC_LOG_DEBUG("CopyBlob DRAM->SSD ok, key=" << key << ", size=" << src.size_);
     } else {
         auto ret = bmProxyPtr_->Copy(src.gva_, dst.gva_, dst.size_, SMEMB_COPY_G2G);
         if (ret != MMC_OK) {
             MMC_LOG_ERROR("bm put failed:" << ret << ", src=" << src << ", dst=" << dst);
             return MMC_ERROR;
         }
+        MMC_LOG_DEBUG("CopyBlob G2G ok, key=" << key << ", size=" << dst.size_);
     }
+    return MMC_OK;
+}
+
+Result MmcLocalServiceDefault::BlobDelete(const std::string& key, const MmcMemBlobDesc &blob)
+{
+    MMC_LOG_DEBUG("BlobDelete key=" << key << ", rank=" << blob.rank_);
+
+    if (options_.localSsdSize == 0 || ubsIoProxyPtr_ == nullptr) {
+        MMC_LOG_ERROR("ubsIo proxy is null or ssd disabled, key=" << key);
+        return MMC_ERROR;
+    }
+
+    if (blob.mediaType_ != MEDIA_SSD) {
+        MMC_LOG_ERROR("blob type is mismatch, expected SSD(" << MEDIA_SSD << "), got "
+                                                             << blob.mediaType_ << ", key=" << key);
+        return MMC_ERROR;
+    }
+
+    Result ret = ubsIoProxyPtr_->Delete(key);
+    if (ret != MMC_OK) {
+        MMC_LOG_ERROR("ubsIo delete failed:" << ret << ", key=" << key << ", rank=" << blob.rank_);
+        return ret;
+    }
+    MMC_LOG_DEBUG("Deleted blob successfully, key=" << key);
     return MMC_OK;
 }
 } // namespace mmc
