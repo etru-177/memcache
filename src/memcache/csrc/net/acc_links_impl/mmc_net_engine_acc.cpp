@@ -449,7 +449,7 @@ Result NetEngineAcc::HandleNeqRequest(const TcpReqContext &context)
     /* use result variable for real opcode */
     MMC_LOG_DEBUG("HandleNeqRequest Header " << context.Header().ToString());
     int16_t opCode = context.Header().result;
-    MMC_ASSERT_RETURN(opCode < gHandlerSize, MMC_NET_REQ_HANDLE_NO_FOUND);
+    MMC_ASSERT_RETURN(opCode >= gHandlerMin && opCode < gHandlerMax, MMC_NET_REQ_HANDLE_NO_FOUND);
     if (reqReceivedHandlers_[opCode] == nullptr) {
         /*  client do reply response */
         MMC_ASSERT_RETURN(HandleAllRequests4Response(context) == MMC_OK, MMC_ERROR);
