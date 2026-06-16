@@ -17,6 +17,7 @@ BUILD_MODE="RELEASE"
 BUILD_PYTHON="ON"
 BUILD_TEST="OFF"
 INCREMENTAL="OFF"
+BUILD_UBSIO="OFF"
 
 show_help() {
     echo "Usage: $0 [options]"
@@ -24,6 +25,7 @@ show_help() {
     echo "  --build_mode <mode>     Set build mode (RELEASE/DEBUG/ASAN), default: RELEASE"
     echo "  --build_test <ON/OFF>   Enable/disable package test utilities, default: OFF"
     echo "  --incremental           Enable incremental build (skip clean), default: OFF"
+    echo "  --build_ubsio <ON/OFF>  Enable/disable build and package ubs-io (SSD backend), default: OFF"
     echo "  --help                  Show this help message"
     echo ""
     echo "Example:"
@@ -45,6 +47,10 @@ while [[ "$#" -gt 0 ]]; do
             INCREMENTAL="ON"
             shift 1
             ;;
+        --build_ubsio)
+            BUILD_UBSIO="$2"
+            shift 2
+            ;;
         --help)
             show_help
             exit 0
@@ -60,11 +66,12 @@ done
 
 echo "BUILD_MODE: $BUILD_MODE"
 echo "BUILD_PYTHON: $BUILD_PYTHON"
+echo "BUILD_UBSIO: $BUILD_UBSIO"
 
 cd "${ROOT_PATH}"
 
-bash build.sh "${BUILD_MODE}" OFF OFF "${BUILD_PYTHON}" ON "${INCREMENTAL}"
+bash build.sh "${BUILD_MODE}" OFF OFF "${BUILD_PYTHON}" ON "${INCREMENTAL}" "${BUILD_UBSIO}"
 
-bash run_pkg_maker/make_run.sh "${BUILD_TEST}"
+bash run_pkg_maker/make_run.sh "${BUILD_TEST}" "${BUILD_UBSIO}"
 
 cd "${CURRENT_DIR}"

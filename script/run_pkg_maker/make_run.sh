@@ -10,6 +10,7 @@
 # See the Mulan PSL v2 for more details.
 
 BUILD_TEST=${1:-OFF}
+BUILD_UBSIO=${2:-OFF}
 
 set -e
 readonly BASH_PATH=$(dirname $(readlink -f "$0"))
@@ -61,6 +62,11 @@ else
 fi
 cp "${OUTPUT_DIR}"/memcache/wheel/*.whl ${PKG_DIR}/"${ARCH_OS}"/wheel/
 cp "${PROJECT_DIR}"/config/* ${PKG_DIR}/config
+
+if [ "$BUILD_UBSIO" = "ON" ]; then
+    mkdir -p ${PKG_DIR}/3rdparty/ubsio
+    cp -r "${OUTPUT_DIR}"/3rdparty/ubsio/* ${PKG_DIR}/3rdparty/ubsio/
+fi
 
 if [ "$BUILD_TEST" = "ON" ]; then
     mkdir -p ${PKG_DIR}/"${ARCH_OS}"/script/mock_server

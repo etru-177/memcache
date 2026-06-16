@@ -42,6 +42,7 @@ option(BUILD_GIT_COMMIT_GEN_FILE "generate commit log file" ON)
 option(BUILD_PYTHON "build python file" ON)
 option(ENABLE_PTRACER "build ptracer" OFF)
 option(BUILD_CPP_EXAMPLE "Compile and package the c++ example." OFF)
+option(BUILD_UBSIO "Enable/disable build and package ubs-io (SSD backend)" OFF)
 
 if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE RELEASE)
@@ -204,6 +205,9 @@ include_directories(
 )
 
 add_subdirectory(3rdparty)
+
+# include ubs-io cmake after TARGET_INSTALL_DIR set
+include(cmake/config_ubsio.cmake)
 
 set(HYBRID_SRC ${PROJECT_SOURCE_DIR}/3rdparty/memfabric_hybrid/src)
 file(GLOB_RECURSE ALL_HEADERS

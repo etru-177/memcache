@@ -15,6 +15,7 @@ export BUILD_OPEN_ABI=${3:-OFF}
 export BUILD_PYTHON=${4:-ON}
 export ENABLE_PTRACER=${5:-ON}
 export INCREMENTAL=${6:-OFF}
+export BUILD_UBSIO=${7:-OFF}
 
 readonly SCRIPT_FULL_PATH=$(dirname $(readlink -f "$0"))
 readonly PROJECT_FULL_PATH=$(dirname "$SCRIPT_FULL_PATH")
@@ -93,6 +94,7 @@ else
     export GENERATOR="Unix Makefiles"
     export MAKE_CMD=make
 fi
+
 cmake \
     -G "$GENERATOR" \
     -DCMAKE_BUILD_TYPE="${BUILD_MODE}" \
@@ -100,6 +102,7 @@ cmake \
     -DBUILD_OPEN_ABI="${BUILD_OPEN_ABI}" \
     -DBUILD_PYTHON="${BUILD_PYTHON}" \
     -DENABLE_PTRACER="${ENABLE_PTRACER}" \
+    -DBUILD_UBSIO="${BUILD_UBSIO}" \
     -S . -B build/
 
 ${MAKE_CMD} install -j"${MMC_BUILD_JOBS}" -C build/
@@ -108,6 +111,9 @@ FABRIC_PROJ_DIR=${PROJ_DIR}/3rdparty/memfabric_hybrid
 
 mkdir -p "${PROJ_DIR}/src/memcache/python/memcache_hybrid/lib"
 \cp -v "${PROJ_DIR}/output/memcache/lib64/libmf_memcache.so" "${PROJ_DIR}/src/memcache/python/memcache_hybrid/lib"
+if [ "${BUILD_UBSIO:-OFF}" == "ON" ]; then
+    \cp -v "${PROJ_DIR}/output/3rdparty/ubsio/lib/"*.so* "${PROJ_DIR}/src/memcache/python/memcache_hybrid/lib" 2>/dev/null || true
+fi
 mkdir -p "${PROJ_DIR}/src/memcache/python/memcache_hybrid/config"
 \cp -v "${PROJ_DIR}"/config/* "${PROJ_DIR}/src/memcache/python/memcache_hybrid/config"
 
@@ -119,6 +125,9 @@ rm -rf build memcache_hybrid.egg-info
 export LD_LIBRARY_PATH="${PROJ_DIR}/src/memcache/python/memcache_hybrid/lib":$LD_LIBRARY_PATH # fix `auditwheel repair` failed
 export LD_LIBRARY_PATH="${FABRIC_PROJ_DIR}/output/smem/lib64":$LD_LIBRARY_PATH # fix `auditwheel repair` failed
 export LD_LIBRARY_PATH="${FABRIC_PROJ_DIR}/output/hybm/lib64":$LD_LIBRARY_PATH # fix `auditwheel repair` failed
+if [ "${BUILD_UBSIO:-OFF}" == "ON" ]; then
+    export LD_LIBRARY_PATH="${PROJ_DIR}/output/3rdparty/ubsio/lib":$LD_LIBRARY_PATH # fix `auditwheel repair` failed
+fi
 python3 setup.py bdist_wheel
 
 mkdir -p "${PROJ_DIR}/output/memcache/wheel"
