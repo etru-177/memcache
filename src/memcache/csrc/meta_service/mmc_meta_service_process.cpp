@@ -333,6 +333,11 @@ int MmcMetaServiceProcess::StartHttpServer()
         return ret;
     }
 
+    if (host != "127.0.0.1") {
+        MMC_LOG_ERROR("HTTP server bind address must be 127.0.0.1, got: " << host);
+        return MMC_INVALID_PARAM;
+    }
+
     MMC_LOG_INFO("Starting HTTP server on " << host << ":" << port);
     if (leaderElection_ == nullptr) {
         MMC_LOG_INFO("HA snapshot provider will return default state because leader election is not initialized");

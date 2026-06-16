@@ -107,3 +107,11 @@ TEST_F(TestMetaServiceUrlResolve, ResolveUrlField_WithEmptyUrl_ReturnsEmpty)
     const std::string resolvedUrl = Configuration::ResolveUrlField("");
     EXPECT_TRUE(resolvedUrl.empty());
 }
+
+TEST_F(TestMetaServiceUrlResolve, ParseHttpLocalhostUrl_ReturnsCorrectIpAndPort)
+{
+    UrlParser parser;
+    ASSERT_TRUE(parser.Initialize("http://127.0.0.1:8080"));
+    EXPECT_EQ(parser.GetIp(), "127.0.0.1");
+    EXPECT_EQ(parser.GetPort(), 8080U);
+}

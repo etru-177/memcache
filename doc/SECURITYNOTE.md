@@ -5,6 +5,7 @@
 | Local/Client客户端 | 客户端通信IP地址 | 随机端口（由操作系统自动分配） | meta service    | meta_service_url中的\<ip\> | meta_service_url中的\<port\> , 默认值5000, 可配范围[1025, 65535] | TCP           | 用于元数据对象管理                | 是         | TLS  |
 | memory fabric实例 | 客户端通信IP地址 | 随机端口（由操作系统自动分配） | memory fabric实例 | config_store_url中的\<ip\> | config_store_url中的\<port\> , 默认值6000, 可配范围[1025, 65535] | TCP           | 用于memory fabric中BM信息交换同步 | 是         | TLS  |
 | 参与hcom通信的实例     | 客户端通信IP地址 | 随机端口（由操作系统自动分配） | 参与hcom通信的实例     | hcom_url中的\<ip\>         | hcom_url中的\<port\> , 默认值7000, 可配范围[1025, 65535]         | TCP/RDMA/SDMA | 用于hcom通信                 | 是         | TLS  |
+| 本机管理/监控客户端      | 127.0.0.1 | 随机端口（由操作系统自动分配） | meta service    | 127.0.0.1                | metrics_url中的\<port\> , 默认值8000, 可配范围[1025, 65535]      | HTTPS/HTTP    | 用于RESTful API管理与监控        | 是         | TLS(可选)/无认证 |
 
 说明：
 支持通过配置文件配置TLS私钥、证书、口令等，进行TLS安全连接。
@@ -63,7 +64,6 @@
 | 注册处理新链接事件函数  | `void RegisterNewLinkHandler(const AccNewLinkHandler &h);`                                                                                             |
 | 注册密码解密的函数    | `void RegisterDecryptHandler(const AccDecryptHandler &h);`                                                                                             |
 | 加载安全认证所需动态库  | `int32_t LoadDynamicLib(const std::string &dynLibPath);`                                                                                               |
-
 
 ### 依赖软件声明
 
