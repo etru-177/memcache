@@ -203,12 +203,12 @@ Result MmcUbsIoProxy::BatchGetWithHBM(const std::vector<std::string> &keys,
     for (const auto &key : keys) {
         keyPtrs.emplace_back(key.c_str());
     }
-    void*** bufs = new void** [lengthsRows];
+    void*** bufs = new (std::nothrow) void** [lengthsRows];
     if (bufs == nullptr) {
         MMC_LOG_ERROR("alloc buf failed");
         return MMC_ERROR;
     }
-    size_t** lengths = new size_t* [lengthsRows];
+    size_t** lengths = new (std::nothrow) size_t* [lengthsRows];
     if (lengths == nullptr) {
         MMC_LOG_ERROR("alloc length failed");
         delete[] bufs;

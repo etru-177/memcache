@@ -11,6 +11,7 @@
 */
 
 #include <iostream>
+#include <unistd.h>
 
 #include "mmc_client.h"
 #include "mmc_client_default.h"
@@ -56,6 +57,20 @@ static bool CopyPutOptions(const ReplicateConfig &replicateConfig, mmc_put_optio
     return true;
 }
 
+SignalBlocker::SignalBlocker()
+{
+    sigemptyset(&set_);
+    sigaddset(&set_, SIGINT);
+    sigaddset(&set_, SIGTERM);
+    sigaddset(&set_, SIGHUP);
+    pthread_sigmask(SIG_BLOCK, &set_, &oldset_);
+}
+
+SignalBlocker::~SignalBlocker()
+{
+    pthread_sigmask(SIG_SETMASK, &oldset_, nullptr);
+}
+
 // ResourceTracker implementation using singleton pattern
 ResourceTracker &ResourceTracker::getInstance()
 {
@@ -87,18 +102,21 @@ ResourceTracker::~ResourceTracker()
 
 void ResourceTracker::registerInstance(MmcacheStore *instance)
 {
+    SignalBlocker blocker;
     std::lock_guard<std::mutex> lock(mutex_);
     instances_.insert(instance);
 }
 
 void ResourceTracker::unregisterInstance(MmcacheStore *instance)
 {
+    SignalBlocker blocker;
     std::lock_guard<std::mutex> lock(mutex_);
     instances_.erase(instance);
 }
 
 void ResourceTracker::cleanupAllResources()
 {
+    SignalBlocker blocker;
     std::lock_guard<std::mutex> lock(mutex_);
 
     // Perform cleanup outside the lock to avoid potential deadlocks
@@ -113,7 +131,9 @@ void ResourceTracker::cleanupAllResources()
 
 void ResourceTracker::signalHandler(int signal)
 {
-    std::cout << "Received signal " << signal << ", cleaning up resources" << std::endl;
+    const char msg[] = "Received signal, cleaning up resources\n";
+    if (write(STDERR_FILENO, msg, sizeof(msg) - 1) < 0) {}
+
     getInstance().cleanupAllResources();
 
     // Re-raise the signal with default handler to allow normal termination

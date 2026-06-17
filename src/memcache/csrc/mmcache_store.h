@@ -60,6 +60,19 @@ private:
     std::unordered_set<MmcacheStore *> instances_;
 };
 
+class SignalBlocker {
+public:
+    SignalBlocker();
+    ~SignalBlocker();
+
+    SignalBlocker(const SignalBlocker &) = delete;
+    SignalBlocker &operator=(const SignalBlocker &) = delete;
+
+private:
+    sigset_t set_{};
+    sigset_t oldset_{};
+};
+
 class MmcacheStore : public ock::mmc::ObjectStore {
 public:
     MmcacheStore();

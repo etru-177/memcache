@@ -140,7 +140,7 @@ bool MmcMetaServiceProcess::CheckIsRunning()
 {
     const std::string filePath = "/tmp/mmc_meta_service";
     const std::string fileName = filePath + ".lock";
-    const int fd = open(fileName.c_str(), O_WRONLY | O_CREAT, 0600);
+    const int fd = open(fileName.c_str(), O_WRONLY | O_CREAT | O_NOFOLLOW, 0600);
     if (fd < 0) {
         std::cerr << "Open file " << fileName.c_str() << " failed, error message is " << strerror(errno) << "."
                   << std::endl;
