@@ -52,6 +52,7 @@ smemBmCopyBatchFunc MFSmemApi::gSmemBmCopyBatch = nullptr;
 smemBmRegisterUserMemFunc MFSmemApi::gSmemBmRegisterUserMem = nullptr;
 smemBmUnregisterUserMemFunc MFSmemApi::gSmemBmUnregisterUserMem = nullptr;
 smemBmWaitFunc MFSmemApi::gSmemBmWait = nullptr;
+smemBmGvaToVaFunc MFSmemApi::gSmemBmGvaToVa = nullptr;
 
 std::string MFSmemApi::ResolveLibDir()
 {
@@ -95,6 +96,7 @@ Result MFSmemApi::LoadAllSymbols()
         {reinterpret_cast<void **>(&gSmemBmRegisterUserMem), "smem_bm_register_user_mem"},
         {reinterpret_cast<void **>(&gSmemBmUnregisterUserMem), "smem_bm_unregister_user_mem"},
         {reinterpret_cast<void **>(&gSmemBmWait), "smem_bm_wait"},
+        {reinterpret_cast<void **>(&gSmemBmGvaToVa), "smem_bm_gva_to_va"},
     };
 
     for (const auto &symbol : kSmemSymbols) {
@@ -154,7 +156,7 @@ Result MFSmemApi::LoadLibrary(const std::string &libDirPath)
     }
 
     gLoaded = true;
-    MMC_LOG_INFO("MFSmemApi LoadLibrary: loaded 20 smem_bm symbols from " << realPath);
+    MMC_LOG_INFO("MFSmemApi LoadLibrary: loaded 21 smem_bm symbols from " << realPath);
     return MMC_OK;
 }
 
@@ -180,6 +182,7 @@ void MFSmemApi::ClearAllSymbols()
     gSmemBmRegisterUserMem = nullptr;
     gSmemBmUnregisterUserMem = nullptr;
     gSmemBmWait = nullptr;
+    gSmemBmGvaToVa = nullptr;
 }
 
 void MFSmemApi::CleanupLibrary()

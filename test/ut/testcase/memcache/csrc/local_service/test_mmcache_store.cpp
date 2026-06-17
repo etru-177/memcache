@@ -109,7 +109,7 @@ static int GenerateLocalConf(std::string confPath)
     outFile << "ock.mmc.client.read_thread_pool.size = 32" << std::endl;
     outFile << "ock.mmc.client.write_thread_pool.size = 4" << std::endl;
 
-    outFile << "ock.mmc.local_service.ssd.size = 0" << std::endl;
+    outFile << "ock.mmc.local_service.storage.size = 0" << std::endl;
 
     outFile.close();
     return 0;
@@ -439,8 +439,8 @@ TEST_F(TestMmcacheStore, SsdConfig_InitsUbsIoWithSsdSize)
     outFile << "ock.mmc.client.timeout.seconds = 60" << std::endl;
     outFile << "ock.mmc.client.read_thread_pool.size = 32" << std::endl;
     outFile << "ock.mmc.client.write_thread_pool.size = 4" << std::endl;
-    //ssd.size > 0 — LocalService 调用 InitUbsIo(deviceId, ssdSize)
-    outFile << "ock.mmc.local_service.ssd.size = 1GB" << std::endl;
+    //storage.size > 0 — LocalService 调用 InitUbsIo(deviceId, ssdSize)
+    outFile << "ock.mmc.local_service.storage.size = 1GB" << std::endl;
     outFile.close();
 
     // 启动 MetaService
@@ -499,7 +499,7 @@ TEST_F(TestMmcacheStore, SsdEvictHandler_DramToSsdCopy)
     outFile << "ock.mmc.client.timeout.seconds = 60" << std::endl;
     outFile << "ock.mmc.client.read_thread_pool.size = 32" << std::endl;
     outFile << "ock.mmc.client.write_thread_pool.size = 4" << std::endl;
-    outFile << "ock.mmc.local_service.ssd.size = 1GB" << std::endl;
+    outFile << "ock.mmc.local_service.storage.size = 1GB" << std::endl;
     outFile.close();
 
     mmc_meta_service_config_t metaServiceConfig{};
@@ -572,7 +572,7 @@ TEST_F(TestMmcacheStore, SsdExistQueryHandler)
     outFile << "ock.mmc.client.timeout.seconds = 60" << std::endl;
     outFile << "ock.mmc.client.read_thread_pool.size = 32" << std::endl;
     outFile << "ock.mmc.client.write_thread_pool.size = 4" << std::endl;
-    outFile << "ock.mmc.local_service.ssd.size = 1GB" << std::endl;
+    outFile << "ock.mmc.local_service.storage.size = 1GB" << std::endl;
     outFile.close();
 
     mmc_meta_service_config_t metaServiceConfig{};
@@ -630,7 +630,7 @@ TEST_F(TestMmcacheStore, SsdRemoveHandler)
     outFile << "ock.mmc.client.timeout.seconds = 60" << std::endl;
     outFile << "ock.mmc.client.read_thread_pool.size = 32" << std::endl;
     outFile << "ock.mmc.client.write_thread_pool.size = 4" << std::endl;
-    outFile << "ock.mmc.local_service.ssd.size = 1GB" << std::endl;
+    outFile << "ock.mmc.local_service.storage.size = 1GB" << std::endl;
     outFile.close();
 
     mmc_meta_service_config_t metaServiceConfig{};
@@ -664,7 +664,7 @@ TEST_F(TestMmcacheStore, SsdRemoveHandler)
 }
 
 // ===== LocalService BlobDelete handler =====
-// When ssd.size=0, LocalService does not initialize SSD, BlobDelete handler path is harmless
+// When storage.size=0, LocalService does not initialize SSD, BlobDelete handler path is harmless
 TEST_F(TestMmcacheStore, SsdDisabled_NoUbsIoInit)
 {
     auto store = ObjectStore::CreateObjectStore();
@@ -710,7 +710,7 @@ TEST_F(TestMmcacheStore, CopyBlob_SsdToDram)
     outFile << "ock.mmc.client.timeout.seconds = 60" << std::endl;
     outFile << "ock.mmc.client.read_thread_pool.size = 32" << std::endl;
     outFile << "ock.mmc.client.write_thread_pool.size = 4" << std::endl;
-    outFile << "ock.mmc.local_service.ssd.size = 1GB" << std::endl;
+    outFile << "ock.mmc.local_service.storage.size = 1GB" << std::endl;
     outFile.close();
 
     mmc_meta_service_config_t metaServiceConfig{};
@@ -777,8 +777,8 @@ TEST_F(TestMmcacheStore, RegisterBm_ReportsSsdMount)
     outFile << "ock.mmc.client.timeout.seconds = 60" << std::endl;
     outFile << "ock.mmc.client.read_thread_pool.size = 32" << std::endl;
     outFile << "ock.mmc.client.write_thread_pool.size = 4" << std::endl;
-    // ssd.size > 0 → RegisterBm reports MEDIA_SSD
-    outFile << "ock.mmc.local_service.ssd.size = 1GB" << std::endl;
+    // storage.size > 0 → RegisterBm reports MEDIA_SSD
+    outFile << "ock.mmc.local_service.storage.size = 1GB" << std::endl;
     outFile.close();
 
     mmc_meta_service_config_t metaServiceConfig{};

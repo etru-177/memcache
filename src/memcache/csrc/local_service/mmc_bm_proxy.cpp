@@ -436,5 +436,23 @@ Result MmcBmProxy::CopyWait()
     return ret;
 }
 
+Result MmcBmProxy::GvaToVa(uint64_t gva, MediaType mediaType, uint64_t &va)
+{
+    if (handle_ == nullptr) {
+        MMC_LOG_ERROR("GvaToVa failed, bm handle is null");
+        return MMC_ERROR;
+    }
+    smem_bm_mem_type_t memType =
+        mediaType == MEDIA_HBM ? SMEM_MEM_TYPE_LOCAL_DEVICE : SMEM_MEM_TYPE_LOCAL_HOST;
+    void *vaPtr = nullptr;
+    int32_t ret = MFSmemApi::SmemBmGvaToVa(handle_, reinterpret_cast<void *>(gva), memType, &vaPtr);
+    if (ret != MMC_OK || vaPtr == nullptr) {
+        MMC_LOG_ERROR("GvaToVa failed, gva=" << gva << ", mediaType=" << mediaType << ", ret=" << ret);
+        return MMC_ERROR;
+    }
+    va = reinterpret_cast<uint64_t>(vaPtr);
+    return MMC_OK;
+}
+
 } // namespace mmc
 } // namespace ock

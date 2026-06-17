@@ -74,6 +74,9 @@ public:
 
     Result CopyWait();
 
+    Result GvaToVa(uint64_t gva, MediaType mediaType, uint64_t &va);
+    smem_bm_t GetHandle() const { return handle_; }
+
     uint64_t GetGva(MediaType type) const
     {
         if (type == MEDIA_NONE) {

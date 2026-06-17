@@ -118,6 +118,10 @@ Result MmcLocalServiceDefault::InitBm()
                                        .hcomTlsConfig = options_.hcomTlsConfig,
                                        .storeTlsConfig = options_.configStoreTlsConfig};
 
+    uint32_t createFlags = options_.flags;
+    if (options_.localSsdSize > 0 && options_.localDRAMSize > 0) {
+        createFlags |= SMEM_BM_FLAG_DRAM_MAP_HOST_VA;
+    }
     mmc_bm_create_config_t createConfig = {.id = options_.createId,
                                            .memberSize = options_.worldSize,
                                            .dataOpType = options_.dataOpType,
@@ -125,7 +129,7 @@ Result MmcLocalServiceDefault::InitBm()
                                            .localMaxDRAMSize = options_.localMaxDRAMSize,
                                            .localHBMSize = options_.localHBMSize,
                                            .localMaxHBMSize = options_.localMaxHBMSize,
-                                           .flags = options_.flags};
+                                           .flags = createFlags};
 
     MmcBmProxyPtr bmProxy = MmcBmProxyFactory::GetInstance("bmProxyDefault");
     MMC_ASSERT_RETURN(bmProxy != nullptr, MMC_ERROR);
@@ -283,7 +287,13 @@ Result MmcLocalServiceDefault::CopyBlob(const std::string& key, const MmcMemBlob
             return MMC_ERROR;
         }
         TP_TRACE_BEGIN(TP_MMC_LOCAL_UBS_IO_GET);
-        Result ret = ubsIoProxyPtr_->Get(key, reinterpret_cast<void*>(dst.gva_), src.size_);
+        uint64_t dstVa = 0;
+        Result gvaRet = bmProxyPtr_->GvaToVa(dst.gva_, static_cast<MediaType>(dst.mediaType_), dstVa);
+        if (gvaRet != MMC_OK) {
+            MMC_LOG_ERROR("gva_to_va failed for dst gva=" << dst.gva_ << ", ret=" << gvaRet);
+            return gvaRet;
+        }
+        Result ret = ubsIoProxyPtr_->Get(key, reinterpret_cast<void*>(dstVa), src.size_);
         TP_TRACE_END(TP_MMC_LOCAL_UBS_IO_GET, ret);
         if (ret != MMC_OK) {
             MMC_LOG_ERROR("ubsIo get failed:" << ret << ", src=" << src << ", dst=" << dst);
@@ -300,7 +310,13 @@ Result MmcLocalServiceDefault::CopyBlob(const std::string& key, const MmcMemBlob
             return MMC_INVALID_PARAM;
         }
         TP_TRACE_BEGIN(TP_MMC_LOCAL_UBS_IO_PUT);
-        Result ret = ubsIoProxyPtr_->Put(key, reinterpret_cast<void*>(src.gva_), src.size_);
+        uint64_t srcVa = 0;
+        Result gvaRet = bmProxyPtr_->GvaToVa(src.gva_, static_cast<MediaType>(src.mediaType_), srcVa);
+        if (gvaRet != MMC_OK) {
+            MMC_LOG_ERROR("gva_to_va failed for src gva=" << src.gva_ << ", ret=" << gvaRet);
+            return gvaRet;
+        }
+        Result ret = ubsIoProxyPtr_->Put(key, reinterpret_cast<void*>(srcVa), src.size_);
         TP_TRACE_END(TP_MMC_LOCAL_UBS_IO_PUT, ret);
         if (ret != MMC_OK) {
             MMC_LOG_ERROR("ubsIo put failed:" << ret << ", src=" << src << ", dst=" << dst);

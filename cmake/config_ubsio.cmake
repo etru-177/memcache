@@ -27,7 +27,7 @@ if (BUILD_UBSIO)
     FetchContent_Declare(
         ubs-io
         GIT_REPOSITORY https://gitcode.com/openeuler/ubs-io.git
-        GIT_TAG 2c653c293792eeeb1295c79446f33c2e37856a06
+        GIT_TAG develop
     )
 
     FetchContent_GetProperties(ubs-io)

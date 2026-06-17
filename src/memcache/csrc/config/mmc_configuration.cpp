@@ -336,7 +336,7 @@ bool Configuration::SetWithStrAutoConvert(const std::string &key, const std::str
         if (memSize == UINT64_MAX) {
             std::cerr << "Memory size value (" << tempValue << ") is invalid." << std::endl <<
                          "please check 'ock.mmc.local_service.dram.size' 'ock.mmc.local_service.hbm.size'" <<
-                         "or 'ock.mmc.local_service.ssd.size'" << std::endl;
+                         "or 'ock.mmc.local_service.storage.size'" << std::endl;
             return false;
         }
         mUInt64Items.insert(std::make_pair(key, memSize));

@@ -155,3 +155,13 @@ uint32_t smem_bm_get_rank_id_by_gva(smem_bm_t handle, void *gva)
 {
     return 0;
 }
+
+int32_t smem_bm_gva_to_va(smem_bm_t handle, void *gva, smem_bm_mem_type_t vaMemType, void **va)
+{
+    if (va == nullptr) {
+        return -1;
+    }
+    // 返回一个基于gva的伪VA地址，模拟真实转换
+    *va = reinterpret_cast<void *>(reinterpret_cast<uint64_t>(gva) + 0x1000);
+    return 0;
+}

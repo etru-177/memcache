@@ -438,7 +438,7 @@ public:
         }
 
         if (config.localSsdSize > MAX_SSD_SIZE) {
-            MMC_LOG_ERROR("ock.mmc.local_service.ssd.size(" << config.localSsdSize
+            MMC_LOG_ERROR("ock.mmc.local_service.storage.size(" << config.localSsdSize
                                                             << ") exceeds (" << MAX_SSD_SIZE << ")");
             return MMC_INVALID_PARAM;
         }

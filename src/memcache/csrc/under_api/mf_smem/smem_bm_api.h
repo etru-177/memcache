@@ -43,6 +43,7 @@ using smemBmCopyBatchFunc = int32_t (*)(smem_bm_t, smem_batch_copy_params_t *, s
 using smemBmRegisterUserMemFunc = int32_t (*)(smem_bm_t, uint64_t, uint64_t);
 using smemBmUnregisterUserMemFunc = int32_t (*)(smem_bm_t, uint64_t);
 using smemBmWaitFunc = int32_t (*)(smem_bm_t);
+using smemBmGvaToVaFunc = int32_t (*)(smem_bm_t, void *, smem_bm_mem_type_t, void **);
 
 class MFSmemApi {
 public:
@@ -153,6 +154,11 @@ public:
         return gSmemBmWait(handle);
     }
 
+    static int32_t SmemBmGvaToVa(smem_bm_t handle, void *gva, smem_bm_mem_type_t vaMemType, void **va)
+    {
+        return gSmemBmGvaToVa(handle, gva, vaMemType, va);
+    }
+
 private:
     static Result LoadAllSymbols();
     static Result LoadSymbol(const char *symbolName, void **target);
@@ -185,6 +191,7 @@ private:
     static smemBmRegisterUserMemFunc gSmemBmRegisterUserMem;
     static smemBmUnregisterUserMemFunc gSmemBmUnregisterUserMem;
     static smemBmWaitFunc gSmemBmWait;
+    static smemBmGvaToVaFunc gSmemBmGvaToVa;
 };
 } // namespace mmc
 } // namespace ock
