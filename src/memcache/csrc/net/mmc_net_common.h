@@ -71,7 +71,7 @@ inline Result NetEngineOptions::ExtractIpPortFromUrl(const std::string &url, Net
 {
     using namespace mf;
     auto result = SocketAddressParserMgr::getInstance().CreateParser(url);
-    MMC_ASSERT_RETURN(result != nullptr, MMC_INVALID_PARAM);
+    MMC_ASSERT_LOG_AND_RETURN(result != nullptr, "result is nullptr", MMC_INVALID_PARAM);
     std::string ipStr = result->GetIp();
     std::string portStr = std::to_string(result->GetPort());
     if (!result->IsIpv6()) {

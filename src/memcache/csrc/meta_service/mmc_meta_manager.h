@@ -107,12 +107,12 @@ public:
             return MMC_OK;
         }
         globalAllocator_ = MmcMakeRef<MmcGlobalAllocator>();
-        MMC_ASSERT_RETURN(globalAllocator_ != nullptr, MMC_MALLOC_FAILED);
+        MMC_ASSERT_LOG_AND_RETURN(globalAllocator_ != nullptr, "globalAllocator_ is nullptr", MMC_MALLOC_FAILED);
         auto GetTypeFunc = [](const MmcMemObjMetaPtr &objMeta) -> MediaType { return objMeta->GetBlobType(); };
         metaContainer_ = MmcMetaContainer<std::string, MmcMemObjMetaPtr>::Create(GetTypeFunc);
-        MMC_ASSERT_RETURN(metaContainer_ != nullptr, MMC_MALLOC_FAILED);
+        MMC_ASSERT_LOG_AND_RETURN(metaContainer_ != nullptr, "metaContainer_ is nullptr", MMC_MALLOC_FAILED);
         threadPool_ = MmcMakeRef<MmcThreadPool>("metamgr_pool", METAMGR_POOL_BASE);
-        MMC_ASSERT_RETURN(threadPool_ != nullptr, MMC_MALLOC_FAILED);
+        MMC_ASSERT_LOG_AND_RETURN(threadPool_ != nullptr, "threadPool_ is nullptr", MMC_MALLOC_FAILED);
         MMC_RETURN_ERROR(threadPool_->Start(), "thread pool start failed");
         // P4: 注册 FreeBlobs 的 SSD 预释放回调，在释放 SSD blob 前通过 RPC 删除远端数据
         MmcMemBlob::ssdPreFreeHandler_ = [this](const std::string &key, const MmcMemBlobDesc &desc) {

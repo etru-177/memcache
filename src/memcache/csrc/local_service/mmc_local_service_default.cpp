@@ -38,7 +38,8 @@ Result MmcLocalServiceDefault::Start(const mmc_local_service_config_t &config)
     MMC_RETURN_ERROR(InitBm(), "Failed to init bm of local service " << name_);
 
     metaNetClient_ = MetaNetClientFactory::GetInstance(this->options_.discoveryURL, "MetaClientCommon").Get();
-    MMC_ASSERT_RETURN(metaNetClient_.Get() != nullptr, MMC_NEW_OBJECT_FAILED);
+    MMC_ASSERT_LOG_AND_RETURN(metaNetClient_.Get() != nullptr,
+        "metaNetClient_.Get() is nullptr", MMC_NEW_OBJECT_FAILED);
     if (!metaNetClient_->Status()) {
         NetEngineOptions options;
         options.name = name_;
@@ -132,7 +133,7 @@ Result MmcLocalServiceDefault::InitBm()
                                            .flags = createFlags};
 
     MmcBmProxyPtr bmProxy = MmcBmProxyFactory::GetInstance("bmProxyDefault");
-    MMC_ASSERT_RETURN(bmProxy != nullptr, MMC_ERROR);
+    MMC_ASSERT_LOG_AND_RETURN(bmProxy != nullptr, "bmProxy is nullptr", MMC_ERROR);
     Result ret = bmProxy->InitBm(initConfig, createConfig);
     if (ret != MMC_OK) {
         return ret;
@@ -230,7 +231,7 @@ Result MmcLocalServiceDefault::RegisterBm()
 Result MmcLocalServiceDefault::InitUbsIo(int32_t deviceId, uint64_t ssdSize)
 {
     MmcUbsIoProxyPtr ubsIoProxy = MmcUbsIoProxyFactory::GetInstance("ubsIoProxyDefault");
-    MMC_ASSERT_RETURN(ubsIoProxy != nullptr, MMC_ERROR);
+    MMC_ASSERT_LOG_AND_RETURN(ubsIoProxy != nullptr, "ubsIoProxy is nullptr", MMC_ERROR);
     ubsIoProxyPtr_ = ubsIoProxy;
     return ubsIoProxy->InitUbsIo(deviceId, ssdSize);
 }

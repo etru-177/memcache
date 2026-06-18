@@ -43,10 +43,10 @@ Result ock::mmc::MetaNetServer::Start(NetEngineOptions &options)
         return MMC_OK;
     }
 
-    MMC_ASSERT_RETURN(metaService_.Get() != nullptr, MMC_INVALID_PARAM);
+    MMC_ASSERT_LOG_AND_RETURN(metaService_.Get() != nullptr, "metaService_.Get() is nullptr", MMC_INVALID_PARAM);
 
     NetEnginePtr server = NetEngine::Create();
-    MMC_ASSERT_RETURN(server != nullptr, MMC_MALLOC_FAILED);
+    MMC_ASSERT_LOG_AND_RETURN(server != nullptr, "server is nullptr", MMC_MALLOC_FAILED);
     server->RegRequestReceivedHandler(LOCAL_META_OPCODE_REQ::ML_ALLOC_REQ,
                                       std::bind(&MetaNetServer::HandleAlloc, this, std::placeholders::_1));
     server->RegRequestReceivedHandler(LOCAL_META_OPCODE_REQ::ML_BM_REGISTER_REQ,
@@ -88,7 +88,8 @@ Result ock::mmc::MetaNetServer::Start(NetEngineOptions &options)
     server->RegLinkBrokenHandler(std::bind(&MetaNetServer::HandleLinkBroken, this, std::placeholders::_1));
 
     /* start engine */
-    MMC_ASSERT_RETURN(server->Start(options) == MMC_OK, MMC_NOT_STARTED);
+    auto temp = server->Start(options);
+    MMC_ASSERT_LOG_AND_RETURN(temp == MMC_OK, "server->Start(options) = " << temp, MMC_NOT_STARTED);
 
     engine_ = server;
     started_ = true;
@@ -98,8 +99,8 @@ Result ock::mmc::MetaNetServer::Start(NetEngineOptions &options)
 
 Result MetaNetServer::HandleBmRegister(const NetContextPtr &context)
 {
-    MMC_ASSERT_RETURN(metaService_ != nullptr, MMC_ERROR);
-    MMC_ASSERT_RETURN(context != nullptr, MMC_ERROR);
+    MMC_ASSERT_LOG_AND_RETURN(metaService_ != nullptr, "metaService_ is nullptr", MMC_ERROR);
+    MMC_ASSERT_LOG_AND_RETURN(context != nullptr, "context is nullptr", MMC_ERROR);
     BmRegisterRequest req;
     context->GetRequest<BmRegisterRequest>(req);
     TP_TRACE_BEGIN(TP_MMC_META_BM_REGISTER);
@@ -114,7 +115,7 @@ Result MetaNetServer::HandleBmRegister(const NetContextPtr &context)
 
 Result MetaNetServer::HandleBmUnregister(const NetContextPtr &context)
 {
-    MMC_ASSERT_RETURN(metaService_ != nullptr, MMC_ERROR);
+    MMC_ASSERT_LOG_AND_RETURN(metaService_ != nullptr, "metaService_ is nullptr", MMC_ERROR);
     BmUnregisterRequest req;
     Response resp;
     resp.ret_ = MMC_OK;
@@ -158,7 +159,7 @@ Result MetaNetServer::HandleNewLink(const NetLinkPtr &link)
 Result MetaNetServer::HandleLinkBroken(const NetLinkPtr &link)
 {
     MMC_LOG_DEBUG(name_ << " link broken");
-    MMC_ASSERT_RETURN(metaService_ != nullptr, MMC_ERROR);
+    MMC_ASSERT_LOG_AND_RETURN(metaService_ != nullptr, "metaService_ is nullptr", MMC_ERROR);
     int32_t rankId = link->Id();
     TP_TRACE_BEGIN(TP_MMC_META_CLEAR_RESOURCE);
     auto ret = metaService_->ClearResource(rankId);
@@ -168,7 +169,7 @@ Result MetaNetServer::HandleLinkBroken(const NetLinkPtr &link)
 
 Result MetaNetServer::HandleAlloc(const NetContextPtr &context)
 {
-    MMC_ASSERT_RETURN(context != nullptr, MMC_ERROR);
+    MMC_ASSERT_LOG_AND_RETURN(context != nullptr, "context is nullptr", MMC_ERROR);
     AllocRequest req;
     AllocResponse resp;
     context->GetRequest<AllocRequest>(req);

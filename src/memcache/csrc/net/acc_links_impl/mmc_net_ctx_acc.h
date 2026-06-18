@@ -43,8 +43,9 @@ inline int32_t NetContextAcc::Reply(int16_t responseCode, const char *respData, 
 {
     /* step2: copy data */
     TcpDataBufPtr dataBuf = new (std::nothrow) ock::acc::AccDataBuffer(respDataLen);
-    MMC_ASSERT_RETURN(dataBuf.Get() != nullptr, MMC_NEW_OBJECT_FAILED);
-    MMC_ASSERT_RETURN(dataBuf->AllocIfNeed(), MMC_NEW_OBJECT_FAILED);
+    MMC_ASSERT_LOG_AND_RETURN(dataBuf.Get() != nullptr, "dataBuf.Get() is nullptr", MMC_NEW_OBJECT_FAILED);
+    auto temp = dataBuf->AllocIfNeed();
+    MMC_ASSERT_LOG_AND_RETURN(temp, "dataBuf->AllocIfNeed() = " << temp, MMC_NEW_OBJECT_FAILED);
     std::copy_n(respData, respDataLen, static_cast<char *>(dataBuf->DataPtrVoid()));
     dataBuf->SetDataSize(respDataLen);
     return realContext.Reply(responseCode, dataBuf);

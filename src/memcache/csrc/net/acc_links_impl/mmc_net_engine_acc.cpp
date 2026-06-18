@@ -258,12 +258,12 @@ Result NetEngineAcc::Call(uint32_t targetId, int16_t opCode, const char *reqData
                           uint32_t &respDataLen, int32_t timeoutInSecond)
 {
     uint64_t startTime = TP_CURRENT_TIME_NS;
-    MMC_ASSERT_RETURN(started_, MMC_NOT_STARTED);
-    MMC_ASSERT_RETURN(reqData != nullptr, MMC_INVALID_PARAM);
-    MMC_ASSERT_RETURN(reqDataLen != 0, MMC_INVALID_PARAM);
-    MMC_ASSERT_RETURN(respData != nullptr, MMC_INVALID_PARAM);
+    MMC_ASSERT_LOG_AND_RETURN(started_, "started_ = " << started_, MMC_NOT_STARTED);
+    MMC_ASSERT_LOG_AND_RETURN(reqData != nullptr, "reqData is nullptr", MMC_INVALID_PARAM);
+    MMC_ASSERT_LOG_AND_RETURN(reqDataLen != 0, "reqDataLen = " << reqDataLen, MMC_INVALID_PARAM);
+    MMC_ASSERT_LOG_AND_RETURN(respData != nullptr, "respData is nullptr", MMC_INVALID_PARAM);
 
-    MMC_ASSERT_RETURN(opCode != -1, MMC_INVALID_PARAM);
+    MMC_ASSERT_LOG_AND_RETURN(opCode != -1, "opCode = " << opCode, MMC_INVALID_PARAM);
 
     /* step1: do serialization */
 
@@ -275,21 +275,23 @@ Result NetEngineAcc::Call(uint32_t targetId, int16_t opCode, const char *reqData
     }
     /* step3: copy data */
     auto dataBuf = MmcMakeRef<ock::acc::AccDataBuffer>(reqDataLen);
-    MMC_ASSERT_RETURN(dataBuf.Get() != nullptr, MMC_NEW_OBJECT_FAILED);
-    MMC_ASSERT_RETURN(dataBuf->AllocIfNeed(), MMC_NEW_OBJECT_FAILED);
+    MMC_ASSERT_LOG_AND_RETURN(dataBuf.Get() != nullptr, "dataBuf.Get() is nullptr", MMC_NEW_OBJECT_FAILED);
+    auto ret = dataBuf->AllocIfNeed();
+    MMC_ASSERT_LOG_AND_RETURN(ret, "dataBuf->AllocIfNeed() = " << ret, MMC_NEW_OBJECT_FAILED);
     std::copy_n(reqData, reqDataLen, static_cast<char *>(dataBuf->DataPtrVoid()));
     dataBuf->SetDataSize(reqDataLen);
 
     /* step4: create wait handler and initialize */
     auto waiter = MmcMakeRef<NetWaitHandler>(ctxStore_);
-    MMC_ASSERT_RETURN(waiter.Get() != nullptr, MMC_NEW_OBJECT_FAILED);
-    MMC_ASSERT_RETURN(waiter->Initialize() == MMC_OK, MMC_ERROR);
+    MMC_ASSERT_LOG_AND_RETURN(waiter.Get() != nullptr, "waiter.Get() is nullptr", MMC_NEW_OBJECT_FAILED);
+    auto res = waiter->Initialize();
+    MMC_ASSERT_LOG_AND_RETURN(res == MMC_OK, "res = " << res, MMC_ERROR);
 
     /* step5: put into ctx store before sent the data to peer in case of the peer responses very fast  */
     uint32_t seqNo = 0;
     Result result = ctxStore_->PutAndGetSeqNo<NetWaitHandler>(waiter.Get(), seqNo);
-    MMC_ASSERT_RETURN(result == MMC_OK, result);
-    MMC_ASSERT_RETURN(link->RealLink() != nullptr, MMC_ERROR);
+    MMC_ASSERT_LOG_AND_RETURN(result == MMC_OK, "result = " << result, result);
+    MMC_ASSERT_LOG_AND_RETURN(link->RealLink() != nullptr, "link->RealLink() is nullptr", MMC_ERROR);
     /* step6: send message to peer */
 
     result = link->RealLink()->NonBlockSend(MSG_TYPE_DATA, opCode, seqNo, dataBuf.Get(), nullptr);
@@ -313,7 +315,7 @@ Result NetEngineAcc::Call(uint32_t targetId, int16_t opCode, const char *reqData
 
     /* got response data and deserialize */
     auto &data = waiter->Data();
-    MMC_ASSERT_RETURN(data.Get() != nullptr, MMC_ERROR);
+    MMC_ASSERT_LOG_AND_RETURN(data.Get() != nullptr, "data.Get() is nullptr", MMC_ERROR);
     /* set response code */
 
     /* deserialize */
@@ -333,9 +335,9 @@ Result NetEngineAcc::Call(uint32_t targetId, int16_t opCode, const char *reqData
 
 Result NetEngineAcc::Send(uint32_t peerId, const char *reqData, uint32_t reqDataLen, int32_t timeoutInSecond)
 {
-    MMC_ASSERT_RETURN(started_, MMC_NOT_STARTED);
-    MMC_ASSERT_RETURN(reqData != nullptr, MMC_INVALID_PARAM);
-    MMC_ASSERT_RETURN(reqDataLen != 0, MMC_INVALID_PARAM);
+    MMC_ASSERT_LOG_AND_RETURN(started_, "started_ = " << started_, MMC_NOT_STARTED);
+    MMC_ASSERT_LOG_AND_RETURN(reqData != nullptr, "reqData is nullptr", MMC_INVALID_PARAM);
+    MMC_ASSERT_LOG_AND_RETURN(reqDataLen != 0, "reqDataLen = " << reqDataLen, MMC_INVALID_PARAM);
 
     return MMC_OK;
 }
@@ -356,17 +358,17 @@ Result NetEngineAcc::Initialize(const NetEngineOptions &options)
 
     /* create concurrent link map */
     NetLinkMapAccPtr tmpLinkMap = MmcMakeRef<NetLinkMapAcc>();
-    MMC_ASSERT_RETURN(tmpLinkMap != nullptr, MMC_NEW_OBJECT_FAILED);
+    MMC_ASSERT_LOG_AND_RETURN(tmpLinkMap != nullptr, "tmpLinkMap is nullptr", MMC_NEW_OBJECT_FAILED);
 
     /* create ctx store */
     NetContextStorePtr tmpCtxStore = MmcMakeRef<NetContextStore>(UN65536);
-    MMC_ASSERT_RETURN(tmpCtxStore != nullptr, MMC_NEW_OBJECT_FAILED);
+    MMC_ASSERT_LOG_AND_RETURN(tmpCtxStore != nullptr, "tmpCtxStore is nullptr", MMC_NEW_OBJECT_FAILED);
     auto result = tmpCtxStore->Initialize();
     MMC_RETURN_ERROR(result, "Failed to initialize ctx store for communication seq number");
 
     /* create tcp server */
     auto tmpServer = TcpServer::Create();
-    MMC_ASSERT_RETURN(tmpServer != nullptr, MMC_NEW_OBJECT_FAILED);
+    MMC_ASSERT_LOG_AND_RETURN(tmpServer != nullptr, "tmpServer is nullptr", MMC_NEW_OBJECT_FAILED);
     server_ = tmpServer.Get();
 
     /* register callbacks */
@@ -409,7 +411,7 @@ void NetEngineAcc::UnInitialize()
 
 Result NetEngineAcc::RegisterTcpServerHandler()
 {
-    MMC_ASSERT_RETURN(server_ != nullptr, MMC_NOT_INITIALIZED);
+    MMC_ASSERT_LOG_AND_RETURN(server_ != nullptr, "server_ is nullptr", MMC_NOT_INITIALIZED);
 
     using namespace std::placeholders;
     if (options_.startListener) {
@@ -425,13 +427,13 @@ Result NetEngineAcc::RegisterTcpServerHandler()
 
 Result NetEngineAcc::HandleNewLink(const TcpConnReq &req, const TcpLinkPtr &link) const
 {
-    MMC_ASSERT_RETURN(link.Get() != nullptr, MMC_INVALID_PARAM);
+    MMC_ASSERT_LOG_AND_RETURN(link.Get() != nullptr, "link.Get() is nullptr", MMC_INVALID_PARAM);
 
     auto peerId = static_cast<uint32_t>(req.rankId);
     link->UpCtx(peerId);
 
     auto newLinkAcc = MmcMakeRef<NetLinkAcc>(peerId, link);
-    MMC_ASSERT_RETURN(newLinkAcc != nullptr, MMC_NEW_OBJECT_FAILED);
+    MMC_ASSERT_LOG_AND_RETURN(newLinkAcc != nullptr, "newLinkAcc is nullptr", MMC_NEW_OBJECT_FAILED);
     MMC_LOG_DEBUG("NEW Link");
 
     /* add into peer link map */
@@ -449,10 +451,14 @@ Result NetEngineAcc::HandleNeqRequest(const TcpReqContext &context)
     /* use result variable for real opcode */
     MMC_LOG_DEBUG("HandleNeqRequest Header " << context.Header().ToString());
     int16_t opCode = context.Header().result;
-    MMC_ASSERT_RETURN(opCode >= gHandlerMin && opCode < gHandlerMax, MMC_NET_REQ_HANDLE_NO_FOUND);
+
+    MMC_ASSERT_LOG_AND_RETURN(opCode >= gHandlerMin && opCode < gHandlerMax,
+        "opCode = " << opCode << ", gHandlerMin = " << gHandlerMin << ", gHandlerMax = " << gHandlerMax,
+        MMC_NET_REQ_HANDLE_NO_FOUND);
     if (reqReceivedHandlers_[opCode] == nullptr) {
         /*  client do reply response */
-        MMC_ASSERT_RETURN(HandleAllRequests4Response(context) == MMC_OK, MMC_ERROR);
+        auto res = HandleAllRequests4Response(context);
+        MMC_ASSERT_LOG_AND_RETURN(res == MMC_OK, "HandleAllRequests4Response(context) = " << res, MMC_ERROR);
     } else {
         /* server do function */
         // context buf是link缓冲区，切线程需要将数据copy出来
@@ -485,7 +491,7 @@ Result NetEngineAcc::HandleMsgSent(TcpMsgSentResult result, const TcpMsgHeader &
 
 Result NetEngineAcc::HandleLinkBroken(const TcpLinkPtr &link) const
 {
-    MMC_ASSERT_RETURN(link.Get() != nullptr, MMC_INVALID_PARAM);
+    MMC_ASSERT_LOG_AND_RETURN(link.Get() != nullptr, "link.Get() is nullptr", MMC_INVALID_PARAM);
 
     const auto peerId = static_cast<uint32_t>(link->UpCtx());
 
@@ -507,9 +513,9 @@ Result NetEngineAcc::HandleLinkBroken(const TcpLinkPtr &link) const
 Result NetEngineAcc::ConnectToPeer(uint32_t peerId, const std::string &peerIp, uint16_t port, NetLinkPtr &newLink,
                                    bool isForce)
 {
-    MMC_ASSERT_RETURN(started_, MMC_NOT_STARTED);
-    MMC_ASSERT_RETURN(!peerIp.empty(), MMC_INVALID_PARAM);
-    MMC_ASSERT_RETURN(port != 0, MMC_INVALID_PARAM);
+    MMC_ASSERT_LOG_AND_RETURN(started_, "started_ = " << started_, MMC_NOT_STARTED);
+    MMC_ASSERT_LOG_AND_RETURN(!peerIp.empty(), "peerIp is empty", MMC_INVALID_PARAM);
+    MMC_ASSERT_LOG_AND_RETURN(port != 0, "port = " << port, MMC_INVALID_PARAM);
 
     TcpConnReq connReq;
     connReq.rankId = peerId;
@@ -543,7 +549,7 @@ Result NetEngineAcc::ConnectToPeer(uint32_t peerId, const std::string &peerIp, u
 
     /* add into peer link map */
     linkAcc = MmcMakeRef<NetLinkAcc>(peerId, realLink);
-    MMC_ASSERT_RETURN(linkAcc != nullptr, MMC_NEW_OBJECT_FAILED);
+    MMC_ASSERT_LOG_AND_RETURN(linkAcc != nullptr, "linkAcc is nullptr", MMC_NEW_OBJECT_FAILED);
     peerLinkMap_->Add(peerId, linkAcc);
 
     /* set peer id */
@@ -559,7 +565,7 @@ Result NetEngineAcc::HandleAllRequests4Response(const TcpReqContext &context)
     NetWaitHandler *out = nullptr;
     auto result = ctxStore_->GetSeqNoAndRemove<NetWaitHandler>(context.SeqNo(), out, false);
     /* check if out is nullptr */
-    MMC_ASSERT_RETURN(out != nullptr, MMC_ERROR);
+    MMC_ASSERT_LOG_AND_RETURN(out != nullptr, "out is nullptr", MMC_ERROR);
     if (result != MMC_OK) {
         if (out != nullptr) { /* decrease ref */
             out->DecreaseRef();
@@ -573,9 +579,10 @@ Result NetEngineAcc::HandleAllRequests4Response(const TcpReqContext &context)
     out->DecreaseRef(); /* decrease ref */
 
     auto dataBuf = MmcMakeRef<ock::acc::AccDataBuffer>(context.DataLen());
-    MMC_ASSERT_RETURN(result == MMC_OK, MMC_NEW_OBJECT_FAILED);
-    MMC_ASSERT_RETURN(dataBuf->AllocIfNeed(), MMC_NEW_OBJECT_FAILED);
-    MMC_ASSERT_RETURN(context.DataPtr() != nullptr, MMC_ERROR);
+    MMC_ASSERT_LOG_AND_RETURN(result == MMC_OK, "result = " << result, MMC_NEW_OBJECT_FAILED);
+    auto ret = dataBuf->AllocIfNeed();
+    MMC_ASSERT_LOG_AND_RETURN(ret, "dataBuf->AllocIfNeed() = " << ret, MMC_NEW_OBJECT_FAILED);
+    MMC_ASSERT_LOG_AND_RETURN(context.DataPtr() != nullptr, "context.DataPtr() is nullptr", MMC_ERROR);
     std::copy_n(static_cast<char *>(context.DataPtr()), context.DataLen(),
                 reinterpret_cast<char *>(dataBuf->DataIntPtr()));
     dataBuf->SetDataSize(context.DataLen());

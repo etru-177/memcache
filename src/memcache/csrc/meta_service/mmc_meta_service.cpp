@@ -39,7 +39,8 @@ Result MmcMetaService::Start(const mmc_meta_service_config_t &options)
                         "invalid param, evictThresholdHigh must large than evictThresholdLow", MMC_INVALID_PARAM);
 
     metaNetServer_ = MmcMakeRef<MetaNetServer>(this, name_ + "_MetaServer").Get();
-    MMC_ASSERT_RETURN(metaNetServer_.Get() != nullptr, MMC_NEW_OBJECT_FAILED);
+    MMC_ASSERT_LOG_AND_RETURN(metaNetServer_.Get() != nullptr,
+        "metaNetServer_.Get() is nullptr", MMC_NEW_OBJECT_FAILED);
     /* init engine */
     NetEngineOptions netOptions;
     std::string url{options_.discoveryURL};
@@ -55,7 +56,7 @@ Result MmcMetaService::Start(const mmc_meta_service_config_t &options)
 
     metaBackUpMgrPtr_ = MMCMetaBackUpMgrFactory::GetInstance("DefaultMetaBackup");
     MMCMetaBackUpConfPtr defaultPtr = MmcMakeRef<MMCMetaBackUpConfDefault>(metaNetServer_).Get();
-    MMC_ASSERT_RETURN(metaBackUpMgrPtr_ != nullptr, MMC_MALLOC_FAILED);
+    MMC_ASSERT_LOG_AND_RETURN(metaBackUpMgrPtr_ != nullptr, "metaBackUpMgrPtr_ is nullptr", MMC_MALLOC_FAILED);
     if (options.haEnable) {
         MMC_RETURN_ERROR(metaBackUpMgrPtr_->Start(defaultPtr), "metaBackUpMgr start failed");
     }
@@ -101,8 +102,8 @@ Result MmcMetaService::BmRegister(uint32_t rank, std::vector<uint16_t> mediaType
         MmcLocalMemlInitInfo locInfo{bm[i], capacity[i]};
         infos.emplace_back(locInfo);
     }
-    MMC_ASSERT_RETURN(metaBackUpMgrPtr_ != nullptr, MMC_MALLOC_FAILED);
-    MMC_ASSERT_RETURN(metaMgrProxy_ != nullptr, MMC_MALLOC_FAILED);
+    MMC_ASSERT_LOG_AND_RETURN(metaBackUpMgrPtr_ != nullptr, "metaBackUpMgrPtr_ is nullptr", MMC_MALLOC_FAILED);
+    MMC_ASSERT_LOG_AND_RETURN(metaMgrProxy_ != nullptr, "metaMgrProxy_ is nullptr", MMC_MALLOC_FAILED);
     MMC_RETURN_ERROR(metaBackUpMgrPtr_->Load(blobMap), "Mount loc { " << rank << " } load backup failed");
     MMC_RETURN_ERROR(metaMgrProxy_->Mount(locs, infos, blobMap), "Mount loc { " << rank << " } failed");
     MMC_LOG_INFO("Mount loc {rank:" << rank << ", rebuild size:" << blobMap.size() << ", mediaNum:" << typeNum

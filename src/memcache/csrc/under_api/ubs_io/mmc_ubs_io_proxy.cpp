@@ -62,9 +62,9 @@ void MmcUbsIoProxy::DestroyUbsIo()
 
 Result MmcUbsIoProxy::Put(const std::string &key, void *buf, size_t length)
 {
-    MMC_ASSERT_RETURN(started_, MMC_NOT_INITIALIZED);
-    MMC_ASSERT_RETURN(buf != nullptr, MMC_INVALID_PARAM);
-    MMC_ASSERT_RETURN(!key.empty(), MMC_INVALID_PARAM);
+    MMC_ASSERT_LOG_AND_RETURN(started_, "started_ = " << started_, MMC_NOT_INITIALIZED);
+    MMC_ASSERT_LOG_AND_RETURN(buf != nullptr, "buf is nullptr", MMC_INVALID_PARAM);
+    MMC_ASSERT_LOG_AND_RETURN(!key.empty(), "key is empty", MMC_INVALID_PARAM);
 
     uint32_t flags = 0;
     TP_TRACE_BEGIN(TP_MMC_UBS_IO_PUT);
@@ -78,9 +78,9 @@ Result MmcUbsIoProxy::Put(const std::string &key, void *buf, size_t length)
 
 Result MmcUbsIoProxy::Get(const std::string &key, void *buf, size_t length)
 {
-    MMC_ASSERT_RETURN(started_, MMC_NOT_INITIALIZED);
-    MMC_ASSERT_RETURN(buf != nullptr, MMC_INVALID_PARAM);
-    MMC_ASSERT_RETURN(!key.empty(), MMC_INVALID_PARAM);
+    MMC_ASSERT_LOG_AND_RETURN(started_, "started_ = " << started_, MMC_NOT_INITIALIZED);
+    MMC_ASSERT_LOG_AND_RETURN(buf != nullptr, "buf is nullptr", MMC_INVALID_PARAM);
+    MMC_ASSERT_LOG_AND_RETURN(!key.empty(), "key is empty", MMC_INVALID_PARAM);
 
     uint32_t flags = 0;
     TP_TRACE_BEGIN(TP_MMC_UBS_IO_GET);
@@ -94,8 +94,8 @@ Result MmcUbsIoProxy::Get(const std::string &key, void *buf, size_t length)
 
 Result MmcUbsIoProxy::Exist(const std::string &key)
 {
-    MMC_ASSERT_RETURN(started_, false);
-    MMC_ASSERT_RETURN(!key.empty(), false);
+    MMC_ASSERT_LOG_AND_RETURN(started_, "started_ = " << started_, false);
+    MMC_ASSERT_LOG_AND_RETURN(!key.empty(), "key is empty", false);
 
     uint32_t flags = 0;
     TP_TRACE_BEGIN(TP_MMC_UBS_IO_EXIST);
@@ -106,8 +106,8 @@ Result MmcUbsIoProxy::Exist(const std::string &key)
 
 Result MmcUbsIoProxy::Delete(const std::string &key)
 {
-    MMC_ASSERT_RETURN(started_, MMC_NOT_INITIALIZED);
-    MMC_ASSERT_RETURN(!key.empty(), MMC_INVALID_PARAM);
+    MMC_ASSERT_LOG_AND_RETURN(started_, "started_ = " << started_, MMC_NOT_INITIALIZED);
+    MMC_ASSERT_LOG_AND_RETURN(!key.empty(), "key is empty", MMC_INVALID_PARAM);
 
     uint32_t flags = 0;
     TP_TRACE_BEGIN(TP_MMC_UBS_IO_DELETE);
@@ -121,8 +121,8 @@ Result MmcUbsIoProxy::Delete(const std::string &key)
 
 Result MmcUbsIoProxy::GetLength(const std::string &key, size_t &length)
 {
-    MMC_ASSERT_RETURN(started_, MMC_NOT_INITIALIZED);
-    MMC_ASSERT_RETURN(!key.empty(), MMC_INVALID_PARAM);
+    MMC_ASSERT_LOG_AND_RETURN(started_, "started_ = " << started_, MMC_NOT_INITIALIZED);
+    MMC_ASSERT_LOG_AND_RETURN(!key.empty(), "key is empty", MMC_INVALID_PARAM);
 
     uint32_t flags = 0;
     size_t tempLength = 0;
@@ -139,10 +139,12 @@ Result MmcUbsIoProxy::GetLength(const std::string &key, size_t &length)
 Result MmcUbsIoProxy::BatchPut(const std::vector<std::string> &keys, const std::vector<void *> &bufs,
     const std::vector<size_t> &lengths, std::vector<int> &results)
 {
-    MMC_ASSERT_RETURN(started_, MMC_NOT_INITIALIZED);
-    MMC_ASSERT_RETURN(!keys.empty(), MMC_INVALID_PARAM);
-    MMC_ASSERT_RETURN(keys.size() == bufs.size(), MMC_INVALID_PARAM);
-    MMC_ASSERT_RETURN(keys.size() == lengths.size(), MMC_INVALID_PARAM);
+    MMC_ASSERT_LOG_AND_RETURN(started_, "started_ = " << started_, MMC_NOT_INITIALIZED);
+    MMC_ASSERT_LOG_AND_RETURN(!keys.empty(), "keys are empty", MMC_INVALID_PARAM);
+    MMC_ASSERT_LOG_AND_RETURN(keys.size() == bufs.size(),
+        "keys.size() = " << keys.size() << ", bufs.size() = " << bufs.size(), MMC_INVALID_PARAM);
+    MMC_ASSERT_LOG_AND_RETURN(keys.size() == lengths.size(),
+        "keys.size() = " << keys.size() << ", lengths.size() = " << lengths.size(), MMC_INVALID_PARAM);
 
     const uint32_t keysCount = static_cast<uint32_t>(keys.size());
     std::vector<const char *> keyPtrs;
@@ -165,9 +167,10 @@ Result MmcUbsIoProxy::BatchPut(const std::vector<std::string> &keys, const std::
 Result MmcUbsIoProxy::BatchGet(const std::vector<std::string> &keys, void **bufs,
     std::vector<size_t> &lengths, std::vector<int> &results)
 {
-    MMC_ASSERT_RETURN(started_, MMC_NOT_INITIALIZED);
-    MMC_ASSERT_RETURN(!keys.empty(), MMC_INVALID_PARAM);
-    MMC_ASSERT_RETURN(keys.size() == lengths.size(), MMC_INVALID_PARAM);
+    MMC_ASSERT_LOG_AND_RETURN(started_, "started_ = " << started_, MMC_NOT_INITIALIZED);
+    MMC_ASSERT_LOG_AND_RETURN(!keys.empty(), "keys are empty", MMC_INVALID_PARAM);
+    MMC_ASSERT_LOG_AND_RETURN(keys.size() == lengths.size(),
+        "keys.size() = " << keys.size() << ", lengths.size() = " << lengths.size(), MMC_INVALID_PARAM);
 
     const uint32_t keysCount = static_cast<uint32_t>(keys.size());
     std::vector<const char *> keyPtrs;
@@ -189,13 +192,17 @@ Result MmcUbsIoProxy::BatchGetWithHBM(const std::vector<std::string> &keys,
                                       std::vector<std::vector<size_t>>& npuBufLengths,
                                       std::vector<int> &results)
 {
-    MMC_ASSERT_RETURN(started_, MMC_NOT_INITIALIZED);
-    MMC_ASSERT_RETURN(!keys.empty(), MMC_INVALID_PARAM);
-    MMC_ASSERT_RETURN(keys.size() == npuBufAddrs.size() && keys.size() == npuBufLengths.size(), MMC_INVALID_PARAM);
+    MMC_ASSERT_LOG_AND_RETURN(started_, "started_ = " << started_, MMC_NOT_INITIALIZED);
+    MMC_ASSERT_LOG_AND_RETURN(!keys.empty(), "keys are empty", MMC_INVALID_PARAM);
+    MMC_ASSERT_LOG_AND_RETURN(keys.size() == npuBufAddrs.size() && keys.size() == npuBufLengths.size(),
+        "keys.size() = " << keys.size() << ", npuBufAddrs.size() = " << npuBufAddrs.size()
+        << ", npuBufLengths.size() = " << npuBufLengths.size(), MMC_INVALID_PARAM);
     uint32_t lengthsRows = keys.size();
     uint32_t lengthsCols = npuBufAddrs[0].size();
     for (uint32_t i = 1; i < lengthsRows; i++) {
-        MMC_ASSERT_RETURN(lengthsCols == npuBufAddrs[i].size(), MMC_INVALID_PARAM);
+        MMC_ASSERT_LOG_AND_RETURN(lengthsCols == npuBufAddrs[i].size(),
+            "lengthsCols = " << lengthsCols << ", npuBufAddrs[" << i << "].size() = " << npuBufAddrs[i].size(),
+            MMC_INVALID_PARAM);
     }
     const uint32_t keysCount = static_cast<uint32_t>(keys.size());
     std::vector<const char *> keyPtrs;
@@ -231,7 +238,7 @@ Result MmcUbsIoProxy::BatchGetWithHBM(const std::vector<std::string> &keys,
 
 Result MmcUbsIoProxy::BatchGetFree(void **bufs, int keysCount)
 {
-    MMC_ASSERT_RETURN(started_, MMC_NOT_INITIALIZED);
+    MMC_ASSERT_LOG_AND_RETURN(started_, "started_ = " << started_, MMC_NOT_INITIALIZED);
 
     TP_TRACE_BEGIN(TP_MMC_UBS_IO_BATCH_FREE);
     int32_t ret = DlUbsioApi::UbsioBatchFreeAddress(bufs, keysCount);
@@ -241,8 +248,8 @@ Result MmcUbsIoProxy::BatchGetFree(void **bufs, int keysCount)
 
 Result MmcUbsIoProxy::BatchExist(const std::vector<std::string> &keys, bool *results)
 {
-    MMC_ASSERT_RETURN(started_, MMC_NOT_INITIALIZED);
-    MMC_ASSERT_RETURN(!keys.empty(), MMC_INVALID_PARAM);
+    MMC_ASSERT_LOG_AND_RETURN(started_, "started_ = " << started_, MMC_NOT_INITIALIZED);
+    MMC_ASSERT_LOG_AND_RETURN(!keys.empty(), "keys are empty", MMC_INVALID_PARAM);
 
     const uint32_t keysCount = static_cast<uint32_t>(keys.size());
     std::vector<const char *> keyPtrs;
@@ -261,8 +268,8 @@ Result MmcUbsIoProxy::BatchExist(const std::vector<std::string> &keys, bool *res
 
 Result MmcUbsIoProxy::BatchDelete(const std::vector<std::string> &keys, std::vector<int32_t> &results)
 {
-    MMC_ASSERT_RETURN(started_, MMC_NOT_INITIALIZED);
-    MMC_ASSERT_RETURN(!keys.empty(), MMC_INVALID_PARAM);
+    MMC_ASSERT_LOG_AND_RETURN(started_, "started_ = " << started_, MMC_NOT_INITIALIZED);
+    MMC_ASSERT_LOG_AND_RETURN(!keys.empty(), "keys are empty", MMC_INVALID_PARAM);
 
     const uint32_t keysCount = static_cast<uint32_t>(keys.size());
     std::vector<const char *> keyPtrs;
@@ -282,8 +289,8 @@ Result MmcUbsIoProxy::BatchDelete(const std::vector<std::string> &keys, std::vec
 Result MmcUbsIoProxy::BatchGetLength(const std::vector<std::string> &keys, std::vector<size_t> &lengths,
     std::vector<int32_t> &results)
 {
-    MMC_ASSERT_RETURN(started_, MMC_NOT_INITIALIZED);
-    MMC_ASSERT_RETURN(!keys.empty(), MMC_INVALID_PARAM);
+    MMC_ASSERT_LOG_AND_RETURN(started_, "started_ = " << started_, MMC_NOT_INITIALIZED);
+    MMC_ASSERT_LOG_AND_RETURN(!keys.empty(), "keys are empty", MMC_INVALID_PARAM);
 
     const uint32_t keysCount = static_cast<uint32_t>(keys.size());
     std::vector<const char *> keyPtrs;

@@ -38,11 +38,11 @@ Result MmcClientDefault::Start(const mmc_client_config_t &config)
         return MMC_OK;
     }
     bmProxy_ = MmcBmProxyFactory::GetInstance("bmProxyDefault");
-    MMC_ASSERT_RETURN(bmProxy_ != nullptr, MMC_MALLOC_FAILED);
+    MMC_ASSERT_LOG_AND_RETURN(bmProxy_ != nullptr, "bmProxy_ is nullptr", MMC_MALLOC_FAILED);
     rankId_ = bmProxy_->RankId();
 
     threadPool_ = MmcMakeRef<MmcThreadPool>("client_pool", 1);
-    MMC_ASSERT_RETURN(threadPool_ != nullptr, MMC_MALLOC_FAILED);
+    MMC_ASSERT_LOG_AND_RETURN(threadPool_ != nullptr, "threadPool_ is nullptr", MMC_MALLOC_FAILED);
     MMC_RETURN_ERROR(threadPool_->Start(), "thread pool start failed");
 
     bool bindCpu = false;
@@ -53,16 +53,17 @@ Result MmcClientDefault::Start(const mmc_client_config_t &config)
     readThreadPool_ = MmcMakeRef<MmcThreadPool>("read_pool", config.readThreadPoolNum);
     aggregateIO_ = config.aggregateIO;
     aggregateNum_ = static_cast<size_t>(config.aggregateNum);
-    MMC_ASSERT_RETURN(readThreadPool_ != nullptr, MMC_MALLOC_FAILED);
+    MMC_ASSERT_LOG_AND_RETURN(readThreadPool_ != nullptr, "readThreadPool_ is nullptr", MMC_MALLOC_FAILED);
     MMC_RETURN_ERROR(readThreadPool_->Start(bindCpu), "read thread pool start failed");
 
     writeThreadPool_ = MmcMakeRef<MmcThreadPool>("write_pool", config.writeThreadPoolNum);
-    MMC_ASSERT_RETURN(writeThreadPool_ != nullptr, MMC_MALLOC_FAILED);
+    MMC_ASSERT_LOG_AND_RETURN(writeThreadPool_ != nullptr, "writeThreadPool_ is nullptr", MMC_MALLOC_FAILED);
     MMC_RETURN_ERROR(writeThreadPool_->Start(bindCpu), "write thread pool start failed");
 
-    MMC_ASSERT_RETURN(memchr(config.discoveryURL, '\0', DISCOVERY_URL_SIZE) != nullptr, MMC_INVALID_PARAM);
+    MMC_ASSERT_LOG_AND_RETURN(memchr(config.discoveryURL, '\0', DISCOVERY_URL_SIZE) != nullptr,
+        "config.discoveryURL possibly unterminated", MMC_INVALID_PARAM);
     auto tmpNetClient = MetaNetClientFactory::GetInstance(config.discoveryURL, "MetaClientCommon").Get();
-    MMC_ASSERT_RETURN(tmpNetClient != nullptr, MMC_NEW_OBJECT_FAILED);
+    MMC_ASSERT_LOG_AND_RETURN(tmpNetClient != nullptr, "tmpNetClient is nullptr", MMC_NEW_OBJECT_FAILED);
     if (!tmpNetClient->Status()) {
         NetEngineOptions options;
         options.name = name_;
@@ -160,7 +161,7 @@ Result MmcClientDefault::Put(const std::string &key, const MmcBufferArray &bufAr
 {
     MMC_VALIDATE_RETURN(bmProxy_ != nullptr, "BmProxy is null", MMC_CLIENT_NOT_INIT);
     MMC_VALIDATE_RETURN(metaNetClient_ != nullptr, "MetaNetClient is null", MMC_CLIENT_NOT_INIT);
-    MMC_ASSERT_RETURN(!bufArr.Buffers().empty(), MMC_ERROR);
+    MMC_ASSERT_LOG_AND_RETURN(!bufArr.Buffers().empty(), "bufArr.Buffers() is empty", MMC_ERROR);
     uint64_t operateId = GenerateOperateId(rankId_);
     AllocRequest request{key, {}, operateId};
     MMC_VALIDATE_RETURN(PrepareAllocOpt(bufArr.TotalSize(), options, flags, request.options_) == MMC_OK, "put error",

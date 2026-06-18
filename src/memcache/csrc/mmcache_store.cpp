@@ -243,7 +243,8 @@ int MmcacheStore::PutFrom(const std::string &key, void *buffer, size_t size, con
     mmc_buffer mmcBuffer = {.addr = reinterpret_cast<uint64_t>(buffer), .type = type, .offset = 0, .len = size};
 
     mmc_put_options options{};
-    MMC_ASSERT_RETURN(CopyPutOptions(replicateConfig, options), MMC_ERROR);
+    auto temp = CopyPutOptions(replicateConfig, options);
+    MMC_ASSERT_LOG_AND_RETURN(temp, "CopyPutOptions(replicateConfig, options) = " << temp, MMC_ERROR);
     TP_TRACE_BEGIN(TP_MMC_PY_PUT);
     const auto res = mmcc_put(key.c_str(), &mmcBuffer, options, 0);
     auto ret = ReturnWrapper(res, key);
@@ -481,7 +482,8 @@ std::vector<int> MmcacheStore::BatchPutFrom(const std::vector<std::string> &keys
     }
 
     mmc_put_options options{};
-    MMC_ASSERT_RETURN(CopyPutOptions(replicateConfig, options), results);
+    auto temp = CopyPutOptions(replicateConfig, options);
+    MMC_ASSERT_LOG_AND_RETURN(temp, "CopyPutOptions(replicateConfig, options) = " << temp, results);
     TP_TRACE_BEGIN(TP_MMC_PY_BATCH_PUT);
     mmcc_batch_put(keyArray.data(), count, bufferArray.data(), options, ALLOC_RANDOM, results.data());
     TP_TRACE_END(TP_MMC_PY_BATCH_PUT, 0);
@@ -543,7 +545,8 @@ int MmcacheStore::PutFromLayers(const std::string &key, const std::vector<void *
                                 const std::vector<size_t> &sizes, const int32_t direct,
                                 const ReplicateConfig &replicateConfig)
 {
-    MMC_ASSERT_RETURN(MmcClientDefault::GetInstance() != nullptr, MMC_INVALID_PARAM);
+    MMC_ASSERT_LOG_AND_RETURN(MmcClientDefault::GetInstance() != nullptr,
+        "MmcClientDefault::GetInstance() is nullptr", MMC_INVALID_PARAM);
     if (direct != SMEMB_COPY_L2G && direct != SMEMB_COPY_H2G && direct != SMEMB_COPY_AUTO) {
         MMC_LOG_ERROR(
             "Invalid direct(" << direct
@@ -558,7 +561,7 @@ int MmcacheStore::PutFromLayers(const std::string &key, const std::vector<void *
     } else if (direct == SMEMB_COPY_H2G) {
         type = MEDIA_DRAM;
     } else if (direct == SMEMB_COPY_AUTO) {
-        MMC_ASSERT_RETURN(!buffers.empty(), MMC_INVALID_PARAM);
+        MMC_ASSERT_LOG_AND_RETURN(!buffers.empty(), "buffers is empty", MMC_INVALID_PARAM);
         uint64_t va = reinterpret_cast<uint64_t>(buffers[0]);
         type = IsInHybmDeviceRange(va) ? MEDIA_HBM : MEDIA_DRAM;
     }
@@ -580,7 +583,8 @@ int MmcacheStore::PutFromLayers(const std::string &key, const std::vector<void *
     }
 
     mmc_put_options options{};
-    MMC_ASSERT_RETURN(CopyPutOptions(replicateConfig, options), MMC_ERROR);
+    auto temp = CopyPutOptions(replicateConfig, options);
+    MMC_ASSERT_LOG_AND_RETURN(temp, "CopyPutOptions(replicateConfig, options) = " << temp, MMC_ERROR);
     Result res;
     MmcBufferArray bufArr;
     for (size_t i = 0; i < layerNum; i += 1) {
@@ -601,7 +605,8 @@ std::vector<int> MmcacheStore::BatchPutFromLayers(const std::vector<std::string>
                                                   const std::vector<std::vector<size_t>> &sizes, const int32_t direct,
                                                   const ReplicateConfig &replicateConfig)
 {
-    MMC_ASSERT_RETURN(MmcClientDefault::GetInstance() != nullptr, {});
+    MMC_ASSERT_LOG_AND_RETURN(MmcClientDefault::GetInstance() != nullptr,
+        "MmcClientDefault::GetInstance() is nullptr", {});
     const size_t batchSize = keys.size();
     MMC_VALIDATE_RETURN(batchSize > 0, "key vector is empty", {});
     MMC_VALIDATE_RETURN(batchSize <= MAX_BATCH_OP_COUNT, "key vector length exceeds limit" << MAX_BATCH_OP_COUNT,
@@ -649,7 +654,8 @@ std::vector<int> MmcacheStore::BatchPutFromLayers(const std::vector<std::string>
     }
 
     mmc_put_options options{};
-    MMC_ASSERT_RETURN(CopyPutOptions(replicateConfig, options), results);
+    auto temp = CopyPutOptions(replicateConfig, options);
+    MMC_ASSERT_LOG_AND_RETURN(temp, "opyPutOptions(replicateConfig, options) = " << temp, results);
     TP_TRACE_BEGIN(TP_MMC_PY_BATCH_PUT_LAYERS);
     std::vector<MmcBufferArray> bufferArrays;
     GetBufferArrays(batchSize, type, buffers, sizes, bufferArrays);
@@ -673,7 +679,8 @@ int MmcacheStore::GetIntoLayers(const std::string &key, const std::vector<void *
                                  "1 (SMEMB_COPY_G2L) , 2 (SMEMB_COPY_G2H) and 9 (SMEMB_COPY_AUTO) is supported");
         return MMC_INVALID_PARAM;
     }
-    MMC_ASSERT_RETURN(MmcClientDefault::GetInstance() != nullptr, MMC_INVALID_PARAM);
+    MMC_ASSERT_LOG_AND_RETURN(MmcClientDefault::GetInstance() != nullptr,
+        "MmcClientDefault::GetInstance() is nullptr", MMC_INVALID_PARAM);
 
     uint32_t type = MEDIA_DRAM;
     if (direct == SMEMB_COPY_G2L) {
@@ -681,7 +688,7 @@ int MmcacheStore::GetIntoLayers(const std::string &key, const std::vector<void *
     } else if (direct == SMEMB_COPY_G2H) {
         type = MEDIA_DRAM;
     } else if (direct == SMEMB_COPY_AUTO) {
-        MMC_ASSERT_RETURN(!buffers.empty(), MMC_INVALID_PARAM);
+        MMC_ASSERT_LOG_AND_RETURN(!buffers.empty(), "buffers is empty", MMC_INVALID_PARAM);
         uint64_t va = reinterpret_cast<uint64_t>(buffers[0]);
         type = IsInHybmDeviceRange(va) ? MEDIA_HBM : MEDIA_DRAM;
     }
@@ -720,7 +727,8 @@ std::vector<int> MmcacheStore::BatchGetIntoLayers(const std::vector<std::string>
                                                   const std::vector<std::vector<void *>> &buffers,
                                                   const std::vector<std::vector<size_t>> &sizes, const int32_t direct)
 {
-    MMC_ASSERT_RETURN(MmcClientDefault::GetInstance() != nullptr, {});
+    MMC_ASSERT_LOG_AND_RETURN(MmcClientDefault::GetInstance() != nullptr,
+        "MmcClientDefault::GetInstance() is nullptr", {});
     const size_t batchSize = keys.size();
     MMC_VALIDATE_RETURN(batchSize > 0, "key vector is empty", {});
     MMC_VALIDATE_RETURN(batchSize <= MAX_BATCH_OP_COUNT, "key vector length exceeds limit" << MAX_BATCH_OP_COUNT,
@@ -829,7 +837,8 @@ int MmcacheStore::ReturnWrapper(const int result, const std::string &key)
 int MmcacheStore::Put(const std::string &key, mmc_buffer &buffer, const ReplicateConfig &replicateConfig)
 {
     mmc_put_options options{};
-    MMC_ASSERT_RETURN(CopyPutOptions(replicateConfig, options), MMC_ERROR);
+    auto temp = CopyPutOptions(replicateConfig, options);
+    MMC_ASSERT_LOG_AND_RETURN(temp, "CopyPutOptions(replicateConfig, options); = " << temp, MMC_ERROR);
     TP_TRACE_BEGIN(TP_MMC_PY_PUT);
     const auto res = mmcc_put(key.c_str(), &buffer, options, 0);
     auto ret = ReturnWrapper(res, key);
@@ -859,7 +868,8 @@ int MmcacheStore::PutBatch(const std::vector<std::string> &keys, std::vector<mmc
     }
 
     mmc_put_options options{};
-    MMC_ASSERT_RETURN(CopyPutOptions(replicateConfig, options), MMC_INVALID_PARAM);
+    auto temp = CopyPutOptions(replicateConfig, options);
+    MMC_ASSERT_LOG_AND_RETURN(temp, "CopyPutOptions(replicateConfig, options) = " << temp, MMC_INVALID_PARAM);
     TP_TRACE_BEGIN(TP_MMC_PY_BATCH_PUT);
     mmcc_batch_put(keyArray.data(), count, bufferArray.data(), options, ALLOC_RANDOM, results.data());
     TP_TRACE_END(TP_MMC_PY_BATCH_PUT, 0);

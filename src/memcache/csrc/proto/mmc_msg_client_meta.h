@@ -275,7 +275,8 @@ struct BatchAllocRequest : MsgBase {
         packer.Serialize(msgId);
         packer.Serialize(destRankId);
         packer.Serialize(keys_);
-        MMC_ASSERT_RETURN(keys_.size() == options_.size(), MMC_ERROR);
+        MMC_ASSERT_LOG_AND_RETURN(keys_.size() == options_.size(),
+            "keys_.size() = " << keys_.size() << ", options_.size() = " << options_.size(), MMC_ERROR);
         for (const auto &option : options_) {
             option.Serialize(packer);
         }

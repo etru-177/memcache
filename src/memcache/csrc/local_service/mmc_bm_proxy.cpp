@@ -239,8 +239,10 @@ Result MmcBmProxy::AsyncPut(const MmcBufferArray &bufArr, const MmcMemBlobDesc &
     size_t shift = 0;
     for (const auto &buffer : bufArr.Buffers()) {
         auto addr = blob.gva_ + shift;
-        MMC_ASSERT_RETURN(addr - shift == blob.gva_, MMC_ERROR);
-        MMC_ASSERT_RETURN(blob.size_ >= shift, MMC_ERROR);
+        MMC_ASSERT_LOG_AND_RETURN(addr - shift == blob.gva_,
+            "addr = " << addr << ", shift = " << shift << ", blob.gva_ = " << blob.gva_, MMC_ERROR);
+        MMC_ASSERT_LOG_AND_RETURN(blob.size_ >= shift,
+            "blob.size_ = " << blob.size_ << ", shift = " << shift, MMC_ERROR);
         MMC_RETURN_ERROR(Put(&buffer, addr, blob.size_ - shift), "failed put data to smem bm");
         shift += MmcBufSize(buffer);
     }
@@ -263,8 +265,10 @@ Result MmcBmProxy::AsyncGet(const MmcBufferArray &bufArr, const MmcMemBlobDesc &
     size_t shift = 0;
     for (const auto &buffer : bufArr.Buffers()) {
         auto addr = blob.gva_ + shift;
-        MMC_ASSERT_RETURN(addr - shift == blob.gva_, MMC_ERROR);
-        MMC_ASSERT_RETURN(blob.size_ >= shift, MMC_ERROR);
+        MMC_ASSERT_LOG_AND_RETURN(addr - shift == blob.gva_,
+            "addr = " << addr << ", shift = " << shift << ", blob.gva_ = " << blob.gva_, MMC_ERROR);
+        MMC_ASSERT_LOG_AND_RETURN(blob.size_ >= shift,
+            "blob.size_ = " << blob.size_ << ", shift = " << shift, MMC_ERROR);
         MMC_RETURN_ERROR(Get(&buffer, addr, blob.size_ - shift), "Failed to get data from smem bm");
         shift += MmcBufSize(buffer);
     }

@@ -93,7 +93,8 @@ Result MmcBlobAllocator::Release(const MmcMemBlobPtr &blob)
         return MMC_ERROR;
     }
     auto alignedSize = AllocSizeAlignUp(blob->Size());
-    MMC_ASSERT_RETURN(allocatedSize_ >= alignedSize, MMC_ERROR);
+    MMC_ASSERT_LOG_AND_RETURN(allocatedSize_ >= alignedSize,
+        "allocatedSize_ = " << allocatedSize_ << ", alignedSize = " << alignedSize, MMC_ERROR);
     auto blobAddr = blob->Gva();
     if (blobAddr < bmAddr_ || blobAddr + alignedSize > bmAddr_ + capacity_) {
         MMC_LOG_ERROR("blob address not in allocator");

@@ -199,13 +199,13 @@ private:
 
 #define MMC_AUDIT_LOG(MSG) MMC_OUT_AUDIT_LOG(MSG)
 
-// if ARGS is false, print error
-#define MMC_ASSERT_RETURN(ARGS, RET)             \
-    do {                                         \
-        if (__builtin_expect(!(ARGS), 0) != 0) { \
-            MMC_LOG_ERROR("Assert " << #ARGS);   \
-            return RET;                          \
-        }                                        \
+// if ARGS is false, print error with variable values
+#define MMC_ASSERT_LOG_AND_RETURN(ARGS, MSG, RET)                  \
+    do {                                                            \
+        if (__builtin_expect(!(ARGS), 0) != 0) {                    \
+            MMC_LOG_ERROR("Assert " << #ARGS << ", " << MSG);       \
+            return RET;                                             \
+        }                                                           \
     } while (0)
 
 #define MMC_ASSERT_RET_VOID(ARGS)                \
