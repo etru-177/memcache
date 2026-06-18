@@ -351,7 +351,7 @@ protected:
 
 inline void NetEngine::RegRequestReceivedHandler(int16_t opCode, const NetReqReceivedHandler &h)
 {
-    MMC_ASSERT_RET_VOID(opCode >= 0 && opCode < gHandlerMax);
+    MMC_ASSERT_RET_VOID(opCode >= 0 && opCode < gHandlerMax, "opCode = " << opCode);
 
     std::lock_guard<std::mutex> guard(mutex_);
     reqReceivedHandlers_[opCode] = h;
@@ -360,8 +360,8 @@ inline void NetEngine::RegRequestReceivedHandler(int16_t opCode, const NetReqRec
 
 inline void NetEngine::RegRequestSentHandler(int16_t opCode, const NetReqSentHandler &h)
 {
-    MMC_ASSERT_RET_VOID(h != nullptr);
-    MMC_ASSERT_RET_VOID(opCode >= 0 && opCode < gHandlerMax);
+    MMC_ASSERT_RET_VOID(h != nullptr, "NetReqSentHandler is nullptr");
+    MMC_ASSERT_RET_VOID(opCode >= 0 && opCode < gHandlerMax, "opCode = " << opCode);
 
     std::lock_guard<std::mutex> guard(mutex_);
     reqSentHandlers_[opCode] = h;
@@ -369,7 +369,7 @@ inline void NetEngine::RegRequestSentHandler(int16_t opCode, const NetReqSentHan
 
 inline void NetEngine::RegNewLinkHandler(const NetNewLinkHandler &h)
 {
-    MMC_ASSERT_RET_VOID(h != nullptr);
+    MMC_ASSERT_RET_VOID(h != nullptr, "NetNewLinkHandler is nullptr");
 
     std::lock_guard<std::mutex> guard(mutex_);
     newLinkHandler_ = h;
@@ -377,7 +377,7 @@ inline void NetEngine::RegNewLinkHandler(const NetNewLinkHandler &h)
 
 inline void NetEngine::RegLinkBrokenHandler(const NetLinkBrokenHandler &h)
 {
-    MMC_ASSERT_RET_VOID(h != nullptr);
+    MMC_ASSERT_RET_VOID(h != nullptr, "NetLinkBrokenHandler is nullptr");
 
     std::lock_guard<std::mutex> guard(mutex_);
     linkBrokenHandler_ = h;

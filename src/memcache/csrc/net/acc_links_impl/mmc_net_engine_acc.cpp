@@ -80,7 +80,8 @@ void NetEngineAcc::Stop()
     if (threadPool_ != nullptr) {
         threadPool_->Destroy();
     }
-    MMC_ASSERT(StopInner() == MMC_OK);
+    Result result = StopInner();
+    MMC_ASSERT(result == MMC_OK, "StopInner = " << result);
 
     UnInitialize();
 
@@ -451,7 +452,6 @@ Result NetEngineAcc::HandleNeqRequest(const TcpReqContext &context)
     /* use result variable for real opcode */
     MMC_LOG_DEBUG("HandleNeqRequest Header " << context.Header().ToString());
     int16_t opCode = context.Header().result;
-
     MMC_ASSERT_LOG_AND_RETURN(opCode >= gHandlerMin && opCode < gHandlerMax,
         "opCode = " << opCode << ", gHandlerMin = " << gHandlerMin << ", gHandlerMax = " << gHandlerMax,
         MMC_NET_REQ_HANDLE_NO_FOUND);

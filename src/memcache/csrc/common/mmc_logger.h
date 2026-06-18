@@ -208,19 +208,19 @@ private:
         }                                                           \
     } while (0)
 
-#define MMC_ASSERT_RET_VOID(ARGS)                \
-    do {                                         \
-        if (__builtin_expect(!(ARGS), 0) != 0) { \
-            MMC_LOG_ERROR("Assert " << #ARGS);   \
-            return;                              \
-        }                                        \
+#define MMC_ASSERT_RET_VOID(ARGS, MSG)                          \
+    do {                                                        \
+        if (__builtin_expect(!(ARGS), 0) != 0) {                \
+            MMC_LOG_ERROR("Assert " << #ARGS << ", " << MSG);   \
+            return;                                             \
+        }                                                       \
     } while (0)
 
-#define MMC_ASSERT(ARGS)                         \
-    do {                                         \
-        if (__builtin_expect(!(ARGS), 0) != 0) { \
-            MMC_LOG_ERROR("Assert " << #ARGS);   \
-        }                                        \
+#define MMC_ASSERT(ARGS, MSG)                                     \
+    do {                                                          \
+        if (__builtin_expect(!(ARGS), 0) != 0) {                  \
+            MMC_LOG_ERROR("Assert " << #ARGS << ", " << MSG);     \
+        }                                                         \
     } while (0)
 
 #define MMC_RETURN_ERROR(result, msg)                     \
