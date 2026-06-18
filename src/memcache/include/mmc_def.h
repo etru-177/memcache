@@ -17,7 +17,6 @@
 #define DISCOVERY_URL_SIZE 1024
 #define PATH_MAX_SIZE      1024
 #define PROTOCOL_SIZE      64
-#define MAX_BATCH_OP_COUNT 16384
 #define TLS_PATH_SIZE      256
 #define TLS_PATH_MAX_LEN   (TLS_PATH_SIZE - 1)
 

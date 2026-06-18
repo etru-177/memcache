@@ -314,12 +314,6 @@ TEST_F(TestMmcacheStore, BatchRemoveTest)
     keys.emplace_back("test");
     ret = store->BatchRemove(keys);
     EXPECT_NE(ret[0], 0);
-
-    for (int i = 0; i < MAX_BATCH_OP_COUNT + 1; ++i) {
-        keys.push_back("test_" + std::to_string(i));
-    }
-    ret = store->BatchRemove(keys);
-    EXPECT_EQ(ret[0], MMC_INVALID_PARAM);
 }
 
 TEST_F(TestMmcacheStore, BatchIsExist)
@@ -333,12 +327,6 @@ TEST_F(TestMmcacheStore, BatchIsExist)
     keys.emplace_back("test");
     ret = store->BatchIsExist(keys);
     EXPECT_NE(ret[0], 0);
-
-    for (int i = 0; i < MAX_BATCH_OP_COUNT + 1; ++i) {
-        keys.push_back("test_" + std::to_string(i));
-    }
-    ret = store->BatchIsExist(keys);
-    EXPECT_EQ(ret[0], MMC_INVALID_PARAM);
 }
 
 TEST_F(TestMmcacheStore, BatchMalloc)

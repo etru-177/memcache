@@ -352,10 +352,6 @@ TEST_F(TestMmcServiceInterface, testBatchOperationsEdgeCases)
 
     ret = mmcc_batch_exist(nullptr, 0, results, 0);
     ASSERT_EQ(ret, ock::mmc::MMC_INVALID_PARAM);
-
-    const uint32_t oversize = MAX_BATCH_OP_COUNT + 1;
-    ret = mmcc_batch_remove(nullptr, oversize, results, 0);
-    ASSERT_EQ(ret, ock::mmc::MMC_INVALID_PARAM);
 }
 
 TEST_F(TestMmcServiceInterface, testBatchQueryInvalidKeys)
@@ -408,10 +404,6 @@ TEST_F(TestMmcServiceInterface, testBatchGetErrorHandling)
     mmc_buffer bufs[1];
     std::vector<int> results2(1, -1);
     ret = mmcc_batch_get(keys, 0, bufs, 0, results2.data());
-    ASSERT_EQ(ret, ock::mmc::MMC_INVALID_PARAM);
-
-    const uint32_t oversize = MAX_BATCH_OP_COUNT + 1;
-    ret = mmcc_batch_get(keys, oversize, bufs, 0, results2.data());
     ASSERT_EQ(ret, ock::mmc::MMC_INVALID_PARAM);
 
     const char *validKeys[] = {"key1", "key2"};
