@@ -10,6 +10,18 @@
 # MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 # See the Mulan PSL v2 for more details.
 
+import ctypes
+import os
+import sys
+
+from memfabric_hybrid import bm
+
+L2G = bm.BmCopyType.L2G  # 拷贝方向：本地 HBM → 全局空间
+G2L = bm.BmCopyType.G2L  # 拷贝方向：全局空间 → 本地 HBM
+G2H = bm.BmCopyType.G2H  # 拷贝方向：全局空间 → 本地 Host DRAM
+H2G = bm.BmCopyType.H2G  # 拷贝方向：本地 Host DRAM → 全局空间
+AUTO = bm.BmCopyType.AUTO  # 拷贝方向：自动推断方向
+
 __all__ = [
     "DistributedObjectStore",
     "KeyInfo",
@@ -17,11 +29,12 @@ __all__ = [
     "MetaConfig",
     "MetaService",
     "ReplicateConfig",
+    "L2G",
+    "G2L",
+    "G2H",
+    "H2G",
+    "AUTO",
 ]
-
-import ctypes
-import os
-import sys
 
 import memfabric_hybrid
 

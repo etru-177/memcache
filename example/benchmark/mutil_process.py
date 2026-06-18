@@ -119,7 +119,7 @@ def write_worker(*args):
         store = init_mooncake(device_id)
         print(f"==== Start to init mooncake device:{device_id}")
     else:
-        from memcache_hybrid import DistributedObjectStore
+        from memcache_hybrid import DistributedObjectStore, L2G, G2L, G2H
         store = DistributedObjectStore()
         print(f"==== Start to init memcache device:{device_id}")
         res = store.init(device_id)
@@ -169,7 +169,7 @@ def write_worker(*args):
     sync.wait()
     start = time.perf_counter()
     for keys, buffs, sizes in zip(keys_list, buffs_list, sizes_list):
-        write_ret = store.batch_put_from_layers(keys, buffs, sizes, 0)
+        write_ret = store.batch_put_from_layers(keys, buffs, sizes, L2G)
         if any(x != 0 for x in write_ret):
             raise f"Failed to put pid:{os.getpid()} deviceId:{device_id}"
     end = time.perf_counter()
@@ -210,7 +210,7 @@ def read_worker(*args):
         store = init_mooncake(device_id)
         print(f"==== Start to init mooncake device:{device_id}")
     else:
-        from memcache_hybrid import DistributedObjectStore
+        from memcache_hybrid import DistributedObjectStore, L2G, G2L, G2H
         store = DistributedObjectStore()
         print(f"==== Start to init memcache device:{device_id}")
         res = store.init(device_id)
@@ -234,9 +234,9 @@ def read_worker(*args):
         one_dim_tensor = malloc_npu_blocks(max(block_size, default=0), 1, batch_size)
         store.register_buffer(one_dim_tensor.data_ptr(), max(block_size, default=0) * batch_size)
     if g_local_type == "npu":
-        direct_t = 1
+        direct_t = G2L
     else:
-        direct_t = 2
+        direct_t = G2H
     # 实测此步骤很耗时，提前准备
     keys_list = []
     buffs_list = []

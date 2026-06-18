@@ -14,7 +14,7 @@ import time
 import sys
 import unittest
 import multiprocessing
-from memcache_hybrid import DistributedObjectStore
+from memcache_hybrid import DistributedObjectStore, L2G, G2L
 from memcache_hybrid import MetaService
 import acl
 import torch
@@ -93,11 +93,11 @@ class TestExample(unittest.TestCase):
         print(f"=========={gvas=}")
 
         time.sleep(5)
-        ret = self._distributed_object_store.batch_copy(gvas, buffers, sizes, 0)
+        ret = self._distributed_object_store.batch_copy(gvas, buffers, sizes, L2G)
         self.assertEqual(ret, 0)
 
         time.sleep(5)
-        ret = self._distributed_object_store.batch_copy(gvas, read_buffers, sizes, 1)
+        ret = self._distributed_object_store.batch_copy(gvas, read_buffers, sizes, G2L)
         self.assertEqual(ret, 0)
 
         for rd, wr in zip(read_tensors, write_tensors):
@@ -106,7 +106,7 @@ class TestExample(unittest.TestCase):
 
 
 
-        ret = self._distributed_object_store.batch_get_into(keys, read2_buffers, sizes, 1)
+        ret = self._distributed_object_store.batch_get_into(keys, read2_buffers, sizes, G2L)
         self.assertEqual(ret, [0, 0, 0, 0])
         for rd, wr in zip(read2_tensors, write_tensors):
             print(f"=========={wr.sum().item()=}, {rd.sum().item()=}")

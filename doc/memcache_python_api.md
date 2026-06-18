@@ -358,7 +358,7 @@ assert result == 0, f"put_batch failed: {result}"
 #### put_from
 
 ```python
-result = store.put_from(key, buffer_ptr, size, direct=SMEMB_COPY_H2G, replicateConfig=defaultConfig)
+result = store.put_from(key, buffer_ptr, size, direct=memcache_hybrid.H2G, replicateConfig=defaultConfig)
 ```
 
 **功能**: 从预分配的缓冲区中写入数据，适用于需要高效内存管理的场景
@@ -369,8 +369,8 @@ result = store.put_from(key, buffer_ptr, size, direct=SMEMB_COPY_H2G, replicateC
 - `buffer_ptr`: 缓冲区指针
 - `size`: 数据大小
 - `direct`: 数据拷贝方向，可选值：
-    - `SMEMB_COPY_H2G`: 从主机内存到全局内存（默认）
-    - `SMEMB_COPY_L2G`: 从卡上内存到全局内存
+    - `memcache_hybrid.H2G`: 从主机内存到全局内存（默认）
+    - `memcache_hybrid.L2G`: 从卡上内存到全局内存
 - `replicateConfig`: 复制配置，具体请参考ReplicateConfig数据结构
 
 **返回值**:
@@ -381,7 +381,7 @@ result = store.put_from(key, buffer_ptr, size, direct=SMEMB_COPY_H2G, replicateC
 #### batch_put_from
 
 ```python
-result = store.batch_put_from(keys, buffer_ptrs, sizes, direct=SMEMB_COPY_H2G, replicateConfig=defaultConfig)
+result = store.batch_put_from(keys, buffer_ptrs, sizes, direct=memcache_hybrid.H2G, replicateConfig=defaultConfig)
 ```
 
 **功能**: 从预分配的缓冲区中批量写入数据，提高处理效率
@@ -392,8 +392,8 @@ result = store.batch_put_from(keys, buffer_ptrs, sizes, direct=SMEMB_COPY_H2G, r
 - `buffer_ptrs`: 缓冲区指针列表
 - `sizes`: 数据大小列表
 - `direct`: 数据拷贝方向，可选值：
-    - `SMEMB_COPY_H2G`: 从主机内存到全局内存（默认）
-    - `SMEMB_COPY_L2G`: 从卡上内存到全局内存
+    - `memcache_hybrid.H2G`: 从主机内存到全局内存（默认）
+    - `memcache_hybrid.L2G`: 从卡上内存到全局内存
 - `replicateConfig`: 复制配置，具体请参考ReplicateConfig数据结构
 
 **返回值**:
@@ -405,7 +405,7 @@ result = store.batch_put_from(keys, buffer_ptrs, sizes, direct=SMEMB_COPY_H2G, r
 #### put_from_layers
 
 ```python
-result = store.put_from_layers(key, buffer_ptrs, sizes, direct=SMEMB_COPY_H2G, replicateConfig=defaultConfig)
+result = store.put_from_layers(key, buffer_ptrs, sizes, direct=memcache_hybrid.H2G, replicateConfig=defaultConfig)
 ```
 
 **功能**: 从多个预分配的缓冲区中写入分层数据，适用于复杂数据结构的存储
@@ -416,8 +416,8 @@ result = store.put_from_layers(key, buffer_ptrs, sizes, direct=SMEMB_COPY_H2G, r
 - `buffer_ptrs`: 缓冲区指针列表，每个指针对应一个数据层
 - `sizes`: 数据大小列表，每个元素对应一个数据层的大小
 - `direct`: 数据拷贝方向，可选值：
-    - `SMEMB_COPY_H2G`: 从主机内存到全局内存（默认）
-    - `SMEMB_COPY_L2G`: 从卡上内存到全局内存
+    - `memcache_hybrid.H2G`: 从主机内存到全局内存（默认）
+    - `memcache_hybrid.L2G`: 从卡上内存到全局内存
 - `replicateConfig`: 复制配置，具体请参考ReplicateConfig数据结构
 
 **返回值**:
@@ -428,7 +428,7 @@ result = store.put_from_layers(key, buffer_ptrs, sizes, direct=SMEMB_COPY_H2G, r
 #### batch_put_from_layers
 
 ```python
-result = store.batch_put_from_layers(keys, buffer_ptrs_list, sizes_list, direct=SMEMB_COPY_H2G,
+result = store.batch_put_from_layers(keys, buffer_ptrs_list, sizes_list, direct=memcache_hybrid.H2G,
                                      replicateConfig=defaultConfig)
 ```
 
@@ -440,8 +440,8 @@ result = store.batch_put_from_layers(keys, buffer_ptrs_list, sizes_list, direct=
 - `buffer_ptrs_list`: 缓冲区指针二维列表，外层列表对应每个键，内层列表对应每个键的各个数据层指针
 - `sizes_list`: 数据大小二维列表，外层列表对应每个键，内层列表对应每个键的各个数据层大小
 - `direct`: 数据拷贝方向，可选值：
-    - `SMEMB_COPY_H2G`: 从主机内存到全局内存（默认）
-    - `SMEMB_COPY_L2G`: 从卡上内存到全局内存
+    - `memcache_hybrid.H2G`: 从主机内存到全局内存（默认）
+    - `memcache_hybrid.L2G`: 从卡上内存到全局内存
 - `replicateConfig`: 复制配置，具体请参考ReplicateConfig数据结构
 
 **返回值**:
@@ -501,7 +501,7 @@ for key, value in zip(keys, values):
 #### get_into
 
 ```python
-result = store.get_into(key, buffer_ptr, size, direct=SMEMB_COPY_G2H)
+result = store.get_into(key, buffer_ptr, size, direct=memcache_hybrid.G2H)
 ```
 
 **功能**: 将数据直接获取到预分配的缓冲区中，适用于需要高效内存管理的场景
@@ -512,8 +512,8 @@ result = store.get_into(key, buffer_ptr, size, direct=SMEMB_COPY_G2H)
 - `buffer_ptr`: 目标缓冲区指针
 - `size`: 缓冲区大小
 - `direct`: 数据拷贝方向，可选值：
-    - `SMEMB_COPY_G2H`: 从全局内存到主机内存（默认）
-    - `SMEMB_COPY_G2L`: 从全局内存到卡上内存
+    - `memcache_hybrid.G2H`: 从全局内存到主机内存（默认）
+    - `memcache_hybrid.G2L`: 从全局内存到卡上内存
 
 **返回值**:
 
@@ -523,7 +523,7 @@ result = store.get_into(key, buffer_ptr, size, direct=SMEMB_COPY_G2H)
 #### batch_get_into
 
 ```python
-results = store.batch_get_into(keys, buffer_ptrs, sizes, direct=SMEMB_COPY_G2H)
+results = store.batch_get_into(keys, buffer_ptrs, sizes, direct=memcache_hybrid.G2H)
 ```
 
 **功能**: 批量将数据获取到预分配的缓冲区中，提高处理效率
@@ -534,8 +534,8 @@ results = store.batch_get_into(keys, buffer_ptrs, sizes, direct=SMEMB_COPY_G2H)
 - `buffer_ptrs`: 缓冲区指针列表
 - `sizes`: 缓冲区大小列表
 - `direct`: 数据拷贝方向，可选值：
-    - `SMEMB_COPY_G2H`: 从全局内存到主机内存（默认）
-    - `SMEMB_COPY_G2L`: 从全局内存到卡上内存
+    - `memcache_hybrid.G2H`: 从全局内存到主机内存（默认）
+    - `memcache_hybrid.G2L`: 从全局内存到卡上内存
 
 **返回值**:
 
@@ -546,7 +546,7 @@ results = store.batch_get_into(keys, buffer_ptrs, sizes, direct=SMEMB_COPY_G2H)
 #### get_into_layers
 
 ```python
-result = store.get_into_layers(key, buffer_ptrs, sizes, direct=SMEMB_COPY_G2H)
+result = store.get_into_layers(key, buffer_ptrs, sizes, direct=memcache_hybrid.G2H)
 ```
 
 **功能**: 将数据分层获取到预分配的缓冲区中，适用于复杂数据结构的读取
@@ -557,8 +557,8 @@ result = store.get_into_layers(key, buffer_ptrs, sizes, direct=SMEMB_COPY_G2H)
 - `buffer_ptrs`: 目标缓冲区指针列表，每个指针对应一个数据层
 - `sizes`: 缓冲区大小列表，每个元素对应一个数据层的大小
 - `direct`: 数据拷贝方向，可选值：
-    - `SMEMB_COPY_G2H`: 从全局内存到主机内存（默认）
-    - `SMEMB_COPY_G2L`: 从全局内存到卡上内存
+    - `memcache_hybrid.G2H`: 从全局内存到主机内存（默认）
+    - `memcache_hybrid.G2L`: 从全局内存到卡上内存
 
 **返回值**:
 
@@ -568,7 +568,7 @@ result = store.get_into_layers(key, buffer_ptrs, sizes, direct=SMEMB_COPY_G2H)
 #### batch_get_into_layers
 
 ```python
-results = store.batch_get_into_layers(keys, buffer_ptrs_list, sizes_list, direct=SMEMB_COPY_G2H)
+results = store.batch_get_into_layers(keys, buffer_ptrs_list, sizes_list, direct=memcache_hybrid.G2H)
 ```
 
 **功能**: 批量将分层数据获取到预分配的缓冲区中，提高处理效率
@@ -579,8 +579,8 @@ results = store.batch_get_into_layers(keys, buffer_ptrs_list, sizes_list, direct
 - `buffer_ptrs_list`: 缓冲区指针二维列表，外层列表对应每个键，内层列表对应每个键的各个目标数据层指针
 - `sizes_list`: 缓冲区大小二维列表，外层列表对应每个键，内层列表对应每个键的各个数据层大小
 - `direct`: 数据拷贝方向，可选值：
-    - `SMEMB_COPY_G2H`: 从全局内存到主机内存（默认）
-    - `SMEMB_COPY_G2L`: 从全局内存到卡上内存
+    - `memcache_hybrid.G2H`: 从全局内存到主机内存（默认）
+    - `memcache_hybrid.G2L`: 从全局内存到卡上内存
 
 **返回值**:
 
