@@ -261,6 +261,8 @@ result = store.setup(config)
 
 **功能**: 设置分布式内存缓存客户端配置
 
+**注**：如果开启device_urma协议，则`max dram * world_size`的池化总大小必须大于32T
+
 **参数**:
 
 - `config`: LocalConfig对象，包含客户端的所有配置参数

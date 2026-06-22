@@ -41,9 +41,10 @@ static std::shared_ptr<ObjectStore> CreateObjectStore();
 
 #### Setup
 ```c++
-virtual int Setup(const local_config &config) = 0;
+virtual int Setup(const local_config &config);
 ```
 **功能**: 初始化并校验本地配置，供后续 `Init` 使用。
+**注**：如果开启device_urma协议，则`max dram * world_size`的池化总大小必须大于32T
 
 **参数**:
 - `config`: 本地配置（`local_config`）

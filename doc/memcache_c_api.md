@@ -31,6 +31,7 @@ void mmcs_meta_service_stop(mmc_meta_service_t handle);
 mmc_local_service_t mmcs_local_service_start(mmc_local_service_config_t *config);
 ```
 **功能**: 启动分布式内存缓存的本地服务，负责本地内存对象的管理。
+**注**：如果开启device_urma协议，则`max dram * world_size`的池化总大小必须大于32T
 
 **参数**:
 - `config`: 本地服务配置信息
