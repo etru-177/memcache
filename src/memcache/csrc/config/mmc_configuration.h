@@ -366,7 +366,7 @@ public:
         config.aggregateNum = GetInt(ConfConstant::OCK_MMC_CLIENT_AGGREGATE_NUM);
         config.writeThreadPoolNum = static_cast<uint32_t>(GetInt(ConfConstant::OCK_MMC_CLIENT_WRITE_THREAD_POOL_SIZE));
         config.batchChunkSize =
-            GetUInt64(ConfConstant::OKC_MMC_LOCAL_SERVICE_DRAM_SIZE.first, DEFAULT_BATCH_CHUNK_SIZE);
+            GetUInt64(ConfConstant::OCK_MMC_CLIENT_BATCH_CHUNK_SIZE.first, DEFAULT_BATCH_CHUNK_SIZE);
         config.batchChunkCount = GetInt(ConfConstant::OCK_MMC_CLIENT_BATCH_CHUNK_COUNT);
         std::string logLevelStr = GetString(ConfConstant::OCK_MMC_LOG_LEVEL);
         StringToUpper(logLevelStr);
