@@ -14,6 +14,8 @@
 
 #include <condition_variable>
 
+#include <vector>
+
 #include "nlohmann/json.hpp"
 
 #include "mmc_blob_state.h"
@@ -32,12 +34,10 @@ struct MemObjQueryInfo {
     uint16_t prot_;
     uint8_t numBlobs_;
     bool valid_;
-    uint32_t blobRanks_[MAX_BLOB_COPIES];
-    uint16_t blobTypes_[MAX_BLOB_COPIES];
-    uint64_t blobGvas_[MAX_BLOB_COPIES];
-    MemObjQueryInfo() : size_(0), prot_(0), numBlobs_(0), valid_(false), blobTypes_{0}, blobRanks_{0}, blobGvas_{0} {}
+    std::vector<MmcMemBlobDesc> blobs_;
+    MemObjQueryInfo() : size_(0), prot_(0), numBlobs_(0), valid_(false), blobs_{} {}
     MemObjQueryInfo(const uint64_t size, const uint16_t prot, const uint8_t numBlobs, const bool valid)
-        : size_(size), prot_(prot), numBlobs_(numBlobs), valid_(valid)
+        : size_(size), prot_(prot), numBlobs_(numBlobs), valid_(valid), blobs_{}
     {}
 
     nlohmann::json toJson(const std::string &key) const
@@ -50,10 +50,15 @@ struct MemObjQueryInfo {
         queryInfo["valid"] = valid_;
 
         nlohmann::json blobsArray = nlohmann::json::array();
-        for (uint32_t i = 0; i < numBlobs_; i++) {
+        const uint32_t blobCount =
+            numBlobs_ < static_cast<uint32_t>(blobs_.size()) ? numBlobs_ : static_cast<uint32_t>(blobs_.size());
+        for (uint32_t i = 0; i < blobCount; i++) {
             nlohmann::json blobJson;
-            blobJson["rank"] = blobRanks_[i];
-            blobJson["medium"] = MediumTypeToString(static_cast<MediaType>(blobTypes_[i]));
+            blobJson["rank"] = blobs_[i].rank_;
+            blobJson["medium"] = MediumTypeToString(static_cast<MediaType>(blobs_[i].mediaType_));
+            blobJson["gva"] = blobs_[i].gva_;
+            blobJson["state"] = blobs_[i].state_;
+            blobJson["leaseTimeoutTtlMs"] = blobs_[i].leaseTimeoutTtlMs_;
             blobsArray.push_back(blobJson);
         }
         queryInfo["blobs"] = blobsArray;
@@ -78,8 +83,8 @@ class MmcMemBlob final : public MmcReferable {
 public:
     MmcMemBlob() = delete;
     MmcMemBlob(const uint32_t &rank, const uint64_t &gva, const uint64_t &size, const MediaType &mediaType,
-               const BlobState &state)
-        : rank_(rank), gva_(gva), size_(size), mediaType_(mediaType), state_(state)
+               const BlobState &state, uint64_t defaultTtlMs = MMC_DATA_TTL_MS)
+        : rank_(rank), gva_(gva), size_(size), mediaType_(mediaType), state_(state), metaLeaseManager_(defaultTtlMs)
     {}
     ~MmcMemBlob() override = default;
 
@@ -149,6 +154,9 @@ public:
     inline Result ExtendLease(const uint32_t id, const uint32_t requestId, uint64_t ttl);
 
     inline bool IsLeaseExpired();
+
+    inline uint64_t LeaseTimeoutTtlMs() const;
+    inline void SetDefaultLeaseTtlMs(uint64_t defaultTtlMs);
 
     friend std::ostream &operator<<(std::ostream &os, const MmcMemBlob &blob)
     {
@@ -239,7 +247,7 @@ inline bool MmcMemBlob::MatchFilter(const MmcBlobFilterPtr &filter) const
 
 inline MmcMemBlobDesc MmcMemBlob::GetDesc() const
 {
-    return MmcMemBlobDesc{rank_, gva_, size_, mediaType_};
+    return MmcMemBlobDesc{rank_, gva_, size_, mediaType_, state_, LeaseTimeoutTtlMs()};
 }
 
 Result MmcMemBlob::ExtendLease(const uint32_t id, const uint32_t requestId, uint64_t ttl)
@@ -254,6 +262,16 @@ bool MmcMemBlob::IsLeaseExpired()
     }
     metaLeaseManager_.Wait();
     return true;
+}
+
+inline uint64_t MmcMemBlob::LeaseTimeoutTtlMs() const
+{
+    return metaLeaseManager_.RemainingLeaseTtlMs();
+}
+
+inline void MmcMemBlob::SetDefaultLeaseTtlMs(uint64_t defaultTtlMs)
+{
+    metaLeaseManager_.SetDefaultTtlMs(defaultTtlMs);
 }
 
 } // namespace mmc

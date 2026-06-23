@@ -50,6 +50,7 @@ enum MmcErrorCode : int32_t {
     MMC_UNMATCHED_RET = -3103,
     MMC_LEASE_NOT_EXPIRED = -3104,
     MMC_META_BACKUP_ERROR = -3105,
+    MMC_LEASE_EXPIRED = -3106,
 };
 
 inline std::ostream &operator<<(std::ostream &os, MmcErrorCode errCode)

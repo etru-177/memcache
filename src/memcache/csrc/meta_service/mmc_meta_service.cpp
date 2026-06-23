@@ -37,6 +37,9 @@ Result MmcMetaService::Start(const mmc_meta_service_config_t &options)
     options_ = options;
     MMC_VALIDATE_RETURN(options.evictThresholdHigh > options.evictThresholdLow,
                         "invalid param, evictThresholdHigh must large than evictThresholdLow", MMC_INVALID_PARAM);
+    options_.leaseTtlMs = options.leaseTtlMs == 0 ? MMC_DATA_TTL_MS : options.leaseTtlMs;
+    MMC_VALIDATE_RETURN(options_.leaseTtlMs > 0, "invalid param, leaseTtlMs must be greater than 0",
+                        MMC_INVALID_PARAM);
 
     metaNetServer_ = MmcMakeRef<MetaNetServer>(this, name_ + "_MetaServer").Get();
     MMC_ASSERT_LOG_AND_RETURN(metaNetServer_.Get() != nullptr,
@@ -62,7 +65,7 @@ Result MmcMetaService::Start(const mmc_meta_service_config_t &options)
     }
 
     metaMgrProxy_ = MmcMakeRef<MmcMetaMgrProxy>(metaNetServer_).Get();
-    MMC_RETURN_ERROR(metaMgrProxy_->Start(MMC_DATA_TTL_MS, options.evictThresholdHigh, options.evictThresholdLow),
+    MMC_RETURN_ERROR(metaMgrProxy_->Start(options_.leaseTtlMs, options.evictThresholdHigh, options.evictThresholdLow),
         "Failed to start meta mgr proxy of meta service " << name_);
 
     NetEngineOptions configStoreOpt{};
@@ -191,7 +194,7 @@ bool MmcMetaService::StartPeriodicTask(const std::string &taskName, uint32_t int
         return false;
     }
     if (periodicTask_ == nullptr) {
-        periodicTask_ = std::make_unique<MmcPeriodicTask>();
+        periodicTask_ = std::make_unique<MmcPeriodicTask>(name_);
     }
 
     if (!periodicTask_->RegisterTask(taskName, intervalSeconds, std::move(task))) {

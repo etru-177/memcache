@@ -19,6 +19,7 @@
 #define PROTOCOL_SIZE      64
 #define TLS_PATH_SIZE      256
 #define TLS_PATH_MAX_LEN   (TLS_PATH_SIZE - 1)
+#define MMC_QUERY_FLAG_GVA_READ_START (1U << 0)
 
 #ifdef __cplusplus
 extern "C" {
@@ -53,6 +54,7 @@ typedef struct {
     int32_t logRotationFileCount;
     uint16_t evictThresholdHigh;
     uint16_t evictThresholdLow;
+    uint64_t leaseTtlMs;
     mmc_tls_config accTlsConfig;
     mmc_tls_config configStoreTlsConfig;
     uint32_t metricsReportIntervalSeconds;

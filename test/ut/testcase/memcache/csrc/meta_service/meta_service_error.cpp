@@ -13,6 +13,7 @@
 #include "gtest/gtest.h"
 #include "mmc_service.h"
 #include "mmc_client.h"
+#include "mmc_periodic_task.h"
 #include "mmc_blob_allocator.h"
 
 using namespace testing;
@@ -201,6 +202,7 @@ TEST_F(TestMmcServiceError, metaService)
     free(hostSrc);
     free(hostDest);
     mmcs_local_service_stop(local_service);
+    MmcPeriodicTaskFactory::DestroyInstance();
     mmcc_uninit();
     mmcs_meta_service_stop(meta_service);
 }
@@ -351,6 +353,7 @@ TEST_F(TestMmcServiceError, metaServiceRebuild)
     free(hostSrc);
     free(hostDest);
     mmcs_local_service_stop(local_service);
+    MmcPeriodicTaskFactory::DestroyInstance();
     mmcc_uninit();
     mmcs_meta_service_stop(meta_service);
 }

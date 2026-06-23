@@ -28,6 +28,7 @@ constexpr auto OCK_MMC_METRICS_REPORT_INTERVAL_SECONDS =
 constexpr auto OCK_MMC_META_HA_ENABLE = std::make_pair("ock.mmc.meta.ha.enable", false);
 constexpr auto OKC_MMC_EVICT_THRESHOLD_HIGH = std::make_pair("ock.mmc.evict_threshold_high", 90);
 constexpr auto OKC_MMC_EVICT_THRESHOLD_LOW = std::make_pair("ock.mmc.evict_threshold_low", 80);
+constexpr auto OCK_MMC_META_LEASE_TTL_MS = std::make_pair("ock.mmc.meta.lease_ttl_ms", 2000);
 constexpr auto OCK_MMC_LOG_LEVEL = std::make_pair("ock.mmc.log_level", "info");
 constexpr auto OCK_MMC_LOG_PATH = std::make_pair("ock.mmc.log_path", "/var/log/memcache_hybrid");
 constexpr auto OCK_MMC_LOG_ROTATION_FILE_SIZE = std::make_pair("ock.mmc.log_rotation_file_size", 20);
@@ -94,6 +95,8 @@ constexpr int MAX_WORLD_SIZE = 1024;
 
 constexpr int MIN_EVICT_THRESHOLD = 1;
 constexpr int MAX_EVICT_THRESHOLD = 99;
+constexpr int MIN_LEASE_TTL_MS = 1;
+constexpr int MAX_LEASE_TTL_MS = 2147483647;
 
 constexpr int MIN_RETRY_MS = 0;
 constexpr int MAX_RETRY_MS = 600000;

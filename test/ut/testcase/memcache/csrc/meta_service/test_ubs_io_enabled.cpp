@@ -14,6 +14,7 @@
 #include "mmc_def.h"
 #include "mmc_service.h"
 #include "mmc_client.h"
+#include "mmc_periodic_task.h"
 #include "mmc_mem_blob.h"
 #include "mmc_blob_allocator.h"
 #include "mmc_types.h"
@@ -93,6 +94,7 @@ TEST_F(TestUbsIoEnabled, ClientInitWithUbsIoEnabled)
     int32_t ret = mmcc_init(&clientConfig);
     ASSERT_EQ(ret, ock::mmc::MMC_OK);
 
+    MmcPeriodicTaskFactory::DestroyInstance();
     mmcc_uninit();
 }
 
@@ -170,6 +172,7 @@ TEST_F(TestUbsIoEnabled, PutAndGetWithUbsIoFallback)
     free(hostSrc);
     free(hostDest);
     sleep(1);
+    MmcPeriodicTaskFactory::DestroyInstance();
     mmcs_local_service_stop(local_service);
     mmcc_uninit();
     mmcs_meta_service_stop(meta_service);
@@ -266,6 +269,7 @@ TEST_F(TestUbsIoEnabled, BatchGetWithUbsIoFallback)
     }
 
     sleep(1);
+    MmcPeriodicTaskFactory::DestroyInstance();
     mmcs_local_service_stop(local_service);
     mmcc_uninit();
     mmcs_meta_service_stop(meta_service);
@@ -346,6 +350,7 @@ TEST_F(TestUbsIoEnabled, ExistOperationsWithUbsIo)
     sleep(1);
     mmcs_local_service_stop(local_service);
     mmcc_uninit();
+    MmcPeriodicTaskFactory::DestroyInstance();
     mmcs_meta_service_stop(meta_service);
 }
 
@@ -425,6 +430,7 @@ TEST_F(TestUbsIoEnabled, QueryOperationsWithUbsIo)
 
     free(hostSrc);
     sleep(1);
+    MmcPeriodicTaskFactory::DestroyInstance();
     mmcs_local_service_stop(local_service);
     mmcc_uninit();
     mmcs_meta_service_stop(meta_service);
@@ -509,6 +515,7 @@ TEST_F(TestUbsIoEnabled, UbsIoFallbackWhenMemcacheFull)
     free(hostSrc);
     free(hostDest);
     sleep(1);
+    MmcPeriodicTaskFactory::DestroyInstance();
     mmcs_local_service_stop(local_service);
     mmcc_uninit();
     mmcs_meta_service_stop(meta_service);
@@ -589,6 +596,7 @@ TEST_F(TestUbsIoEnabled, UbsIoDisabledCompare)
     free(hostSrc);
     free(hostDest);
     sleep(1);
+    MmcPeriodicTaskFactory::DestroyInstance();
     mmcs_local_service_stop(local_service);
     mmcc_uninit();
     mmcs_meta_service_stop(meta_service);

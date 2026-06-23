@@ -11,6 +11,7 @@
 */
 #include "mmc_meta_lease_manager.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <limits>
 #include <thread>
@@ -53,11 +54,13 @@ Result MmcMetaLeaseManager::Extend(uint64_t ttl)
 
 void MmcMetaLeaseManager::Wait()
 {
+    const uint64_t waitIntervalMs =
+        std::min<uint64_t>(std::max<uint64_t>(1, defaultTtlMs_ / 10ULL), MMC_DATA_TTL_MS / 10ULL);
     while (!useClient.empty()) {
         if ((ock::dagger::Monotonic::TimeUs() / 1000ULL) >= lease_) {
             return;
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(MMC_DATA_TTL_MS / 10ULL));
+        std::this_thread::sleep_for(std::chrono::milliseconds(waitIntervalMs));
     }
 }
 } // namespace mmc

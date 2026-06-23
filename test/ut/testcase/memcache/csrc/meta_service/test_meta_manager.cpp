@@ -14,6 +14,7 @@
 #include <thread>
 #include "gtest/gtest.h"
 #include "mmc_meta_manager.h"
+#include "mmc_def.h"
 #include "mmc_ref.h"
 
 using namespace testing;
@@ -40,6 +41,12 @@ TestMmcMetaManager::TestMmcMetaManager() {}
 void TestMmcMetaManager::SetUp() {}
 
 void TestMmcMetaManager::TearDown() {}
+
+static Result QueryWithGvaReadStart(const MmcRef<MmcMetaManager> &metaMng, const std::string &key, uint64_t operateId,
+                                    MemObjQueryInfo &queryInfo)
+{
+    return metaMng->Query(key, operateId, MMC_QUERY_FLAG_GVA_READ_START, queryInfo);
+}
 
 TEST_F(TestMmcMetaManager, Init)
 {
@@ -1082,6 +1089,270 @@ TEST_F(TestMmcMetaManager, RewarmBlob_AlreadyHasDram_SkipsRewarm)
 
     // DRAM 用量不变（未产生新分配）
     EXPECT_EQ(getSegmentUsed("DRAM"), dramUsedBefore);
+
+    metaMng->Stop();
+}
+
+TEST_F(TestMmcMetaManager, GvaAlloc_PendingWriteCannotRead)
+{
+    MmcLocation loc{0, MEDIA_DRAM};
+    MmcLocalMemlInitInfo locInfo{0, 1000000};
+    uint64_t defaultTtl = 2000;
+    uint64_t opId1 = 1;
+    uint64_t opId2 = 2;
+    auto metaMng = MmcMakeRef<MmcMetaManager>(defaultTtl, 70, 60);
+    ASSERT_TRUE(metaMng != nullptr);
+    ASSERT_EQ(metaMng->Start(), MMC_OK);
+    std::map<std::string, MmcMemBlobDesc> blobMap;
+    ASSERT_EQ(metaMng->Mount(loc, locInfo, blobMap), MMC_OK);
+
+    AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, ALLOC_FLAGS_GVA_MALLOC_MASK};
+
+    MmcMemMetaDesc objMeta;
+    Result ret = metaMng->Alloc("gva_key_1", allocReq, 1, objMeta);
+    ASSERT_EQ(ret, MMC_OK);
+    ASSERT_EQ(objMeta.NumBlobs(), 1);
+
+    MemObjQueryInfo queryInfo;
+    ret = QueryWithGvaReadStart(metaMng, "gva_key_1", opId2, queryInfo);
+    ASSERT_EQ(ret, MMC_OK);
+    ASSERT_TRUE(queryInfo.valid_);
+    ASSERT_EQ(queryInfo.numBlobs_, 1);
+    ASSERT_EQ(queryInfo.blobs_[0].state_, ALLOCATED);
+
+    metaMng->Remove("gva_key_1");
+    metaMng->Stop();
+}
+
+TEST_F(TestMmcMetaManager, GvaWriteOk_BecomesReadable)
+{
+    MmcLocation loc{0, MEDIA_DRAM};
+    MmcLocalMemlInitInfo locInfo{0, 1000000};
+    uint64_t defaultTtl = 3210;
+    uint64_t opId1 = 1;
+    uint64_t opId2 = 2;
+    auto metaMng = MmcMakeRef<MmcMetaManager>(defaultTtl, 70, 60);
+    ASSERT_TRUE(metaMng != nullptr);
+    ASSERT_EQ(metaMng->Start(), MMC_OK);
+    std::map<std::string, MmcMemBlobDesc> blobMap;
+    ASSERT_EQ(metaMng->Mount(loc, locInfo, blobMap), MMC_OK);
+
+    AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, ALLOC_FLAGS_GVA_MALLOC_MASK};
+
+    MmcMemMetaDesc objMeta;
+    Result ret = metaMng->Alloc("gva_key_2", allocReq, opId1, objMeta);
+    ASSERT_EQ(ret, MMC_OK);
+    ASSERT_EQ(objMeta.NumBlobs(), 1);
+
+    const auto &blob = objMeta.blobs_[0];
+    ret = metaMng->UpdateBlobState(blob.gva_, blob.size_, MMC_WRITE_OK);
+    ASSERT_EQ(ret, MMC_OK);
+
+    bool matched = false;
+    int loopTimes = 50;
+    int64_t sleepMs = 20;
+    for (int i = 0; i < loopTimes; ++i) {
+        MemObjQueryInfo queryInfo;
+        ret = QueryWithGvaReadStart(metaMng, "gva_key_2", opId2, queryInfo);
+        if (ret == MMC_OK && queryInfo.valid_ && queryInfo.numBlobs_ == 1 &&
+            queryInfo.blobs_[0].leaseTimeoutTtlMs_ > 0) {
+            ASSERT_EQ(queryInfo.blobs_[0].state_, READABLE);
+            ASSERT_LE(queryInfo.blobs_[0].leaseTimeoutTtlMs_, defaultTtl);
+            ASSERT_EQ(metaMng->UpdateState("gva_key_2", loc, MMC_READ_FINISH, opId2), MMC_OK);
+            matched = true;
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(sleepMs));
+    }
+    ASSERT_TRUE(matched);
+
+    metaMng->Remove("gva_key_2");
+    metaMng->Stop();
+}
+
+TEST_F(TestMmcMetaManager, QueryFlagReadStart_WorksForRegularReadableSingleBlob)
+{
+    MmcLocation loc{0, MEDIA_DRAM};
+    MmcLocalMemlInitInfo locInfo{0, 1000000};
+    uint64_t defaultTtl = 3210;
+    uint64_t opId1 = 1;
+    uint64_t opId2 = 2;
+    auto metaMng = MmcMakeRef<MmcMetaManager>(defaultTtl, 70, 60);
+    ASSERT_TRUE(metaMng != nullptr);
+    ASSERT_EQ(metaMng->Start(), MMC_OK);
+    std::map<std::string, MmcMemBlobDesc> blobMap;
+    ASSERT_EQ(metaMng->Mount(loc, locInfo, blobMap), MMC_OK);
+
+    AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, 0};
+
+    MmcMemMetaDesc objMeta;
+    Result ret = metaMng->Alloc("regular_key_1", allocReq, opId1, objMeta);
+    ASSERT_EQ(ret, MMC_OK);
+    ASSERT_EQ(objMeta.NumBlobs(), 1);
+    ASSERT_EQ(metaMng->UpdateState("regular_key_1", loc, MMC_WRITE_OK, opId1), MMC_OK);
+
+    MemObjQueryInfo queryInfo;
+    ret = QueryWithGvaReadStart(metaMng, "regular_key_1", opId2, queryInfo);
+    ASSERT_EQ(ret, MMC_OK);
+    ASSERT_TRUE(queryInfo.valid_);
+    ASSERT_EQ(queryInfo.numBlobs_, 1);
+    ASSERT_EQ(queryInfo.blobs_[0].state_, READABLE);
+    ASSERT_GT(queryInfo.blobs_[0].leaseTimeoutTtlMs_, 0);
+    ASSERT_LE(queryInfo.blobs_[0].leaseTimeoutTtlMs_, defaultTtl);
+    ASSERT_EQ(metaMng->UpdateState("regular_key_1", loc, MMC_READ_FINISH, opId2), MMC_OK);
+
+    metaMng->Remove("regular_key_1");
+    metaMng->Stop();
+}
+
+TEST_F(TestMmcMetaManager, GvaPartialWrite_StillNotReadable)
+{
+    MmcLocation loc{0, MEDIA_DRAM};
+    MmcLocalMemlInitInfo locInfo{0, 1000000};
+    uint64_t defaultTtl = 2000;
+    uint64_t opId1 = 1;
+    uint64_t opId2 = 2;
+    auto metaMng = MmcMakeRef<MmcMetaManager>(defaultTtl, 70, 60);
+    ASSERT_TRUE(metaMng != nullptr);
+    ASSERT_EQ(metaMng->Start(), MMC_OK);
+    std::map<std::string, MmcMemBlobDesc> blobMap;
+    ASSERT_EQ(metaMng->Mount(loc, locInfo, blobMap), MMC_OK);
+
+    AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, ALLOC_FLAGS_GVA_MALLOC_MASK};
+
+    MmcMemMetaDesc objMeta;
+    Result ret = metaMng->Alloc("gva_key_3", allocReq, opId1, objMeta);
+    ASSERT_EQ(ret, MMC_OK);
+    ASSERT_EQ(objMeta.NumBlobs(), 1);
+
+    const auto &blob = objMeta.blobs_[0];
+    uint64_t partialSize = blob.size_ / 2;
+    ret = metaMng->UpdateBlobState(blob.gva_, partialSize, MMC_WRITE_OK);
+    ASSERT_EQ(ret, MMC_OK);
+
+    MemObjQueryInfo queryInfo;
+    ret = QueryWithGvaReadStart(metaMng, "gva_key_3", opId2, queryInfo);
+    ASSERT_EQ(ret, MMC_OK);
+    ASSERT_TRUE(queryInfo.valid_);
+    ASSERT_EQ(queryInfo.numBlobs_, 1);
+    ASSERT_EQ(queryInfo.blobs_[0].state_, ALLOCATED);
+
+    metaMng->Remove("gva_key_3");
+    metaMng->Stop();
+}
+
+TEST_F(TestMmcMetaManager, GvaRemoveAfterReadable_CleansIndex)
+{
+    MmcLocation loc{0, MEDIA_DRAM};
+    MmcLocalMemlInitInfo locInfo{0, 1000000};
+    uint64_t defaultTtl = 2000;
+    uint64_t opId1 = 1;
+    uint64_t opId2 = 2;
+    auto metaMng = MmcMakeRef<MmcMetaManager>(defaultTtl, 70, 60);
+    ASSERT_TRUE(metaMng != nullptr);
+    ASSERT_EQ(metaMng->Start(), MMC_OK);
+    std::map<std::string, MmcMemBlobDesc> blobMap;
+    ASSERT_EQ(metaMng->Mount(loc, locInfo, blobMap), MMC_OK);
+
+    AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, ALLOC_FLAGS_GVA_MALLOC_MASK};
+
+    MmcMemMetaDesc objMeta;
+    Result ret = metaMng->Alloc("gva_key_4", allocReq, opId1, objMeta);
+    ASSERT_EQ(ret, MMC_OK);
+    ASSERT_EQ(objMeta.NumBlobs(), 1);
+
+    const auto &blob = objMeta.blobs_[0];
+    ASSERT_EQ(metaMng->UpdateBlobState(blob.gva_, blob.size_, MMC_WRITE_OK), MMC_OK);
+    ASSERT_EQ(metaMng->Remove("gva_key_4"), MMC_OK);
+    ASSERT_EQ(metaMng->ExistKey("gva_key_4"), MMC_UNMATCHED_KEY);
+
+    bool matched = false;
+    int loopTimes = 50;
+    int64_t sleepMs = 20;
+    for (int i = 0; i < loopTimes; ++i) {
+        MemObjQueryInfo queryInfo;
+        ret = QueryWithGvaReadStart(metaMng, "gva_key_4", opId2, queryInfo);
+        if (ret == MMC_UNMATCHED_KEY) {
+            matched = true;
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(sleepMs));
+    }
+    ASSERT_TRUE(matched);
+
+    metaMng->Stop();
+}
+
+TEST_F(TestMmcMetaManager, GvaWriteFail_RemovesKey)
+{
+    MmcLocation loc{0, MEDIA_DRAM};
+    MmcLocalMemlInitInfo locInfo{0, 1000000};
+    uint64_t defaultTtl = 2000;
+    uint64_t opId1 = 1;
+    uint64_t opId2 = 2;
+    auto metaMng = MmcMakeRef<MmcMetaManager>(defaultTtl, 70, 60);
+    ASSERT_TRUE(metaMng != nullptr);
+    ASSERT_EQ(metaMng->Start(), MMC_OK);
+    std::map<std::string, MmcMemBlobDesc> blobMap;
+    ASSERT_EQ(metaMng->Mount(loc, locInfo, blobMap), MMC_OK);
+
+    AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, ALLOC_FLAGS_GVA_MALLOC_MASK};
+
+    MmcMemMetaDesc objMeta;
+    Result ret = metaMng->Alloc("gva_key_5", allocReq, opId1, objMeta);
+    ASSERT_EQ(ret, MMC_OK);
+    ASSERT_EQ(objMeta.NumBlobs(), 1);
+
+    const auto &blob = objMeta.blobs_[0];
+    ret = metaMng->UpdateBlobState(blob.gva_, blob.size_, MMC_WRITE_FAIL);
+    ASSERT_EQ(ret, MMC_OK);
+    ASSERT_EQ(metaMng->ExistKey("gva_key_5"), MMC_UNMATCHED_KEY);
+
+    bool matched = false;
+    int loopTimes = 50;
+    int64_t sleepMs = 20;
+    for (int i = 0; i < loopTimes; ++i) {
+        MemObjQueryInfo queryInfo;
+        ret = QueryWithGvaReadStart(metaMng, "gva_key_5", opId2, queryInfo);
+        if (ret == MMC_UNMATCHED_KEY) {
+            matched = true;
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(sleepMs));
+    }
+    ASSERT_TRUE(matched);
+
+    metaMng->Stop();
+}
+
+TEST_F(TestMmcMetaManager, GvaUnmount_CleansSegmentIndex)
+{
+    MmcLocation loc{0, MEDIA_DRAM};
+    MmcLocalMemlInitInfo locInfo{0, 1000000};
+    uint64_t defaultTtl = 2000;
+    uint64_t opId1 = 1;
+    uint64_t opId2 = 2;
+    auto metaMng = MmcMakeRef<MmcMetaManager>(defaultTtl, 70, 60);
+    ASSERT_TRUE(metaMng != nullptr);
+    ASSERT_EQ(metaMng->Start(), MMC_OK);
+    std::map<std::string, MmcMemBlobDesc> blobMap;
+    ASSERT_EQ(metaMng->Mount(loc, locInfo, blobMap), MMC_OK);
+
+    AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, ALLOC_FLAGS_GVA_MALLOC_MASK};
+
+    MmcMemMetaDesc objMeta;
+    Result ret = metaMng->Alloc("gva_key_6", allocReq, opId1, objMeta);
+    ASSERT_EQ(ret, MMC_OK);
+    ASSERT_EQ(objMeta.NumBlobs(), 1);
+
+    const auto &blob = objMeta.blobs_[0];
+    ASSERT_EQ(metaMng->UpdateBlobState(blob.gva_, blob.size_, MMC_WRITE_OK), MMC_OK);
+
+    ASSERT_EQ(metaMng->Unmount(loc), MMC_OK);
+
+    MemObjQueryInfo queryInfo;
+    ret = QueryWithGvaReadStart(metaMng, "gva_key_6", opId2, queryInfo);
+    ASSERT_EQ(ret, MMC_UNMATCHED_KEY);
 
     metaMng->Stop();
 }

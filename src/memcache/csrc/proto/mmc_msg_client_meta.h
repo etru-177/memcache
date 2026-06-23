@@ -433,7 +433,7 @@ struct AllocResponse : MsgBase {
     Result result_{0};                  /* result of the operation */
 
     AllocResponse() : MsgBase{0, ML_ALLOC_RESP, 0} {}
-    AllocResponse(const uint8_t &numBlobs, const uint16_t &prot, const uint8_t &priority, const uint64_t &lease)
+    AllocResponse(const uint8_t &numBlobs, const uint16_t &prot, const uint8_t &priority)
         : MsgBase{0, ML_ALLOC_RESP, 0}, numBlobs_(numBlobs), prot_(prot), priority_(priority)
     {}
 
@@ -818,16 +818,22 @@ struct BatchIsExistResponse : MsgBase {
 };
 
 struct QueryRequest : MsgBase {
+    uint64_t operateId_{0};
+    uint32_t flag_{0};
     std::string key_;
 
     QueryRequest() : MsgBase{0, ML_QUERY_REQ, 0} {}
-    explicit QueryRequest(const std::string &key) : MsgBase{0, ML_QUERY_REQ, 0}, key_(key) {}
+    explicit QueryRequest(const std::string &key, uint64_t operateId = 0, uint32_t flag = 0)
+        : MsgBase{0, ML_QUERY_REQ, 0}, operateId_(operateId), flag_(flag), key_(key)
+    {}
 
     Result Serialize(NetMsgPacker &packer) const override
     {
         packer.Serialize(msgVer);
         packer.Serialize(msgId);
         packer.Serialize(destRankId);
+        packer.Serialize(operateId_);
+        packer.Serialize(flag_);
         packer.Serialize(key_);
         return MMC_OK;
     }
@@ -837,10 +843,30 @@ struct QueryRequest : MsgBase {
         packer.Deserialize(msgVer);
         packer.Deserialize(msgId);
         packer.Deserialize(destRankId);
+        packer.Deserialize(operateId_);
+        packer.Deserialize(flag_);
         packer.Deserialize(key_);
         return MMC_OK;
     }
 };
+
+inline void SerializeMemObjQueryInfo(NetMsgPacker &packer, const MemObjQueryInfo &queryInfo)
+{
+    packer.Serialize(queryInfo.size_);
+    packer.Serialize(queryInfo.prot_);
+    packer.Serialize(queryInfo.numBlobs_);
+    packer.Serialize(queryInfo.valid_);
+    packer.Serialize(queryInfo.blobs_);
+}
+
+inline void DeserializeMemObjQueryInfo(NetMsgUnpacker &packer, MemObjQueryInfo &queryInfo)
+{
+    packer.Deserialize(queryInfo.size_);
+    packer.Deserialize(queryInfo.prot_);
+    packer.Deserialize(queryInfo.numBlobs_);
+    packer.Deserialize(queryInfo.valid_);
+    packer.Deserialize(queryInfo.blobs_);
+}
 
 struct QueryResponse : MsgBase {
     MemObjQueryInfo queryInfo_;
@@ -853,7 +879,7 @@ struct QueryResponse : MsgBase {
         packer.Serialize(msgVer);
         packer.Serialize(msgId);
         packer.Serialize(destRankId);
-        packer.Serialize(queryInfo_);
+        SerializeMemObjQueryInfo(packer, queryInfo_);
         return MMC_OK;
     }
 
@@ -862,22 +888,28 @@ struct QueryResponse : MsgBase {
         packer.Deserialize(msgVer);
         packer.Deserialize(msgId);
         packer.Deserialize(destRankId);
-        packer.Deserialize(queryInfo_);
+        DeserializeMemObjQueryInfo(packer, queryInfo_);
         return MMC_OK;
     }
 };
 
 struct BatchQueryRequest : MsgBase {
+    uint64_t operateId_{0};
+    uint32_t flag_{0};
     std::vector<std::string> keys_;
 
     BatchQueryRequest() : MsgBase{0, ML_BATCH_QUERY_REQ, 0} {}
-    explicit BatchQueryRequest(const std::vector<std::string> &keys) : MsgBase{0, ML_BATCH_QUERY_REQ, 0}, keys_(keys) {}
+    explicit BatchQueryRequest(const std::vector<std::string> &keys, uint64_t operateId = 0, uint32_t flag = 0)
+        : MsgBase{0, ML_BATCH_QUERY_REQ, 0}, operateId_(operateId), flag_(flag), keys_(keys)
+    {}
 
     Result Serialize(NetMsgPacker &packer) const override
     {
         packer.Serialize(msgVer);
         packer.Serialize(msgId);
         packer.Serialize(destRankId);
+        packer.Serialize(operateId_);
+        packer.Serialize(flag_);
         packer.Serialize(keys_);
         return MMC_OK;
     }
@@ -887,6 +919,8 @@ struct BatchQueryRequest : MsgBase {
         packer.Deserialize(msgVer);
         packer.Deserialize(msgId);
         packer.Deserialize(destRankId);
+        packer.Deserialize(operateId_);
+        packer.Deserialize(flag_);
         packer.Deserialize(keys_);
         return MMC_OK;
     }
@@ -905,7 +939,11 @@ struct BatchQueryResponse : MsgBase {
         packer.Serialize(msgVer);
         packer.Serialize(msgId);
         packer.Serialize(destRankId);
-        packer.Serialize(batchQueryInfos_);
+        const std::size_t size = batchQueryInfos_.size();
+        packer.Serialize(size);
+        for (const auto &queryInfo : batchQueryInfos_) {
+            SerializeMemObjQueryInfo(packer, queryInfo);
+        }
         return MMC_OK;
     }
 
@@ -914,7 +952,19 @@ struct BatchQueryResponse : MsgBase {
         packer.Deserialize(msgVer);
         packer.Deserialize(msgId);
         packer.Deserialize(destRankId);
-        packer.Deserialize(batchQueryInfos_);
+        std::size_t size = 0;
+        packer.Deserialize(size);
+        if (size > MAX_CONTAINER_SIZE) {
+            MMC_LOG_ERROR("container size: " << size << " exceeds limit: " << MAX_CONTAINER_SIZE);
+            return MMC_ERROR;
+        }
+        batchQueryInfos_.clear();
+        batchQueryInfos_.reserve(size);
+        for (std::size_t i = 0; i < size; ++i) {
+            MemObjQueryInfo queryInfo;
+            DeserializeMemObjQueryInfo(packer, queryInfo);
+            batchQueryInfos_.push_back(std::move(queryInfo));
+        }
         return MMC_OK;
     }
 };

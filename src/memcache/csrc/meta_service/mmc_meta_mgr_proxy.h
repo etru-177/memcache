@@ -33,14 +33,14 @@ public:
 
     ~MmcMetaMgrProxy() override = default;
 
-    Result Start(uint64_t defaultTtl, uint16_t evictThresholdHigh, uint16_t evictThresholdLow)
+    Result Start(uint64_t leaseTtl, uint16_t evictThresholdHigh, uint16_t evictThresholdLow)
     {
         std::lock_guard<std::mutex> guard(mutex_);
         if (started_) {
             MMC_LOG_INFO("MmcMetaMgrProxyDefault already started");
             return MMC_OK;
         }
-        metaMangerPtr_ = MmcMakeRef<MmcMetaManager>(defaultTtl, evictThresholdHigh, evictThresholdLow);
+        metaMangerPtr_ = MmcMakeRef<MmcMetaManager>(leaseTtl, evictThresholdHigh, evictThresholdLow);
         if (metaMangerPtr_ == nullptr) {
             MMC_LOG_ERROR("new object failed, probably out of memory");
             return MMC_NEW_OBJECT_FAILED;
@@ -150,7 +150,7 @@ public:
     {
         MmcMetaMetricManager &metricManager = MmcMetaMetricManager::GetInstance();
         metricManager.IncrementRequestCounter(RestMetricType::QUERY);
-        Result metaRet = metaMangerPtr_->Query(req.key_, resp.queryInfo_);
+        Result metaRet = metaMangerPtr_->Query(req.key_, req.operateId_, req.flag_, resp.queryInfo_);
         IncrementResultCounter(metricManager, RestMetricType::QUERY, metaRet);
         return metaRet;
     }
@@ -164,7 +164,7 @@ public:
         for (const std::string &key : req.keys_) {
             MemObjQueryInfo queryInfo;
             metricManager.IncrementRequestCounter(RestMetricType::QUERY);
-            Result metaRet = metaMangerPtr_->Query(key, queryInfo);
+            Result metaRet = metaMangerPtr_->Query(key, req.operateId_, req.flag_, queryInfo);
             results.push_back(metaRet);
             resp.batchQueryInfos_.push_back(queryInfo);
             IncrementResultCounter(metricManager, RestMetricType::QUERY, metaRet);

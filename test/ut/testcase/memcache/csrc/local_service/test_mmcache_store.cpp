@@ -9,11 +9,13 @@
  * MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
  * See the Mulan PSL v2 for more details.
 */
+#include <chrono>
 #include <iostream>
 #include <memory>
 #include <stdlib.h>
 #include <cstdio>
 #include <fstream>
+#include <thread>
 #include "gtest/gtest.h"
 #include "mmcache.h"
 #include "mmc_def.h"
@@ -342,6 +344,7 @@ TEST_F(TestMmcacheStore, BatchMalloc)
     metaServiceConfig.evictThresholdHigh = 80UL;
     metaServiceConfig.evictThresholdLow = 60UL;
     metaServiceConfig.haEnable = false;
+    metaServiceConfig.leaseTtlMs = 100;
     // mmc_meta_service_config_t 不再有 localSsdSize
     UrlStringToChar(metaUrl, metaServiceConfig.discoveryURL);
     UrlStringToChar(bmUrl, metaServiceConfig.configStoreURL);
@@ -382,11 +385,22 @@ TEST_F(TestMmcacheStore, BatchMalloc)
 
     ret = store->BatchCopy(gvas, buffer1, sizes, 0);
     EXPECT_EQ(ret, 0);
+    ret = store->BatchCopy(gvas, buffer1, sizes, 0);
+    EXPECT_EQ(ret, MMC_UNMATCHED_STATE);
+    ret = store->BatchCopy(gvas, buffer2, sizes, 1);
+    EXPECT_EQ(ret, MMC_UNMATCHED_STATE);
+    auto infos = store->BatchGetKeyInfo(keys, MMC_QUERY_FLAG_GVA_READ_START);
+    EXPECT_EQ(infos.size(), keys.size());
     ret = store->BatchCopy(gvas, buffer2, sizes, 1);
     EXPECT_EQ(ret, 0);
     for (auto i = 0; i < sizes.size(); ++i) {
         ret = memcmp(buffer1[i], buffer2[i], sizes[i]);
     }
+    auto leaseInfos = store->BatchGetKeyInfo(keys, MMC_QUERY_FLAG_GVA_READ_START);
+    EXPECT_EQ(leaseInfos.size(), keys.size());
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    ret = store->BatchCopy(gvas, buffer2, sizes, 1);
+    EXPECT_EQ(ret, MMC_LEASE_EXPIRED);
 
     store->BatchRemove(keys);
     store->TearDown();
@@ -806,4 +820,72 @@ TEST_F(TestMmcacheStore, RegisterBm_ReportsSsdMount)
     store->TearDown();
     mmcs_meta_service_stop(meta_service);
     std::remove(confPath.c_str());
+}
+
+TEST_F(TestMmcacheStore, BatchMallocLeaseCleanUp)
+{
+    std::string metaUrl = kMmcacheStoreMetaUrl;
+    std::string bmUrl = kMmcacheStoreConfigStoreUrl;
+
+    mmc_meta_service_config_t metaServiceConfig{};
+    metaServiceConfig.logLevel = INFO_LEVEL;
+    metaServiceConfig.logRotationFileSize = 2 * 1024 * 1024;
+    metaServiceConfig.logRotationFileCount = 20;
+    metaServiceConfig.accTlsConfig.tlsEnable = false;
+    metaServiceConfig.evictThresholdHigh = 80;
+    metaServiceConfig.evictThresholdLow = 60;
+    metaServiceConfig.haEnable = false;
+    metaServiceConfig.leaseTtlMs = 100;
+    UrlStringToChar(metaUrl, metaServiceConfig.discoveryURL);
+    UrlStringToChar(bmUrl, metaServiceConfig.configStoreURL);
+    mmc_meta_service_t meta_service = mmcs_meta_service_start(&metaServiceConfig);
+    ASSERT_TRUE(meta_service != nullptr);
+    mmc_set_extern_logger([](int level, const char *msg) { std::cerr << msg << std::endl; });
+    mmc_set_log_level(1);
+
+    std::shared_ptr<ObjectStore> store = ObjectStore::CreateObjectStore();
+    auto ret = GenerateLocalConf(confPath_);
+    ASSERT_EQ(ret, 0);
+    MMC_LOCAL_CONF_PATH = confPath_;
+    ret = store->Init(0);
+    ASSERT_EQ(ret, 0);
+
+    std::vector<std::string> keys{"lease_key1", "lease_key2", "lease_key3", "lease_key4"};
+    uint64_t bufferTestSize2M = 1024 * 1024 * 2ULL;
+    std::vector<uint64_t> sizes(keys.size(), bufferTestSize2M);
+    uint16_t media = 1;
+
+    auto gva_vec = store->BatchMalloc(keys, sizes, media);
+    for (auto gva : gva_vec) {
+        EXPECT_NE(gva, 0);
+    }
+
+    std::vector<void *> buffer1, buffer2, gvas;
+    for (size_t i = 0; i < sizes.size(); ++i) {
+        auto ptr1 = malloc(sizes[i]);
+        memset(ptr1, static_cast<int>(i), sizes[i]);
+        auto ptr2 = malloc(sizes[i]);
+        memset(ptr2, 0, sizes[i]);
+        buffer1.push_back(ptr1);
+        buffer2.push_back(ptr2);
+        gvas.push_back(reinterpret_cast<void *>(gva_vec[i]));
+    }
+
+    ret = store->BatchCopy(gvas, buffer1, sizes, 0);
+    EXPECT_EQ(ret, 0);
+
+    auto infos = store->BatchGetKeyInfo(keys, MMC_QUERY_FLAG_GVA_READ_START);
+    EXPECT_EQ(infos.size(), keys.size());
+
+    std::this_thread::sleep_for(std::chrono::seconds(4));
+    ret = store->BatchCopy(gvas, buffer2, sizes, 1);
+    EXPECT_EQ(ret, MMC_UNMATCHED_KEY);
+
+    store->BatchRemove(keys);
+    store->TearDown();
+    mmcs_meta_service_stop(meta_service);
+    for (size_t i = 0; i < sizes.size(); ++i) {
+        free(buffer1[i]);
+        free(buffer2[i]);
+    }
 }

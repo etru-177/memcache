@@ -128,9 +128,9 @@ public:
 
     std::vector<int> BatchIsExist(const std::vector<std::string> &keys) override;
 
-    KeyInfo GetKeyInfo(const std::string &key) override;
+    KeyInfo GetKeyInfo(const std::string &key, uint32_t flag = 0) override;
 
-    std::vector<KeyInfo> BatchGetKeyInfo(const std::vector<std::string> &keys) override;
+    std::vector<KeyInfo> BatchGetKeyInfo(const std::vector<std::string> &keys, uint32_t flag = 0) override;
 
     std::vector<uintptr_t> BatchMalloc(const std::vector<std::string> &keys, const std::vector<size_t> &sizes,
                                        uint16_t media) override;

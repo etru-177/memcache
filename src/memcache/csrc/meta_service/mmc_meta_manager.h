@@ -8,7 +8,7 @@
  * EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
  * MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
  * See the Mulan PSL v2 for more details.
-*/
+ */
 #ifndef MEM_FABRIC_MMC_META_MANAGER_H
 #define MEM_FABRIC_MMC_META_MANAGER_H
 
@@ -22,8 +22,8 @@
 #include "mmc_mem_obj_meta.h"
 #include "mmc_meta_container.h"
 #include "mmc_meta_backup_mgr.h"
+#include "mmc_meta_gva_index.h"
 #include "mmc_meta_net_server.h"
-#include "mmc_interval_map.h"
 #include "mmc_thread_pool.h"
 
 namespace ock {
@@ -90,7 +90,7 @@ class MmcMetaManager : public MmcReferable {
 public:
     explicit MmcMetaManager(uint64_t defaultTtl, uint16_t evictThresholdHigh,
                             uint16_t evictThresholdLow)
-        : defaultTtlMs_(defaultTtl), evictThresholdHigh_(evictThresholdHigh),
+        : defaultTtlMs_(defaultTtl == 0 ? MMC_DATA_TTL_MS : defaultTtl), evictThresholdHigh_(evictThresholdHigh),
           evictThresholdLow_(evictThresholdLow)
     {}
 
@@ -216,11 +216,13 @@ public:
                             const MmcMemBlobDesc &srcDesc);
 
     /**
-     * @brief Get blob query info with key
-     * @param key            [in] key of the meta object
-     * @param queryInfo      [out] the query info of the meta object
-     */
-    Result Query(const std::string &key, MemObjQueryInfo &queryInfo);
+      * @brief Get blob query info with key
+      * @param key            [in] key of the meta object
+      * @param operateId      [in] operateId of the meta object
+      * @param flags          [int] the flags of query operation, see MMC_QUERY_FLAG_GVA_READ_START
+      * @param queryInfo      [out] the query info of the meta object
+      */
+    Result Query(const std::string &key, uint64_t operateId, uint32_t flags, MemObjQueryInfo &queryInfo);
 
     /**
      * @brief Get all keys
@@ -258,7 +260,7 @@ private:
     Result FillObjMetaWithRewarm(const std::string &key, uint64_t operateId, MmcBlobFilterPtr filterPtr,
                                  const MmcMemObjMetaPtr &memObj, MmcMemMetaDesc &objMeta);
 
-    Result CopyBlob(const std::string& key, const MmcMemObjMetaPtr &objMeta,
+    Result CopyBlob(const std::string &key, const MmcMemObjMetaPtr &objMeta,
                     const MmcMemBlobDesc &srcBlob, const MmcLocation &dstLoc);
 
     Result RebuildMeta(std::map<std::string, MmcMemBlobDesc> &blobMap);
@@ -269,6 +271,11 @@ private:
     EvictResult EvictCallBackFunction(const std::string &key, const MmcMemObjMetaPtr &objMeta, MediaType srcMediaType);
 
     Result BlobDeleteRpc(const std::string &key, const MmcMemBlobDesc &blob);
+
+    Result RegisterGvaPendingWriteBlob(const std::string &key, uint64_t operateId, const MmcMemObjMetaPtr &objMeta,
+                                       const MmcMemBlobPtr &blob);
+
+    void UnregisterGvaPendingWriteBlob(const MmcMemBlobPtr &blob);
 
 private:
     std::mutex mutex_;
@@ -285,61 +292,7 @@ private:
     uint16_t evictThresholdLow_;
     MetaNetServerPtr metaNetServer_;
     MmcThreadPoolPtr threadPool_;
-
-    struct GvaMapInfo {
-        std::string key_;
-        uint64_t operateId_ = 0;
-        MmcMemBlobPtr blob_;
-        std::map<size_t, size_t> ranges_; // key: start, value: end
-
-        bool Fill(size_t start, size_t fillSize)
-        {
-            if (fillSize == 0) {
-                return false;
-            }
-
-            size_t gva = blob_->Gva();
-            size_t size = blob_->Size();
-
-            size_t absStart = std::max(start, gva);
-            size_t absEnd = std::min(start + fillSize, gva + size);
-            if (absStart >= absEnd) {
-                return false;
-            }
-
-            // 找到第一个可能重叠的区间
-            auto it = ranges_.upper_bound(absStart);
-            if (it != ranges_.begin()) {
-                auto prevIt = std::prev(it);
-                if (prevIt->second >= absStart) {
-                    // 与前一个区间重叠
-                    absStart = std::min(absStart, prevIt->first);
-                    absEnd = std::max(absEnd, prevIt->second);
-                    it = ranges_.erase(prevIt);
-                }
-            }
-
-            // 合并后续重叠的区间
-            while (it != ranges_.end() && it->first <= absEnd) {
-                absEnd = std::max(absEnd, it->second);
-                it = ranges_.erase(it);
-            }
-
-            // 插入合并后的区间
-            ranges_[absStart] = absEnd;
-
-            // 检查是否完全填满
-            return (ranges_.size() == 1 && ranges_.begin()->first == gva && ranges_.begin()->second == gva + size);
-        }
-
-        bool operator==(const GvaMapInfo &other) const
-        {
-            return key_ == other.key_ && operateId_ == other.operateId_;
-        }
-    };
-
-    std::mutex gvaMutex_;
-    MmcIntervalMap<GvaMapInfo> gva2updateMap_;
+    MmcMetaGvaIndex gvaIndex_;
 };
 using MmcMetaManagerPtr = MmcRef<MmcMetaManager>;
 } // namespace mmc

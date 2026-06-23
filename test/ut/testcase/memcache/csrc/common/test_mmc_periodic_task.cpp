@@ -27,14 +27,14 @@ public:
 
 TEST_F(TestMmcPeriodicTask, RegisterTaskReturnsFalseWhenIntervalIsZero)
 {
-    MmcPeriodicTask scheduler;
+    MmcPeriodicTask scheduler("testName");
     EXPECT_FALSE(scheduler.RegisterTask("zero_interval", 0, []() {}));
     EXPECT_FALSE(scheduler.IsRunning());
 }
 
 TEST_F(TestMmcPeriodicTask, RegisterTaskReturnsFalseWhenTaskIsEmpty)
 {
-    MmcPeriodicTask scheduler;
+    MmcPeriodicTask scheduler("testName");
     MmcPeriodicTask::Task emptyTask;
     EXPECT_FALSE(scheduler.RegisterTask("empty_task", 1, emptyTask));
     EXPECT_FALSE(scheduler.IsRunning());
@@ -42,7 +42,7 @@ TEST_F(TestMmcPeriodicTask, RegisterTaskReturnsFalseWhenTaskIsEmpty)
 
 TEST_F(TestMmcPeriodicTask, StartWithoutRegisteredTasksSucceeds)
 {
-    MmcPeriodicTask scheduler;
+    MmcPeriodicTask scheduler("testName");
     EXPECT_TRUE(scheduler.Start());
     EXPECT_TRUE(scheduler.IsRunning());
 
@@ -52,7 +52,7 @@ TEST_F(TestMmcPeriodicTask, StartWithoutRegisteredTasksSucceeds)
 
 TEST_F(TestMmcPeriodicTask, StartTwiceReturnsTrueWhenAlreadyRunning)
 {
-    MmcPeriodicTask scheduler;
+    MmcPeriodicTask scheduler("testName");
     std::atomic<int> counter{0};
     ASSERT_TRUE(scheduler.RegisterTask("double_start_task", 1, [&counter]() { ++counter; }));
 
@@ -66,7 +66,7 @@ TEST_F(TestMmcPeriodicTask, StartTwiceReturnsTrueWhenAlreadyRunning)
 
 TEST_F(TestMmcPeriodicTask, StartAndStopWorkCorrectly)
 {
-    MmcPeriodicTask scheduler;
+    MmcPeriodicTask scheduler("testName");
     std::atomic<int> counter{0};
     ASSERT_TRUE(scheduler.RegisterTask("count_task", 1, [&counter]() { ++counter; }));
     EXPECT_TRUE(scheduler.Start());
@@ -83,7 +83,7 @@ TEST_F(TestMmcPeriodicTask, StartAndStopWorkCorrectly)
 
 TEST_F(TestMmcPeriodicTask, RegisterSameNameUpdatesTaskAndInterval)
 {
-    MmcPeriodicTask scheduler;
+    MmcPeriodicTask scheduler("testName");
     std::atomic<int> oldTaskCounter{0};
     std::atomic<int> newTaskCounter{0};
 
@@ -102,7 +102,7 @@ TEST_F(TestMmcPeriodicTask, RegisterSameNameUpdatesTaskAndInterval)
 
 TEST_F(TestMmcPeriodicTask, TaskExceptionDoesNotStopScheduler)
 {
-    MmcPeriodicTask scheduler;
+    MmcPeriodicTask scheduler("testName");
     std::atomic<int> counter{0};
     ASSERT_TRUE(scheduler.RegisterTask("throw_task", 1, [&counter]() {
         ++counter;
@@ -123,7 +123,7 @@ TEST_F(TestMmcPeriodicTask, TaskExceptionDoesNotStopScheduler)
 
 TEST_F(TestMmcPeriodicTask, UnknownExceptionDoesNotStopScheduler)
 {
-    MmcPeriodicTask scheduler;
+    MmcPeriodicTask scheduler("testName");
     std::atomic<int> counter{0};
     ASSERT_TRUE(scheduler.RegisterTask("unknown_throw_task", 1, [&counter]() {
         ++counter;
@@ -144,14 +144,14 @@ TEST_F(TestMmcPeriodicTask, UnknownExceptionDoesNotStopScheduler)
 
 TEST_F(TestMmcPeriodicTask, StopWithoutStartIsSafe)
 {
-    MmcPeriodicTask scheduler;
+    MmcPeriodicTask scheduler("testName");
     scheduler.Stop();
     EXPECT_FALSE(scheduler.IsRunning());
 }
 
 TEST_F(TestMmcPeriodicTask, RegisterTaskWhileRunningCanWakeWorkerAndExecute)
 {
-    MmcPeriodicTask scheduler;
+    MmcPeriodicTask scheduler("testName");
     std::atomic<int> counter{0};
 
     ASSERT_TRUE(scheduler.RegisterTask("slow_task", 10UL, []() {}));
@@ -168,7 +168,7 @@ TEST_F(TestMmcPeriodicTask, RegisterTaskWhileRunningCanWakeWorkerAndExecute)
 
 TEST_F(TestMmcPeriodicTask, MultipleDueTasksExecuteInRegistrationOrder)
 {
-    MmcPeriodicTask scheduler;
+    MmcPeriodicTask scheduler("testName");
     std::atomic<int> step{0};
     std::atomic<int> firstOrder{0};
     std::atomic<int> secondOrder{0};

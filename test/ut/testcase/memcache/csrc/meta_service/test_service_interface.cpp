@@ -16,6 +16,7 @@
 #include "mmc_client.h"
 #include "mmc_mem_blob.h"
 #include "mmc_blob_allocator.h"
+#include "mmc_periodic_task.h"
 #include "mmc_types.h"
 
 using namespace testing;
@@ -174,6 +175,7 @@ TEST_F(TestMmcServiceInterface, MultiLevelEvict)
     sleep(1);
     free(hostSrc);
     mmcs_local_service_stop(local_service);
+    MmcPeriodicTaskFactory::DestroyInstance();
     mmcc_uninit();
     mmcs_meta_service_stop(meta_service);
 
@@ -295,6 +297,7 @@ TEST_F(TestMmcServiceInterface, metaServiceStart)
     free(hostSrc);
     free(hostDest);
     mmcs_local_service_stop(local_service);
+    MmcPeriodicTaskFactory::DestroyInstance();
     mmcc_uninit();
     mmcs_meta_service_stop(meta_service);
 }

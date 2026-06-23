@@ -15,10 +15,12 @@
 #include "mmc_common_includes.h"
 #include "mmc_configuration.h"
 #include "mmc_def.h"
+#include "mmc_define.h"
 #include "mmc_env.h"
 #include "mmc_service.h"
 #include "mmc_thread_pool.h"
 #include "mmc_types.h"
+#include "mmc_periodic_task.h"
 
 using namespace ock::mmc;
 static mmc_local_service_t g_localService;
@@ -42,6 +44,7 @@ mmc_meta_service_config_t create_default_meta_config()
     config.logRotationFileCount = 50;
     config.evictThresholdHigh = 90U;
     config.evictThresholdLow = 80U;
+    config.leaseTtlMs = MMC_DATA_TTL_MS;
     config.accTlsConfig.tlsEnable = false;
     config.configStoreTlsConfig.tlsEnable = false;
     config.metricsReportIntervalSeconds = 0U;
@@ -62,6 +65,7 @@ std::string meta_config_to_string(const mmc_meta_service_config_t &config)
     oss << "  log_rotation_file_count: " << config.logRotationFileCount << "\n";
     oss << "  evict_threshold_high: " << config.evictThresholdHigh << "\n";
     oss << "  evict_threshold_low: " << config.evictThresholdLow << "\n";
+    oss << "  lease_ttl_ms: " << config.leaseTtlMs << "\n";
     oss << "  tls_enable: " << (config.accTlsConfig.tlsEnable ? "true" : "false") << "\n";
     oss << "  tls_ca_path: " << config.accTlsConfig.caPath << "\n";
     oss << "  tls_ca_crl_path: " << config.accTlsConfig.crlPath << "\n";
@@ -281,6 +285,7 @@ MMC_API void mmc_uninit()
         return;
     }
 
+    MmcPeriodicTaskFactory::DestroyInstance();
     if (g_localService != nullptr) {
         mmcs_local_service_stop(g_localService);
         g_localService = nullptr;

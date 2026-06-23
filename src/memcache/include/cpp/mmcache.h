@@ -319,14 +319,14 @@ public:
      * @param key key to get info
      * @return key info
      */
-    virtual KeyInfo GetKeyInfo(const std::string &key) = 0;
+    virtual KeyInfo GetKeyInfo(const std::string &key, uint32_t flag = 0) = 0;
 
     /**
      * @brief get multiple objects info
      * @param keys Vector of keys to get info
      * @return Vector of key infos
      */
-    virtual std::vector<KeyInfo> BatchGetKeyInfo(const std::vector<std::string> &keys) = 0;
+    virtual std::vector<KeyInfo> BatchGetKeyInfo(const std::vector<std::string> &keys, uint32_t flag = 0) = 0;
 
     virtual std::vector<uintptr_t> BatchMalloc(const std::vector<std::string> &keys, const std::vector<size_t> &sizes,
                                                uint16_t media) = 0;

@@ -172,6 +172,13 @@ Result MmcMetaMgrProxy::BatchUpdateBlobState(const BatchUpdateBlobRequest &req, 
     }
 
     for (size_t i = 0; i < gvaCount; ++i) {
+        if (req.actionResults_[i] != MMC_WRITE_OK && req.actionResults_[i] != MMC_WRITE_FAIL) {
+            MMC_LOG_ERROR("unsupported gva action " << req.actionResults_[i] << ", gva:" << req.gvas_[i]
+                                                    << ", size:" << req.sizes_[i]);
+            resp.results_.push_back(MMC_INVALID_PARAM);
+            continue;
+        }
+
         Result ret = metaMangerPtr_->UpdateBlobState(req.gvas_[i], req.sizes_[i], req.actionResults_[i]);
         if (ret != MMC_OK) {
             MMC_LOG_ERROR("update for gva: " << req.gvas_[i] << ", size:" << req.sizes_[i]

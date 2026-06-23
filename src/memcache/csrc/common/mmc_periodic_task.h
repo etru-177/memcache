@@ -23,6 +23,7 @@
 #include <thread>
 #include <utility>
 #include <vector>
+#include <map>
 
 #include "mmc_logger.h"
 #include "mmc_ptracer.h"
@@ -34,7 +35,7 @@ class MmcPeriodicTask {
 public:
     using Task = std::function<void()>;
 
-    MmcPeriodicTask() = default;
+    explicit MmcPeriodicTask(const std::string &name) : name_(name) {}
     ~MmcPeriodicTask()
     {
         Stop();
@@ -168,12 +169,50 @@ private:
     }
 
 private:
+    std::string name_;
     std::vector<TaskEntry> tasks_;
     std::thread worker_;
     std::mutex mutex_;
     std::condition_variable cv_;
     std::atomic<bool> running_{false};
     std::atomic<bool> stop_{false};
+};
+
+class MmcPeriodicTaskFactory {
+public:
+    static std::shared_ptr<MmcPeriodicTask> GetInstance(const std::string &key = "")
+    {
+        const std::string realKey = key.empty() ? kDefaultKey : key;
+        std::lock_guard<std::mutex> lock(instanceMutex_);
+        const auto it = instances_.find(realKey);
+        if (it == instances_.end()) {
+            std::shared_ptr<MmcPeriodicTask> instance(
+                new (std::nothrow) MmcPeriodicTask(realKey));
+            if (instance == nullptr) {
+                MMC_LOG_ERROR("new object failed, probably out of memory");
+                return nullptr;
+            }
+            instances_.insert(std::make_pair(realKey, instance));
+            return instance;
+        }
+        return it->second;
+    }
+
+    static void DestroyInstance(const std::string &key = "")
+    {
+        const std::string realKey = key.empty() ? kDefaultKey : key;
+        std::lock_guard<std::mutex> lock(instanceMutex_);
+        const auto it = instances_.find(realKey);
+        if (it != instances_.end()) {
+            it->second->Stop();
+            instances_.erase(it);
+        }
+    }
+
+private:
+    inline static std::map<std::string, std::shared_ptr<MmcPeriodicTask>> instances_;
+    inline static std::mutex instanceMutex_;
+    inline static const std::string kDefaultKey = "periodTask";
 };
 
 } // namespace mmc

@@ -189,12 +189,13 @@ virtual int IsExist(const std::string &key) = 0;
 
 #### GetKeyInfo
 ```c++
-virtual KeyInfo GetKeyInfo(const std::string &key) = 0;
+virtual KeyInfo GetKeyInfo(const std::string &key, uint32_t flag = 0) = 0;
 ```
 **功能**: 获取键的元信息。
 
 **参数**:
 - `key`: 数据的键，长度小于256个字节
+- `flag`: 查询标志，默认值为 `0`；在单 blob 场景下，可传入 `MMC_QUERY_FLAG_GVA_READ_START` 为后续基于 GVA 的读取流程做准备
 
 **返回值**:
 返回 KeyInfo，包含：
@@ -202,6 +203,11 @@ virtual KeyInfo GetKeyInfo(const std::string &key) = 0;
 - `blobNum_`: 数据副本数
 - `loc_`: 数据副本所在位置列表
 - `type_`: 数据副本所在介质类型列表
+- `gva_`: 数据副本对应的 GVA 列表
+
+> 补充说明：
+> `GetKeyInfo` 的实际签名带 `flag` 参数。默认值为 `0`；在单 blob 场景下，可传入 `MMC_QUERY_FLAG_GVA_READ_START` 为后续基于 GVA 的读取流程做准备。
+> `KeyInfo` 除 `size_`、`blobNum_`、`loc_`、`type_` 外，还包含 `gva_`，用于描述每个 blob 对应的 GVA 列表。
 
 ### 4. 批量操作接口
 
@@ -267,12 +273,13 @@ virtual std::vector<int> BatchIsExist(const std::vector<std::string> &keys) = 0;
 
 #### BatchGetKeyInfo
 ```c++
-virtual std::vector<KeyInfo> BatchGetKeyInfo(const std::vector<std::string> &keys) = 0;
+virtual std::vector<KeyInfo> BatchGetKeyInfo(const std::vector<std::string> &keys, uint32_t flag = 0) = 0;
 ```
 **功能**: 批量查询元信息。
 
 **参数**:
 - `keys`: 数据键列表（每个键长度 < 256字节）
+- `flag`: 查询标志，默认值为 `0`；在单 blob 场景下，可传入 `MMC_QUERY_FLAG_GVA_READ_START` 为后续基于 GVA 的读取流程做准备
 
 **返回值**:
 返回KeyInfo列表，每个KeyInfo包含：
@@ -280,6 +287,42 @@ virtual std::vector<KeyInfo> BatchGetKeyInfo(const std::vector<std::string> &key
 - `blobNum_`: 数据副本数
 - `loc_`: 数据副本所在位置列表
 - `type_`: 数据副本所在介质类型列表
+- `gva_`: 数据副本对应的 GVA 列表
+
+#### BatchMalloc
+```c++
+virtual std::vector<uintptr_t> BatchMalloc(const std::vector<std::string> &keys, const std::vector<size_t> &sizes,
+                                               uint16_t media) = 0;
+```
+**功能**: 批量为多个 key 申请全局内存，并返回每个 key 对应的起始 GVA。
+
+**参数**:
+- `keys`: 要申请内存的 key 列表，长度必须与 `sizes` 一致
+- `sizes`: 每个 key 对应的数据大小列表
+- `media`: 申请的介质类型，如 `MEDIA_HBM` 或 `MEDIA_DRAM`
+
+**返回值**:
+- `std::vector<uintptr_t>`: 每个元素为一个 key 对应的起始 GVA
+- 申请失败或参数非法时，对应元素为 `0`
+
+#### BatchCopy
+```c++
+virtual int BatchCopy(std::vector<void *> &gvas, std::vector<void *> &buffers, std::vector<size_t> &sizes,
+                          const int32_t direct = 3) = 0;
+```
+**功能**: 批量在 GVA 地址与本地缓冲区之间执行数据拷贝。
+
+**参数**:
+- `gvas`: GVA 地址列表
+- `buffers`: 本地缓冲区列表，必须与 `gvas` 一一对应
+- `sizes`: 每次拷贝的大小列表，长度必须与 `gvas` 一致
+- `direct`: 数据拷贝方向，取值参见 `smem_bm_copy_type`，常用值包括 `SMEMB_COPY_L2G`、`SMEMB_COPY_G2L`、`SMEMB_COPY_G2H`、`SMEMB_COPY_H2G`
+
+**返回值**:
+- `0`: 成功
+- 其他: 失败
+
+> 典型 GVA 流程：`BatchMalloc -> BatchCopy`（写入）-> `GetKeyInfo(..., MMC_QUERY_FLAG_GVA_READ_START)` 或 `BatchGetKeyInfo(..., MMC_QUERY_FLAG_GVA_READ_START)` -> `BatchCopy`（读取）
 
 ### 5. 分层张量操作
 

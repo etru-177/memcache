@@ -203,6 +203,8 @@ public:
         AddIntConf(OKC_MMC_EVICT_THRESHOLD_LOW,
                    VIntRange::Create(OKC_MMC_EVICT_THRESHOLD_LOW.first, MIN_EVICT_THRESHOLD, MAX_EVICT_THRESHOLD - 1),
                    0);
+        AddIntConf(OCK_MMC_META_LEASE_TTL_MS,
+                   VIntRange::Create(OCK_MMC_META_LEASE_TTL_MS.first, MIN_LEASE_TTL_MS, MAX_LEASE_TTL_MS), 0);
 
         AddBoolConf(OCK_MMC_TLS_ENABLE, VStrEnum::Create(OCK_MMC_TLS_ENABLE.first, BOOL_ENUM_STR), 0);
         AddStrConf(OCK_MMC_TLS_CA_PATH, VStrLength::Create(OCK_MMC_TLS_CA_PATH.first, TLS_PATH_MAX_LEN), 0);
@@ -244,6 +246,7 @@ public:
 
         config.evictThresholdHigh = GetInt(ConfConstant::OKC_MMC_EVICT_THRESHOLD_HIGH);
         config.evictThresholdLow = GetInt(ConfConstant::OKC_MMC_EVICT_THRESHOLD_LOW);
+        config.leaseTtlMs = static_cast<uint64_t>(GetInt(ConfConstant::OCK_MMC_META_LEASE_TTL_MS));
         config.logRotationFileSize = GetInt(ConfConstant::OCK_MMC_LOG_ROTATION_FILE_SIZE) * MB_NUM;
         config.logRotationFileCount = GetInt(ConfConstant::OCK_MMC_LOG_ROTATION_FILE_COUNT);
         config.metricsReportIntervalSeconds = GetUInt64(ConfConstant::OCK_MMC_METRICS_REPORT_INTERVAL_SECONDS);

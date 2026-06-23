@@ -13,6 +13,8 @@
 #ifndef MF_HYBRID_MMC_BLOB_COMMON_H
 #define MF_HYBRID_MMC_BLOB_COMMON_H
 #include <iostream>
+
+#include "mmc_blob_state.h"
 #include "mmc_ref.h"
 namespace ock {
 namespace mmc {
@@ -24,14 +26,19 @@ struct MmcMemBlobDesc {
     uint64_t gva_ = UINT64_MAX;       /* global virtual address */
     uint32_t rank_ = UINT32_MAX;      /* rank id of the blob located */
     uint16_t mediaType_ = UINT16_MAX; /* media type where blob located */
+    BlobState state_ = NONE;          /* blob state on meta side when descriptor is filled */
+    uint64_t leaseTimeoutTtlMs_ = 0;  /* remaining read lease TTL in milliseconds */
 
     MmcMemBlobDesc() = default;
-    MmcMemBlobDesc(const uint32_t &rank, const uint64_t &gva, const uint64_t &size, const uint16_t &mediaType)
-        : rank_(rank), size_(size), gva_(gva), mediaType_(mediaType)
+    MmcMemBlobDesc(const uint32_t &rank, const uint64_t &gva, const uint64_t &size, const uint16_t &mediaType,
+                   BlobState state = NONE, uint64_t leaseTimeoutTtlMs = 0)
+        : size_(size), gva_(gva), rank_(rank), mediaType_(mediaType), state_(state),
+          leaseTimeoutTtlMs_(leaseTimeoutTtlMs)
     {}
 
     friend bool operator==(const MmcMemBlobDesc &lhs, const MmcMemBlobDesc &rhs)
     {
+        // Only compare stable identity fields. State/lease are runtime metadata.
         return lhs.size_ == rhs.size_ && lhs.gva_ == rhs.gva_ && lhs.rank_ == rhs.rank_ &&
                lhs.mediaType_ == rhs.mediaType_;
     }
@@ -44,7 +51,8 @@ struct MmcMemBlobDesc {
     friend std::ostream &operator<<(std::ostream &os, const MmcMemBlobDesc &blob)
     {
         os << "blob{size=" << blob.size_ << ",gva=" << blob.gva_ << ",rank=" << blob.rank_
-           << ",media=" << blob.mediaType_ << "}";
+           << ",media=" << blob.mediaType_ << ",leaseTimeoutTtlMs=" << blob.leaseTimeoutTtlMs_
+           << ",state=" << blob.state_ << "}";
         return os;
     }
 };

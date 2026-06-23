@@ -678,7 +678,7 @@ results = store.batch_is_exist(keys)
 #### get_key_info
 
 ```python
-key_info = store.get_key_info(key)
+key_info = store.get_key_info(key, flag=0)
 ```
 
 **功能**: 获取指定key的数据信息
@@ -686,6 +686,7 @@ key_info = store.get_key_info(key)
 **参数**:
 
 - `key`: 数据的键
+- `flag`: 查询标志，默认值为 `0`；在单 blob 场景下，可传入 `1` 为后续基于 GVA 的读取流程做准备
 
 **返回值**:
 
@@ -693,12 +694,13 @@ key_info = store.get_key_info(key)
     - `size()`: 获取数据大小
     - `loc_list()`: 获取数据位置列表
     - `type_list()`: 获取数据类型列表
+    - `gva_list()`: 获取每个 blob 对应的 GVA 列表
     - `__str__()`: 获取信息的字符串表示
 
 #### batch_get_key_info
 
 ```python
-key_infos = store.batch_get_key_info(keys)
+key_infos = store.batch_get_key_info(keys, flag=0)
 ```
 
 **功能**: 批量获取多个key的数据信息，提高处理效率
@@ -706,6 +708,7 @@ key_infos = store.batch_get_key_info(keys)
 **参数**:
 
 - `keys`: 数据键列表
+- `flag`: 查询标志，默认值为 `0`；在单 blob 场景下，可传入 `1` 为后续基于 GVA 的读取流程做准备
 
 **返回值**:
 
@@ -713,7 +716,87 @@ key_infos = store.batch_get_key_info(keys)
     - `size()`: 获取数据大小
     - `loc_list()`: 获取数据位置列表
     - `type_list()`: 获取数据类型列表
+    - `gva_list()`: 获取每个 blob 对应的 GVA 列表
     - `__str__()`: 获取信息的字符串表示
+
+#### GVA 相关接口与常量
+
+#### get_key_info / batch_get_key_info 补充说明
+
+- 这两个接口的实际签名分别为 `store.get_key_info(key, flag=0)` 和 `store.batch_get_key_info(keys, flag=0)`
+- 当 `flag` 传入 `1` 时，可在单 blob 场景下为后续基于 GVA 的读取流程做准备
+- `KeyInfo` 除 `size()`、`loc_list()`、`type_list()` 外，还提供 `gva_list()`，用于返回每个 blob 对应的 GVA 列表
+
+```python
+key_info = store.get_key_info(key, flag=1)
+key_infos = store.batch_get_key_info(keys, flag=1)
+gvas = key_info.gva_list()
+```
+
+#### batch_alloc
+
+```python
+gvas = store.batch_alloc(keys, sizes, media=1)
+```
+
+**功能**: 批量为多个 key 申请全局内存，并返回每个 key 对应的起始 GVA
+
+**参数**:
+
+- `keys`: 要申请内存的 key 列表
+- `sizes`: 每个 key 对应的数据大小列表，长度必须与 `keys` 一致
+- `media`: 申请的介质类型，默认值为 `1`（`MEDIA_DRAM`）；`0` 表示 `MEDIA_HBM`
+
+**返回值**:
+
+- `List[int]`: 每个元素为一个 key 对应的起始 GVA
+- 申请失败或参数非法时，对应元素为 `0`
+
+#### batch_copy
+
+```python
+result = store.batch_copy(gva_ptrs, buffer_ptrs, sizes, direct=SMEMB_COPY_G2L)
+```
+
+**功能**: 批量在 GVA 地址与本地缓冲区之间执行数据拷贝
+
+**参数**:
+
+- `gva_ptrs`: GVA 地址列表
+- `buffer_ptrs`: 本地缓冲区指针列表，必须与 `gva_ptrs` 一一对应
+- `sizes`: 每次拷贝的大小列表，长度必须与 `gva_ptrs` 一致
+- `direct`: 数据拷贝方向，常用值包括：
+    - `SMEMB_COPY_L2G`（`0`）：本地 HBM -> 全局内存
+    - `SMEMB_COPY_G2L`（`1`）：全局内存 -> 本地 HBM
+    - `SMEMB_COPY_G2H`（`2`）：全局内存 -> 本地 Host DRAM
+    - `SMEMB_COPY_H2G`（`3`）：本地 Host DRAM -> 全局内存
+
+**返回值**:
+
+- `0`: 成功
+- 其他: 失败
+
+#### batch_copy_layers
+
+```python
+result = store.batch_copy_layers(gva_ptrs, buffer_ptrs, sizes, direct=SMEMB_COPY_G2L)
+```
+
+**功能**: 以分层数据的形式批量在 GVA 地址与本地缓冲区之间执行拷贝
+
+**参数**:
+
+- `gva_ptrs`: 每个对象的起始 GVA 列表
+- `buffer_ptrs`: 二维缓冲区指针列表，外层对应对象，内层对应该对象的各层缓冲区
+- `sizes`: 二维大小列表，每层大小会从对应起始 GVA 开始按顺序累加
+- `direct`: 数据拷贝方向，含义与 `batch_copy` 一致
+
+**返回值**:
+
+- `0`: 成功
+- 其他: 失败
+
+> 典型 GVA 流程：`batch_alloc -> batch_copy`（写入）-> `get_key_info(..., flag=1)` 或 `batch_get_key_info(..., flag=1)` -> `batch_copy` / `batch_copy_layers`（读取）
 
 #### register_buffer
 

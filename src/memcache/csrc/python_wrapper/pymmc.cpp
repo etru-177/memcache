@@ -423,6 +423,10 @@ void DefineMmcStructModule(py::module_ &m)
                            R"pbdoc(
                     Eviction low threshold in percentage.
                 )pbdoc")
+            .def_readwrite("lease_ttl_ms", &mmc_meta_service_config_t::leaseTtlMs,
+                           R"pbdoc(
+                    Default read lease TTL in milliseconds.
+                )pbdoc")
             .def_property(
                 "tls_enable", [](const mmc_meta_service_config_t &config) { return config.accTlsConfig.tlsEnable; },
                 [](mmc_meta_service_config_t &config, bool value) { config.accTlsConfig.tlsEnable = value; },
@@ -622,9 +626,10 @@ PYBIND11_MODULE(_pymmc, m)
         .def("is_exist", &MmcacheStore::IsExist, py::call_guard<py::gil_scoped_release>())
         .def("batch_is_exist", &MmcacheStore::BatchIsExist, py::call_guard<py::gil_scoped_release>(), py::arg("keys"),
              "Check if multiple objects exist. Returns list of results: 1 if exists, 0 if not exists, -1 if error")
-        .def("get_key_info", &MmcacheStore::GetKeyInfo, py::call_guard<py::gil_scoped_release>())
+        .def("get_key_info", &MmcacheStore::GetKeyInfo, py::call_guard<py::gil_scoped_release>(), py::arg("key"),
+             py::arg("flag") = 0)
         .def("batch_get_key_info", &MmcacheStore::BatchGetKeyInfo, py::call_guard<py::gil_scoped_release>(),
-             py::arg("keys"))
+             py::arg("keys"), py::arg("flag") = 0)
         .def("close", &MmcacheStore::TearDown)
         .def(
             "register_buffer",

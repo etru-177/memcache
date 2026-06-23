@@ -12,13 +12,21 @@
 #ifndef MEM_FABRIC_MMC_CLIENT_DEFAULT_H
 #define MEM_FABRIC_MMC_CLIENT_DEFAULT_H
 
+#include <atomic>
+#include <condition_variable>
+#include <memory>
+#include <thread>
+
 #include "mmc_common_includes.h"
 #include "mmc_meta_net_client.h"
 #include "mmc_def.h"
 #include "mmc_bm_proxy.h"
+#include "mmc_interval_map.h"
+#include "mmc_client_local_gva_blob_tracker.h"
 #include "mmc_ubs_io_proxy.h"
 #include "mmc_thread_pool.h"
 #include "mmc_msg_client_meta.h"
+#include "mmc_periodic_task.h"
 
 namespace ock {
 namespace mmc {
@@ -63,10 +71,10 @@ public:
     Result BatchIsExist(const std::vector<std::string> &keys, std::vector<int32_t> &exist_results,
                         uint32_t flags) const;
 
-    Result Query(const std::string &key, mmc_data_info &query_info, uint32_t flags) const;
+    Result Query(const std::string &key, mmc_data_info &query_info, uint32_t flags);
 
     Result BatchQuery(const std::vector<std::string> &keys, std::vector<mmc_data_info> &query_infos,
-                      uint32_t flags) const;
+                      uint32_t flags);
 
     Result BatchMalloc(const std::vector<std::string> &keys, const std::vector<size_t> &sizes,
                        const mmc_put_options &options, std::vector<uintptr_t> &gvas);
@@ -95,6 +103,7 @@ public:
             MMC_LOG_ERROR("alloc client handler failed");
             return MMC_ERROR;
         }
+        gClientHandler->gvaBlobTracker_.SetName(gClientHandler->name_);
         return MMC_OK;
     }
 
@@ -134,16 +143,25 @@ private:
                       std::vector<int> &batchResult);
     void SyncUpdateState(BatchUpdateRequest &updateRequest);
     void AsyncUpdateState(BatchUpdateRequest &updateRequest);
-    void SyncUpdateBlobByGva(BatchUpdateBlobRequest &updateRequest);
-    void AsyncUpdateBlobByGva(BatchUpdateBlobRequest &updateRequest);
+    Result SyncUpdateBlobByGva(BatchUpdateBlobRequest &updateRequest);
     std::future<int32_t> SubmitPutTask(BatchCopyDesc &copyDesc, MediaType mediaType, bool asyncExec);
     std::future<int32_t> SubmitGetTask(BatchCopyDesc &copyDesc, MediaType mediaType, bool asyncExec);
     Result BatchDataOperation(std::vector<void *> &gvas, std::vector<void *> &buffers, std::vector<size_t> &sizes,
                               int32_t direct);
-    void NotifyUpdateBlobByGva(const std::vector<void *> &gvas, const std::vector<size_t> &sizes,
-                               Result operationResult);
+    Result BatchCopyWritePath(std::vector<void *> &gvas, std::vector<void *> &buffers,
+                              std::vector<size_t> &sizes, int32_t direct);
+    Result BatchCopyReadPath(std::vector<void *> &gvas, std::vector<void *> &buffers,
+                             std::vector<size_t> &sizes, int32_t direct);
+    Result NotifyUpdateBlobByGva(const std::vector<void *> &gvas, const std::vector<size_t> &sizes,
+                                 const std::vector<BlobActionResult> &actions);
+    Result RegisterPeriodicTask(const std::string &taskName, uint32_t intervalSeconds, MmcPeriodicTask::Task task);
+    void ProcessExpiredReadLeases();
     Result ExecuteConcurrently(const std::vector<void *> &gvas, const std::vector<void *> &buffers,
                                const std::vector<size_t> &sizes, bool isPut, MediaType mediaType, size_t chunkSize);
+    void BuildReadFinishRequestsByOperateId(const std::vector<LocalGvaBlobInfoPtr> &claimedInfos,
+                                            std::vector<BatchUpdateRequest> &requests);
+    Result NotifyReadFinishClaims(const std::vector<LocalGvaBlobInfoPtr> &claimedInfos);
+
     // UBS IO相关数据结构，保留供后续 SSD→DRAM 回暖使用
     struct UbsIoBatchGetData {
         const std::vector<std::string> &keys;
@@ -176,6 +194,7 @@ private:
     MmcThreadPoolPtr writeThreadPool_;
     uint64_t batchChunkSize_ = 0;
     uint32_t batchChunkCount_ = 0;
+    LocalGvaBlobTracker gvaBlobTracker_{};
 };
 
 uint32_t MmcClientDefault::RankId(const affinity_policy &policy)

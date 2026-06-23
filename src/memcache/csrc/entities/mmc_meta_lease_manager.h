@@ -15,6 +15,7 @@
 
 #include <unordered_set>
 
+#include "mmc_define.h"
 #include "mmc_logger.h"
 #include "mmc_montotonic.h"
 #include "mmc_ref.h"
@@ -26,11 +27,18 @@ namespace mmc {
 constexpr int RANK_ID_BIT_SHIFT = 32;
 class MmcMetaLeaseManager : public MmcReferable {
 public:
+    explicit MmcMetaLeaseManager(uint64_t defaultTtlMs = MMC_DATA_TTL_MS)
+        : defaultTtlMs_(defaultTtlMs == 0 ? MMC_DATA_TTL_MS : defaultTtlMs)
+    {}
+
     Result Add(uint32_t id, uint32_t requestId, uint64_t ttl);
     Result Remove(uint32_t id, uint32_t requestId);
     Result Extend(uint64_t ttl);
     void Wait();
+    inline uint64_t RemainingLeaseTtlMs() const;
     inline uint32_t UseCount();
+    inline uint64_t DefaultTtlMs() const;
+    inline void SetDefaultTtlMs(uint64_t defaultTtlMs);
     inline uint64_t GenerateClientId(uint32_t rankId, uint32_t requestId);
     inline uint32_t RankId(uint64_t clientId);
     inline uint32_t RequestId(uint64_t clientId);
@@ -46,6 +54,7 @@ public:
     }
 
 private:
+    uint64_t defaultTtlMs_{MMC_DATA_TTL_MS};
     uint64_t lease_{0}; /* lease of the memory object */
     std::unordered_set<uint64_t> useClient;
 };
@@ -55,6 +64,22 @@ using MmcMetaLeaseManagerPtr = MmcRef<MmcMetaLeaseManager>;
 inline uint32_t MmcMetaLeaseManager::UseCount()
 {
     return useClient.size();
+}
+
+inline uint64_t MmcMetaLeaseManager::RemainingLeaseTtlMs() const
+{
+    const uint64_t nowMs = ock::dagger::Monotonic::TimeUs() / 1000ULL;
+    return lease_ > nowMs ? (lease_ - nowMs) : 0;
+}
+
+inline uint64_t MmcMetaLeaseManager::DefaultTtlMs() const
+{
+    return defaultTtlMs_;
+}
+
+inline void MmcMetaLeaseManager::SetDefaultTtlMs(uint64_t defaultTtlMs)
+{
+    defaultTtlMs_ = defaultTtlMs == 0 ? MMC_DATA_TTL_MS : defaultTtlMs;
 }
 
 uint64_t MmcMetaLeaseManager::GenerateClientId(uint32_t rankId, uint32_t requestId)

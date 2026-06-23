@@ -357,11 +357,11 @@ std::vector<int> MmcacheStore::BatchIsExist(const std::vector<std::string> &keys
     return results;
 }
 
-KeyInfo MmcacheStore::GetKeyInfo(const std::string &key)
+KeyInfo MmcacheStore::GetKeyInfo(const std::string &key, uint32_t flag)
 {
     mmc_data_info info;
     TP_TRACE_BEGIN(TP_MMC_PY_QUERY);
-    auto res = mmcc_query(key.c_str(), &info, 0);
+    auto res = mmcc_query(key.c_str(), &info, flag);
     TP_TRACE_END(TP_MMC_PY_QUERY, res);
     if (res != MMC_OK) {
         MMC_LOG_ERROR("Failed to query key " << key << ", error code: " << res);
@@ -382,7 +382,7 @@ KeyInfo MmcacheStore::GetKeyInfo(const std::string &key)
     return keyInfo;
 }
 
-std::vector<KeyInfo> MmcacheStore::BatchGetKeyInfo(const std::vector<std::string> &keys)
+std::vector<KeyInfo> MmcacheStore::BatchGetKeyInfo(const std::vector<std::string> &keys, uint32_t flag)
 {
     uint32_t size = keys.size();
 
@@ -407,7 +407,7 @@ std::vector<KeyInfo> MmcacheStore::BatchGetKeyInfo(const std::vector<std::string
         return {};
     }
     TP_TRACE_BEGIN(TP_MMC_PY_BATCH_QUERY);
-    auto ret = mmcc_batch_query(ckeys, size, infoArr, 0);
+    auto ret = mmcc_batch_query(ckeys, size, infoArr, flag);
     TP_TRACE_END(TP_MMC_PY_BATCH_QUERY, ret);
     if (ret != MMC_OK) {
         delete[] ckeys;

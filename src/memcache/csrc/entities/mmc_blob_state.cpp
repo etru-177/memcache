@@ -26,7 +26,7 @@ struct StateTransitionItem {
 
 Result LeaseAdd(MmcMetaLeaseManager &leaseMgr, uint32_t rankId, uint32_t requestId)
 {
-    return leaseMgr.Add(rankId, requestId, MMC_DATA_TTL_MS);
+    return leaseMgr.Add(rankId, requestId, leaseMgr.DefaultTtlMs());
 }
 
 Result LeaseRemove(MmcMetaLeaseManager &leaseMgr, uint32_t rankId, uint32_t requestId)
@@ -45,7 +45,7 @@ Result LeaseWait(MmcMetaLeaseManager &leaseMgr, uint32_t rankId, uint32_t reques
 
 Result LeaseExtend(MmcMetaLeaseManager &leaseMgr, uint32_t rankId, uint32_t requestId)
 {
-    return leaseMgr.Extend(MMC_DATA_TTL_MS);
+    return leaseMgr.Extend(leaseMgr.DefaultTtlMs());
 }
 
 StateTransTable BlobStateMachine::GetGlobalTransTable()
