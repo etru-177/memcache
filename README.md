@@ -16,22 +16,22 @@ High-performance distributed key-value cache
 <br/>
 
 ## 🔄Latest News
-
+- [2026/06] MemCache使能推理PrefixCache加速案例实践，请关注[wiki主页案例库](https://gitcode.com/Ascend/memcache/wiki/Home.md)获取最新案例
 - [2025/12] MemCache已作为vllm-ascend backend使能大模型推理加速，详情查看vllm-ascend开源社区，[使用示例](https://github.com/vllm-project/vllm-ascend/blob/main/docs/source/user_guide/feature_guide/kv_pool.md#example-of-using-memcache-as-a-kv-pool-backend)
 
 - [2025/11] MemCache项目于2025年11月开源，开源社区地址为：https://gitcode.com/Ascend/memcache
 
-## 🔜 Roadmap
+## 🔜 Roadmap&发布策略
 
-MemCache roadmap和版本分支策略详见： [**Roadmap**](https://gitcode.com/Ascend/memcache/wiki/Roadmap.md)
-
+MemCache roadmap详见： [**Roadmap**](https://gitcode.com/Ascend/memcache/wiki/Roadmap.md)    
+MemCache 分支发布策略：[**分支发布策略**](https://gitcode.com/Ascend/memcache/wiki/%E5%BC%80%E5%8F%91%E4%B8%8E%E5%8F%91%E5%B8%83%E8%8A%82%E5%A5%8F%E5%8E%9F%E5%88%99.md)
 
 ## 🎉概述
 
 MemCache是针对LLM推理、GR推理场景设计的高性能分布式KVCache存储引擎，其主要特性包括：
 
 - **基于对象操作的API**：支持批量和非批量的put/get/exist/remove操作，支持多层结构的KV Block读写接口。
-- **支持多副本**：单个对象支持多副本放置到不同的LocalService，默认是单副本，支持put接口指定副本数量。
+- **多层缓存池**：支持HBM，DDR，SSD组成多级缓存池，多级之间通过淘汰和预取进行数据冷热交换。
 - **高带宽低时延**：使用 [MemFabric](https://gitcode.com/Ascend/memfabric_hybrid)
   作为多级内存和异构网络传输的底座，在Ascend硬件上，基于device_rdma(A2)、device_sdma(A3)、host_rdma(A2/A3)、device_urma(A5)
   等路径提供OneCopy跨机跨介质数据直接访问能力，满足高带宽，低时延的读写性能述求。在鲲鹏硬件上，支持host_urma(K5)。支持host_shm实现同节点共享内存通信。
@@ -48,9 +48,9 @@ MemCache包含LocalService和MetaService两大核心组件：
 - **MetaService**：
   - 负责管理整个集群中内存池空间的分配和管理，处理LocalService的加入与退出。
   - MetaService作为独立进程运行，提供两种启动方式：python API启动；二进制启动，详见 [whl安装使用](./doc/install_whl.md) 和 [run安装使用](./doc/install_run.md)
-  - MetaService支持两种部署形态：
-  ***1、单点模式***：MetaService由单个进程组成，部署方式简单，但存在单点故障的问题。如果MetaService进程崩溃或无法访问，系统将无法继续提供服务，直至重新恢复为止。
-  ***2、HA模式***：该模式基于K8S的的ClusterIP Service和Lease资源构建，部署较为复杂，该模式会部署多个MetaService进程实例，实现多活高可用。部署详见 [MetaService HA](./doc/memcache_metaservice_HA.md)      
+  - MetaService支持两种部署形态：   
+  ***1、单点模式***：MetaService由单个进程组成，部署方式简单，但存在单点故障的问题。如果MetaService进程崩溃或无法访问，系统将无法继续提供服务，直至重新恢复为止。     
+  ***2、HA模式***：该模式基于K8S的的ClusterIP Service和Lease资源构建，部署较为复杂，该模式会部署多个MetaService进程实例，实现多活高可用。部署详见[怎么部署一个MemCache的HA集群](https://gitcode.com/Ascend/memcache/wiki/%E6%80%8E%E4%B9%88%E9%83%A8%E7%BD%B2%E4%B8%80%E4%B8%AAmemcache%E7%9A%84HA%E9%9B%86%E7%BE%A4.md)
                 
 
 - **LocalService**：负责承担如下功能：
@@ -78,34 +78,6 @@ MemCache核心能力是提供大容量内存池和高性能的H2D、D2H、**D2RH
   <img src="./doc/source/memcache_a3.png" alt="A3 perf">
 </div>
 
-## 🔍目录结构
-
-```
-├── LICENSE                                 # LICENSE
-├── .clang-format                           # 格式化配置
-├── .gitmodules                             # git配置
-├── .gitignore                              # git忽视配置文件
-├── CMakeLists.txt                          # 项目的CMakeList
-├── doc                                     # 文档目录
-├── example                                 # 样例
-│  ├── cpp                                  # c++样例
-│  └── python                               # python样例
-├── script                                  # 构建脚本
-│  ├── build_and_pack_run.sh                # 编译+打包脚本
-│  ├── build.sh                             # 编译脚本
-│  ├── run_ut.sh                            # 编译+运行ut脚本
-├── test                                    # test目录
-│  ├── python                               # python测试用例
-│  ├── k8s_deploy                           # k8s ha样例脚本
-│  └── ut                                   # 单元测试用例
-├── src                                     # 源码
-│  ├── memcache                             # MemCache 源码
-├── config                                  # 配置目录
-│  ├── mmc-local.conf                       # 本地服务配置文件模板
-│  ├── mmc-meta.conf                        # meta服务配置文件模板
-├── README.md
-```
-
 ## 🚀快速入门
 
 请访问以下文档获取简易教程。
@@ -113,7 +85,7 @@ MemCache核心能力是提供大容量内存池和高性能的H2D、D2H、**D2RH
 - 安装使用：[whl安装和使用](./doc/install_whl.md)（适用于Python用户），[run编译、安装和使用](./doc/install_run.md)（适用于C++用户）
 - [配置文件](doc/memcache_config.md)：涉及MetaService、LocalService公共配置
 - [样例执行](./example/examples.md)：介绍如何端到端执行样例代码，包括C++和Python样例
-- [最佳实践]：推出中...
+
 ## 📑学习教程
 
 - [c++接口](doc/memcache_c++_api.md)：C++接口介绍以及C++接口对应的API列表
