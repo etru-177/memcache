@@ -47,9 +47,7 @@ using smemBmGvaToVaFunc = int32_t (*)(smem_bm_t, void *, smem_bm_mem_type_t, voi
 
 class MFSmemApi {
 public:
-    static std::string ResolveLibDir();
-
-    static Result LoadLibrary(const std::string &libDirPath);
+    static Result LoadLibrary();
     static void CleanupLibrary();
 
     static int32_t SmemInit(uint32_t flags)

@@ -18,7 +18,6 @@ namespace ock {
 namespace mmc {
 
 namespace {
-constexpr const char *kMfExtendLibPathEnv = "MEMFABRIC_HYBRID_EXTEND_LIB_PATH";
 
 struct SmemSymbolEntry {
     void **target;
@@ -53,25 +52,6 @@ smemBmRegisterUserMemFunc MFSmemApi::gSmemBmRegisterUserMem = nullptr;
 smemBmUnregisterUserMemFunc MFSmemApi::gSmemBmUnregisterUserMem = nullptr;
 smemBmWaitFunc MFSmemApi::gSmemBmWait = nullptr;
 smemBmGvaToVaFunc MFSmemApi::gSmemBmGvaToVa = nullptr;
-
-std::string MFSmemApi::ResolveLibDir()
-{
-    const auto libDir = SafeGetEnv(kMfExtendLibPathEnv);
-    if (libDir.empty()) {
-        MMC_LOG_ERROR("MFSmemApi: env " << kMfExtendLibPathEnv << " is not set; source memfabric_hybrid set_env.sh");
-        return {};
-    }
-
-    std::string realPath;
-    if (Func::LibraryRealPath(libDir, std::string(gSmemLibName), realPath) != MMC_OK) {
-        MMC_LOG_ERROR("MFSmemApi: " << gSmemLibName << " not found under " << libDir << "; check "
-                                    << kMfExtendLibPathEnv);
-        return {};
-    }
-
-    MMC_LOG_INFO("MFSmemApi: resolved " << gSmemLibName << " lib dir to " << libDir);
-    return libDir;
-}
 
 Result MFSmemApi::LoadAllSymbols()
 {
@@ -121,42 +101,29 @@ Result MFSmemApi::LoadSymbol(const char *symbolName, void **target)
     return MMC_OK;
 }
 
-Result MFSmemApi::LoadLibrary(const std::string &libDirPath)
+Result MFSmemApi::LoadLibrary()
 {
     std::lock_guard<std::mutex> guard(gMutex);
-    if (libDirPath.empty()) {
-        MMC_LOG_ERROR("MFSmemApi LoadLibrary: libDirPath is empty; set env " << kMfExtendLibPathEnv);
-        return MMC_INVALID_PARAM;
-    }
-
     if (gLoaded) {
         return MMC_OK;
     }
 
-    MMC_LOG_INFO("MFSmemApi LoadLibrary: dlopen " << gSmemLibName << " from " << libDirPath);
-    std::string realPath;
-    auto ret = Func::LibraryRealPath(libDirPath, std::string(gSmemLibName), realPath);
-    if (ret != MMC_OK) {
-        MMC_LOG_ERROR("MFSmemApi LoadLibrary: resolve " << gSmemLibName << " under dir " << libDirPath
-                                                        << " failed, ret: " << ret);
-        return ret;
-    }
-
-    gSmemHandle = dlopen(realPath.c_str(), RTLD_NOW | RTLD_LOCAL);
+    MMC_LOG_INFO("MFSmemApi LoadLibrary: dlopen " << gSmemLibName);
+    gSmemHandle = dlopen(gSmemLibName, RTLD_NOW | RTLD_LOCAL);
     if (gSmemHandle == nullptr) {
-        MMC_LOG_ERROR("MFSmemApi LoadLibrary: dlopen failed, path: " << realPath << ", error: " << dlerror());
+        MMC_LOG_ERROR("MFSmemApi LoadLibrary: dlopen failed, lib: " << gSmemLibName << ", error: " << dlerror());
         return MMC_ERROR;
     }
 
     if (LoadAllSymbols() != MMC_OK) {
-        MMC_LOG_ERROR("MFSmemApi LoadLibrary: dlsym smem_bm symbols failed, path: " << realPath);
+        MMC_LOG_ERROR("MFSmemApi LoadLibrary: dlsym smem_bm symbols failed, lib: " << gSmemLibName);
         dlclose(gSmemHandle);
         gSmemHandle = nullptr;
         return MMC_ERROR;
     }
 
     gLoaded = true;
-    MMC_LOG_INFO("MFSmemApi LoadLibrary: loaded 21 smem_bm symbols from " << realPath);
+    MMC_LOG_INFO("MFSmemApi LoadLibrary: loaded 21 smem_bm symbols from " << gSmemLibName);
     return MMC_OK;
 }
 

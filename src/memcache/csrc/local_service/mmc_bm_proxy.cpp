@@ -30,7 +30,7 @@ Result MmcBmProxy::InitBm(const mmc_bm_init_config_t &initConfig, const mmc_bm_c
         return MMC_OK;
     }
 
-    MMC_RETURN_ERROR(MFSmemApi::LoadLibrary(MFSmemApi::ResolveLibDir()), "Failed to load smem bm library");
+    MMC_RETURN_ERROR(MFSmemApi::LoadLibrary(), "Failed to load smem bm library");
 
     createConfig_ = createConfig;
     MMC_RETURN_ERROR(MFSmemApi::SmemSetLogLevel(initConfig.logLevel), "Failed to set smem bm log level");
