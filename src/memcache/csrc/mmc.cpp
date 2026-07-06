@@ -20,6 +20,7 @@
 #include "mmc_service.h"
 #include "mmc_thread_pool.h"
 #include "mmc_types.h"
+#include "mmc_meta_manager.h"
 #include "mmc_periodic_task.h"
 
 using namespace ock::mmc;
@@ -44,6 +45,8 @@ mmc_meta_service_config_t create_default_meta_config()
     config.logRotationFileCount = 50;
     config.evictThresholdHigh = 90U;
     config.evictThresholdLow = 80U;
+    config.rewarmDramWatermark = DEFAULT_REWARM_HIGH_WATERMARK;
+    config.prefetchEnabled = false;
     config.leaseTtlMs = MMC_DATA_TTL_MS;
     config.accTlsConfig.tlsEnable = false;
     config.configStoreTlsConfig.tlsEnable = false;
@@ -105,7 +108,6 @@ local_config create_default_local_config()
     cfg.write_thread_pool_size = 4UL;
     cfg.aggregate_io = true;
     cfg.aggregate_num = 122UL;
-    cfg.local_ssd_size = 0;
     cfg.tls_enable = false;
     cfg.config_store_tls_enable = false;
     cfg.hcom_tls_enable = false;
@@ -132,7 +134,6 @@ std::string local_config_to_string(const local_config &config)
     oss << "  write_thread_pool_size: " << config.write_thread_pool_size << "\n";
     oss << "  aggregate_io: " << (config.aggregate_io ? "true" : "false") << "\n";
     oss << "  aggregate_num: " << config.aggregate_num << "\n";
-    oss << "  local_ssd_size: " << config.local_ssd_size << "\n";
     oss << "  tls_enable: " << (config.tls_enable ? "true" : "false") << "\n";
     oss << "  tls_ca_path: " << config.tls_ca_path << "\n";
     oss << "  tls_ca_crl_path: " << config.tls_ca_crl_path << "\n";

@@ -18,10 +18,12 @@
 #include "mmc_ubs_io_proxy.h"
 #include "mmc_blob_common.h"
 #include "mmc_def.h"
+#include "mmc_thread_pool.h"
 
 namespace ock {
 namespace mmc {
 constexpr int TIMEOUT_THOUSAND = 1000;
+constexpr int UBSIO_EVENT_POOL_SIZE = 2;
 class MmcLocalServiceDefault : public MmcLocalService {
 public:
     explicit MmcLocalServiceDefault(const std::string &name) : name_(name), options_() {}
@@ -38,7 +40,7 @@ public:
 
     Result InitBm();
 
-    Result InitUbsIo(int32_t deviceId, uint64_t ssdSize);
+    Result InitUbsIo(int32_t deviceId);
 
     Result DestroyBm();
 
@@ -46,6 +48,10 @@ public:
                             const std::vector<MmcMemBlobDesc> &blobs);
 
     Result CopyBlob(const std::string& key, const MmcMemBlobDesc &src, const MmcMemBlobDesc &dst);
+
+    std::vector<Result> BatchCopyBlob(const std::vector<std::string>& keys,
+                                      const std::vector<MmcMemBlobDesc>& srcBlobs,
+                                      const std::vector<MmcMemBlobDesc>& dstBlobs);
 
     Result BlobDelete(const std::string& key, const MmcMemBlobDesc &blob);
 
@@ -62,6 +68,22 @@ public:
     inline MetaNetClientPtr GetMetaClient() const;
 
 private:
+    struct BatchIoParams {
+        std::vector<std::string> keys;
+        std::vector<void*> vas;
+        std::vector<size_t> sizes;
+        std::vector<size_t> validIdx;
+    };
+
+    void CollectBatchIoParams(const std::vector<std::string>& keys,
+                              const std::vector<MmcMemBlobDesc>& srcBlobs,
+                              const std::vector<MmcMemBlobDesc>& dstBlobs,
+                              bool srcIsSsd, std::vector<Result>& results, BatchIoParams& out);
+
+    void ExecuteBatchIo(BatchIoParams& params, bool srcIsSsd, std::vector<Result>& results);
+
+    void HandleUbsIoMetaEvents(int type, const std::vector<std::string> &keys);
+
     MetaNetClientPtr metaNetClient_;
     MmcBmProxyPtr bmProxyPtr_;
     MmcUbsIoProxyPtr ubsIoProxyPtr_;
@@ -71,8 +93,9 @@ private:
     bool started_ = false;
     std::string name_;
     mmc_local_service_config_t options_;
-    std::map<std::string, MmcMemBlobDesc> blobMap_;
+    std::map<std::string, std::vector<MmcMemBlobDesc>> blobMap_;
     const int32_t blobRebuildSendMaxCount = 10240;
+    MmcThreadPoolPtr ubsioEventPool_;
 };
 
 inline const std::string &MmcLocalServiceDefault::Name() const

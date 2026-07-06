@@ -22,7 +22,7 @@ std::mutex DlUbsioApi::gMutex;
 void *DlUbsioApi::ubsioHandle = nullptr;
 const std::string DlUbsioApi::gUbsioLibName = "libubsio_kvc.so";
 
-ubsio_client_init_func DlUbsioApi::pUbsioClientInit = nullptr;
+ubsio_client_initFunc DlUbsioApi::pUbsioClientInit = nullptr;
 ubsio_putFunc DlUbsioApi::pUbsioPut = nullptr;
 ubsio_getFunc DlUbsioApi::pUbsioGet = nullptr;
 ubsio_existFunc DlUbsioApi::pUbsioExist = nullptr;
@@ -35,6 +35,7 @@ ubsio_batch_existFunc DlUbsioApi::pUbsioBatchExist = nullptr;
 ubsio_batch_deleteFunc DlUbsioApi::pUbsioBatchDelete = nullptr;
 ubsio_batch_get_lengthFunc DlUbsioApi::pUbsioBatchGetLength = nullptr;
 ubsio_batch_free_addressFunc DlUbsioApi::pUbsioBatchFreeAddress = nullptr;
+ubsio_register_meta_event_callbackFunc DlUbsioApi::pUbsioRegisterMetaEventCallback = nullptr;
 
 Result DlUbsioApi::LoadLibrary()
 {
@@ -51,7 +52,7 @@ Result DlUbsioApi::LoadLibrary()
     }
 
     /* load sym */
-    DL_LOAD_SYM(pUbsioClientInit, ubsio_client_init_func, ubsioHandle, "UbsioKvCacheInit");
+    DL_LOAD_SYM(pUbsioClientInit, ubsio_client_initFunc, ubsioHandle, "UbsioKvCacheInit");
     DL_LOAD_SYM(pUbsioPut, ubsio_putFunc, ubsioHandle, "UbsioKvCachePut");
     DL_LOAD_SYM(pUbsioGet, ubsio_getFunc, ubsioHandle, "UbsioKvCacheGet");
     DL_LOAD_SYM(pUbsioExist, ubsio_existFunc, ubsioHandle, "UbsioKvCacheExist");
@@ -64,6 +65,8 @@ Result DlUbsioApi::LoadLibrary()
     DL_LOAD_SYM(pUbsioBatchDelete, ubsio_batch_deleteFunc, ubsioHandle,  "UbsioKvCacheBatchDelete");
     DL_LOAD_SYM(pUbsioBatchGetLength, ubsio_batch_get_lengthFunc, ubsioHandle,  "UbsioKvCacheBatchGetLength");
     DL_LOAD_SYM(pUbsioBatchFreeAddress, ubsio_batch_free_addressFunc, ubsioHandle,  "UbsioKvCacheBatchFree");
+    DL_LOAD_SYM(pUbsioRegisterMetaEventCallback, ubsio_register_meta_event_callbackFunc, ubsioHandle,
+                "UbsioKvCacheRegisterMetaEventCallback");
 
     gLoaded = true;
     return MMC_OK;
@@ -89,6 +92,7 @@ void DlUbsioApi::CleanupLibrary()
     pUbsioBatchDelete = nullptr;
     pUbsioBatchGetLength = nullptr;
     pUbsioBatchFreeAddress = nullptr;
+    pUbsioRegisterMetaEventCallback = nullptr;
 
     if (ubsioHandle != nullptr) {
         dlclose(ubsioHandle);

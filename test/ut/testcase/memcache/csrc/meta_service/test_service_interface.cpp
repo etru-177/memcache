@@ -494,7 +494,7 @@ protected:
         baseMem = new char[CAPACITY];
         allocator = new ock::mmc::MmcBlobAllocator(0, static_cast<ock::mmc::MediaType>(0),
                                                    reinterpret_cast<uint64_t>(baseMem), CAPACITY);
-        std::map<std::string, ock::mmc::MmcMemBlobDesc> blobMap;
+        std::vector<std::pair<std::string, ock::mmc::MmcMemBlobDesc>> blobMap;
         allocator->BuildFromBlobs(blobMap);
         allocator->Start();
     }

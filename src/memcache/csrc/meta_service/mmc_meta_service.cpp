@@ -65,7 +65,10 @@ Result MmcMetaService::Start(const mmc_meta_service_config_t &options)
     }
 
     metaMgrProxy_ = MmcMakeRef<MmcMetaMgrProxy>(metaNetServer_).Get();
-    MMC_RETURN_ERROR(metaMgrProxy_->Start(options_.leaseTtlMs, options.evictThresholdHigh, options.evictThresholdLow),
+    MmcMetaExtConfig extConfig{};
+    extConfig.prefetchEnabled = options.prefetchEnabled;
+    MMC_RETURN_ERROR(metaMgrProxy_->Start(options_.leaseTtlMs, options.evictThresholdHigh, options.evictThresholdLow,
+                                          options.rewarmDramWatermark, extConfig),
         "Failed to start meta mgr proxy of meta service " << name_);
 
     NetEngineOptions configStoreOpt{};
@@ -83,7 +86,9 @@ Result MmcMetaService::Start(const mmc_meta_service_config_t &options)
 }
 
 Result MmcMetaService::BmRegister(uint32_t rank, std::vector<uint16_t> mediaType, std::vector<uint64_t> bm,
-                                  std::vector<uint64_t> capacity, std::map<std::string, MmcMemBlobDesc> &blobMap)
+                                  std::vector<uint64_t> capacity,
+                                  std::vector<std::pair<std::string, MmcMemBlobDesc>> &blobList,
+                                  bool storageEnabled)
 {
     std::lock_guard<std::mutex> guard(mutex_);
     if (!started_) {
@@ -107,11 +112,12 @@ Result MmcMetaService::BmRegister(uint32_t rank, std::vector<uint16_t> mediaType
     }
     MMC_ASSERT_LOG_AND_RETURN(metaBackUpMgrPtr_ != nullptr, "metaBackUpMgrPtr_ is nullptr", MMC_MALLOC_FAILED);
     MMC_ASSERT_LOG_AND_RETURN(metaMgrProxy_ != nullptr, "metaMgrProxy_ is nullptr", MMC_MALLOC_FAILED);
-    MMC_RETURN_ERROR(metaBackUpMgrPtr_->Load(blobMap), "Mount loc { " << rank << " } load backup failed");
-    MMC_RETURN_ERROR(metaMgrProxy_->Mount(locs, infos, blobMap), "Mount loc { " << rank << " } failed");
-    MMC_LOG_INFO("Mount loc {rank:" << rank << ", rebuild size:" << blobMap.size() << ", mediaNum:" << typeNum
+    MMC_RETURN_ERROR(metaBackUpMgrPtr_->Load(blobList), "Mount loc { " << rank << " } load backup failed");
+    MMC_RETURN_ERROR(metaMgrProxy_->Mount(locs, infos, blobList, storageEnabled),
+                     "Mount loc { " << rank << " } failed");
+    MMC_LOG_INFO("Mount loc {rank:" << rank << ", rebuild size:" << blobList.size() << ", mediaNum:" << typeNum
                                     << "} finish");
-    if (blobMap.size() == 0) {
+    if (blobList.size() == 0) {
         if (rankMediaTypeMap_.find(rank) == rankMediaTypeMap_.end()) {
             rankMediaTypeMap_.insert({rank, {}});
         }

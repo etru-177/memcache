@@ -37,7 +37,8 @@ public:
     void Stop();
 
     Result BmRegister(uint32_t rank, std::vector<uint16_t> mediaType, std::vector<uint64_t> bm,
-                      std::vector<uint64_t> capacity, std::map<std::string, MmcMemBlobDesc> &blobMap);
+                      std::vector<uint64_t> capacity, std::vector<std::pair<std::string, MmcMemBlobDesc>> &blobList,
+                      bool storageEnabled = false);
 
     Result BmUnregister(uint32_t rank, uint16_t mediaType);
 

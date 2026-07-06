@@ -60,6 +60,8 @@ Result MetaNetClient::Start(const NetEngineOptions &config)
                                       std::bind(&MetaNetClient::HandleBlobCopy, this, std::placeholders::_1));
     client->RegRequestReceivedHandler(LOCAL_META_OPCODE_REQ::LM_BLOB_DELETE_REQ,
                                       std::bind(&MetaNetClient::HandleBlobDelete, this, std::placeholders::_1));
+    client->RegRequestReceivedHandler(LOCAL_META_OPCODE_REQ::LM_BATCH_BLOB_COPY_REQ,
+                                      std::bind(&MetaNetClient::HandleBatchBlobCopy, this, std::placeholders::_1));
     client->RegRequestReceivedHandler(LOCAL_META_OPCODE_REQ::LM_REMOVE_ALL_REQ, nullptr);
     client->RegLinkBrokenHandler(std::bind(&MetaNetClient::HandleLinkBroken, this, std::placeholders::_1));
     /* start engine */
@@ -182,6 +184,32 @@ Result MetaNetClient::HandleBlobDelete(const NetContextPtr &context)
     } else {
         MMC_LOG_ERROR("blobDeleteHandler_ is nullptr");
         resp.ret_ = MMC_ERROR;
+    }
+    return context->Reply(req.msgId, resp);
+}
+
+Result MetaNetClient::HandleBatchBlobCopy(const NetContextPtr &context)
+{
+    BatchBlobCopyRequest req;
+    BatchBlobCopyResponse resp;
+    context->GetRequest<BatchBlobCopyRequest>(req);
+    if (batchBlobCopyHandler_ != nullptr) {
+        resp.results_ = batchBlobCopyHandler_(req.keys_, req.srcBlobs_, req.dstBlobs_);
+        size_t n = resp.results_.size();
+        if (n != req.keys_.size()) {
+            MMC_LOG_ERROR("batch copy results size mismatch, results=" << n << ", keys=" << req.keys_.size());
+            resp.results_.resize(req.keys_.size(), MMC_ERROR);
+            return context->Reply(req.msgId, resp);
+        }
+        for (size_t i = 0; i < n; ++i) {
+            if (resp.results_[i] != MMC_OK) {
+                MMC_LOG_ERROR("batchBlobCopy failed for [" << i << "] key=" << req.keys_[i]
+                              << ", ret=" << resp.results_[i]);
+            }
+        }
+    } else {
+        MMC_LOG_ERROR("batchBlobCopyHandler_ is nullptr");
+        resp.results_.resize(req.keys_.size(), MMC_ERROR);
     }
     return context->Reply(req.msgId, resp);
 }

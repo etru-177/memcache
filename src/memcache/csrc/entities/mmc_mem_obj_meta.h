@@ -54,7 +54,8 @@ public:
      * @return 0 if removed
      */
     std::vector<MmcMemBlobPtr> FreeBlobs(const std::string &key, MmcGlobalAllocatorPtr &allocator,
-                                         const MmcBlobFilterPtr &filter = nullptr, bool doBackupRemove = true);
+                                         const MmcBlobFilterPtr &filter = nullptr, bool doBackupRemove = true,
+                                         bool triggerSsdPreFree = false);
 
     /**
      * @brief Get the prot

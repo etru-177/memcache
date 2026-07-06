@@ -34,7 +34,7 @@ public:
     virtual void GetAllKeys(std::vector<Key> &keys) = 0;
     virtual Result Promote(const Key &key) = 0;
     virtual Result InsertLru(const Key &key, MediaType type) = 0;
-    virtual void MultiLevelElimination(const uint16_t evictThresholdHigh, const uint16_t evictThresholdLow,
+    virtual void MultiLevelElimination(const std::vector<std::pair<uint16_t, uint16_t>> &evictWatermarks,
                                        const std::vector<MediaType> &needEvictList,
                                        const std::vector<uint16_t> &nowMemoryThresholds,
                                        std::function<EvictResult(const Key &, const Value &, MediaType)> moveFunc) = 0;

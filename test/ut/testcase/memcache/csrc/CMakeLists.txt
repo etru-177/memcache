@@ -15,3 +15,7 @@ ADD_UNIT_TEST(test_mmc_test
         LINK_LIBRARIES ${TEST_DEPEND_LIBS}
         BUILD_FLAGS -fpermissive --coverage
 )
+add_dependencies(test_mmc_test mock_mf_smem)
+set_tests_properties(test_mmc_test PROPERTIES
+        ENVIRONMENT "MEMFABRIC_HYBRID_EXTEND_LIB_PATH=${PROJECT_OUTPUT_PATH}/test/mock_mf_smem/lib64"
+)

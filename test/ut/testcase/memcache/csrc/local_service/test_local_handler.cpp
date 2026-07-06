@@ -70,6 +70,8 @@ using namespace testing;
 using namespace std;
 using namespace ock::mmc;
 
+constexpr uint16_t REWARM_DRAM_WATERMARK = 100U;
+
 class TestLocalHandler : public testing::Test {
 public:
     TestLocalHandler();
@@ -98,10 +100,10 @@ TEST_F(TestLocalHandler, Init)
     MmcLocalMemlInitInfo locInfo{100, 1000};
 
     uint64_t defaultTtl = 2000;
-    MmcRef<MmcMetaManager> metaMng = MmcMakeRef<MmcMetaManager>(defaultTtl, 70U, 60U);
+    MmcRef<MmcMetaManager> metaMng = MmcMakeRef<MmcMetaManager>(defaultTtl, 70U, 60U, REWARM_DRAM_WATERMARK);
     metaMng->Start();
-    std::map<std::string, MmcMemBlobDesc> blobMap;
-    metaMng->Mount(loc, locInfo, blobMap);
+    std::vector<std::pair<std::string, MmcMemBlobDesc>> blobMap;
+    metaMng->Mount(loc, locInfo, blobMap, false);
     ASSERT_TRUE(metaMng != nullptr);
     metaMng->Stop();
 }
@@ -112,10 +114,10 @@ TEST_F(TestLocalHandler, Alloc)
     MmcLocalMemlInitInfo locInfo{0, 1000000};
 
     uint64_t defaultTtl = 2000;
-    MmcRef<MmcMetaManager> metaMng = MmcMakeRef<MmcMetaManager>(defaultTtl, 70U, 60U);
+    MmcRef<MmcMetaManager> metaMng = MmcMakeRef<MmcMetaManager>(defaultTtl, 70U, 60U, REWARM_DRAM_WATERMARK);
     metaMng->Start();
-    std::map<std::string, MmcMemBlobDesc> blobMap;
-    metaMng->Mount(loc, locInfo, blobMap);
+    std::vector<std::pair<std::string, MmcMemBlobDesc>> blobMap;
+    metaMng->Mount(loc, locInfo, blobMap, false);
 
     AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, 0}; // blobSize, numBlobs, mediaType, preferredRank, flags
     MmcMemMetaDesc objMeta;
@@ -183,12 +185,7 @@ TEST_F(TestMmcBmProxy, InitBm_AlreadyStarted)
     EXPECT_EQ(ret, MMC_OK);
 }
 
-TEST_F(TestMmcBmProxy, InitBm_InvalidOpType)
-{
-    createConfig.dataOpType = "invalid_type";
-    Result ret = InitBmWithConfig();
-    EXPECT_EQ(ret, MMC_ERROR);
-}
+// InitBm_InvalidOpType removed: smem library no longer rejects SMEMB_DATA_OP_BUTT at create time, so InitBm succeeds even for unknown types.
 
 // 总容量 <= 32TB 时不启用 56 位 GVA。
 TEST_F(TestMmcBmProxy, InitBm_BelowThreshold_NotEnable56BitsGva)

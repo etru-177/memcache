@@ -23,7 +23,7 @@
 namespace ock {
 namespace mmc {
 
-using ubsio_client_init_func = int32_t (*)(int32_t, uint64_t);
+using ubsio_client_initFunc = int32_t (*)(int32_t);
 using ubsio_putFunc = int32_t (*)(const char *, void *, size_t, uint32_t);
 using ubsio_getFunc = int32_t (*)(const char *, void *, size_t, uint32_t);
 using ubsio_existFunc = bool (*)(const char *, uint32_t);
@@ -38,17 +38,33 @@ using ubsio_batch_deleteFunc = int32_t (*)(const char **, uint32_t, int32_t *, u
 using ubsio_batch_get_lengthFunc = int32_t (*)(const char **, uint32_t, size_t *, int32_t *, uint32_t);
 using ubsio_batch_free_addressFunc = int32_t (*)(void **, uint32_t);
 
+// UBS IO metadata event callback types (C ABI for cross-so stability)
+enum UbsioMetaEventTypeC {
+    UBSIO_META_RECOVER_C = 0,
+    UBSIO_META_DELETE_C = 1,
+};
+
+typedef struct {
+    int32_t type;
+    const char *key;
+    uint32_t keyLen;
+} UbsioMetaEventC;
+
+typedef void (*UbsioMetaEventCallbackC)(void *context, const UbsioMetaEventC *events, uint32_t count);
+
+using ubsio_register_meta_event_callbackFunc = int32_t (*)(UbsioMetaEventCallbackC callback, void *context);
+
 class DlUbsioApi {
 public:
     static Result LoadLibrary();
     static void CleanupLibrary();
 
-    static inline Result UbsioClientInit(int32_t deviceId, uint64_t ssdSize)
+    static inline Result UbsioClientInit(int32_t deviceId)
     {
         if (pUbsioClientInit == nullptr) {
             return MMC_NOT_INITIALIZED;
         }
-        return pUbsioClientInit(deviceId, ssdSize);
+        return pUbsioClientInit(deviceId);
     }
 
     static inline Result UbsioPut(const char *key, void *buf, size_t length, uint32_t flags)
@@ -67,10 +83,10 @@ public:
         return pUbsioGet(key, buf, length, flags);
     }
 
-    static inline Result UbsioExist(const char *key, uint32_t flags)
+    static inline bool UbsioExist(const char *key, uint32_t flags)
     {
         if (pUbsioExist == nullptr) {
-            return MMC_NOT_INITIALIZED;
+            return false;
         }
         return pUbsioExist(key, flags);
     }
@@ -151,13 +167,22 @@ public:
         return pUbsioBatchFreeAddress(bufs, keys_count);
     }
 
+    static inline Result UbsioRegisterMetaEventCallback(UbsioMetaEventCallbackC callback, void *context)
+    {
+        if (pUbsioRegisterMetaEventCallback == nullptr) {
+            MMC_LOG_ERROR("UbsioRegisterMetaEventCallback not loaded");
+            return MMC_NOT_INITIALIZED;
+        }
+        return pUbsioRegisterMetaEventCallback(callback, context);
+    }
+
 private:
     static std::mutex gMutex;
     static bool gLoaded;
     static void *ubsioHandle;
     static const std::string gUbsioLibName;
 
-    static ubsio_client_init_func pUbsioClientInit;
+    static ubsio_client_initFunc pUbsioClientInit;
     static ubsio_putFunc pUbsioPut;
     static ubsio_getFunc pUbsioGet;
     static ubsio_existFunc pUbsioExist;
@@ -170,6 +195,7 @@ private:
     static ubsio_batch_deleteFunc pUbsioBatchDelete;
     static ubsio_batch_get_lengthFunc pUbsioBatchGetLength;
     static ubsio_batch_free_addressFunc pUbsioBatchFreeAddress;
+    static ubsio_register_meta_event_callbackFunc pUbsioRegisterMetaEventCallback;
 };
 }  // namespace mmc
 }  // namespace ock

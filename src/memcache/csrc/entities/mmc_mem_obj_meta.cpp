@@ -13,6 +13,7 @@
 #include "mmc_mem_obj_meta.h"
 #include <chrono>
 #include "mmc_global_allocator.h"
+#include "mmc_meta_metric_manager.h"
 
 namespace ock {
 namespace mmc {
@@ -59,7 +60,8 @@ Result MmcMemObjMeta::RemoveBlobs(const MmcBlobFilterPtr &filter, bool revert)
 }
 
 std::vector<MmcMemBlobPtr> MmcMemObjMeta::FreeBlobs(const std::string &key, MmcGlobalAllocatorPtr &allocator,
-                                                    const MmcBlobFilterPtr &filter, bool doBackupRemove)
+                                                    const MmcBlobFilterPtr &filter, bool doBackupRemove,
+                                                    bool triggerSsdPreFree)
 {
     if (NumBlobs() == 0) {
         return {};
@@ -82,8 +84,13 @@ std::vector<MmcMemBlobPtr> MmcMemObjMeta::FreeBlobs(const std::string &key, MmcG
         if (ret != MMC_OK) {
             MMC_LOG_ERROR("remove op, meta update failed:" << ret);
         }
-        // P4: 释放 SSD blob 前异步通过 RPC 删除远端数据
-        MmcMemBlob::SsdPreFree(key, blobs[i]->GetDesc());
+        if (triggerSsdPreFree) {
+            MmcMemBlob::SsdPreFree(key, blobs[i]->GetDesc());
+        }
+        if (blobs[i]->IsRewarmOrigin()) {
+            MmcMetaMetricManager::GetInstance().DecrementRewarmBytesCurrent(blobs[i]->Size(),
+                                                                            blobs[i]->GetDesc().rank_);
+        }
         ret = allocator->Free(blobs[i]);
         if (ret != MMC_OK) {
             MMC_LOG_ERROR("Error in free blobs! failed:" << ret);

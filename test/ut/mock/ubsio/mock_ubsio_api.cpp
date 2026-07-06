@@ -25,11 +25,27 @@ std::mutex gUbsioMutex;
 std::vector<void*> gAllocatedBuffers;
 std::mutex gBufferMutex;
 
+// UBS IO meta event types
+typedef struct {
+    int32_t type;
+    const char *key;
+    uint32_t keyLen;
+} UbsioMetaEventC;
+
+typedef void (*UbsioMetaEventCallbackC)(void *context, const UbsioMetaEventC *events, uint32_t count);
+
 // 初始化函数
-extern "C" int32_t UbsioKvCacheInit(int32_t deviceId, uint64_t ssdSize)
+extern "C" int32_t UbsioKvCacheInit(int32_t deviceId)
 {
     (void)deviceId;
-    (void)ssdSize;
+    return 0;
+}
+
+// 注册元数据事件回调
+extern "C" int32_t UbsioKvCacheRegisterMetaEventCallback(UbsioMetaEventCallbackC callback, void *context)
+{
+    (void)callback;
+    (void)context;
     return 0;
 }
 

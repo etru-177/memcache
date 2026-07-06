@@ -54,7 +54,7 @@ int AllocatorTest(const int worldSize, const int rankId, MmcGlobalAllocatorPtr a
     loc.rank_ = rankId;
     info.bmAddr_ = size * rankId;
     info.capacity_ = size;
-    std::map<std::string, MmcMemBlobDesc> blobMap;
+    std::vector<std::pair<std::string, MmcMemBlobDesc>> blobMap;
     Result result = allocator->Mount(loc, info);
     Result result1 = allocator->BuildFromBlobs(loc, blobMap);
     if (result != MMC_OK || result1 != MMC_OK) {

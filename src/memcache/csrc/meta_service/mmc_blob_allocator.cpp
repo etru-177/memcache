@@ -146,7 +146,7 @@ Result MmcBlobAllocator::Release(const MmcMemBlobPtr &blob)
     return MMC_OK;
 }
 
-Result MmcBlobAllocator::BuildFromBlobs(std::map<std::string, MmcMemBlobDesc> &blobMap)
+Result MmcBlobAllocator::BuildFromBlobs(std::vector<std::pair<std::string, MmcMemBlobDesc>> &blobList)
 {
     spinlock_.lock();
     if (started_) {
@@ -157,10 +157,10 @@ Result MmcBlobAllocator::BuildFromBlobs(std::map<std::string, MmcMemBlobDesc> &b
     }
 
     // 处理每个已分配的blob
-    for (auto it = blobMap.begin(); it != blobMap.end();) {
+    for (auto it = blobList.begin(); it != blobList.end();) {
         if (it->second.rank_ != rank_) {
             MMC_LOG_WARN("rebuild blob not match, allocator rank: " << rank_ << ", blob rank: " << it->second.rank_);
-            it = blobMap.erase(it);
+            it = blobList.erase(it);
             continue;
         }
 
@@ -178,7 +178,7 @@ Result MmcBlobAllocator::BuildFromBlobs(std::map<std::string, MmcMemBlobDesc> &b
         if (res != MMC_OK) {
             MMC_LOG_ERROR("rebuild allocator failed, rank: " << rank_ << " mediaType: " << mediaType_
                                                              << ", blob off:" << offset << ", size: " << size);
-            it = blobMap.erase(it);
+            it = blobList.erase(it);
             continue;
         }
         MMC_LOG_INFO("rebuild block successful, rank: " << it->second);

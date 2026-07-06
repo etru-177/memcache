@@ -186,7 +186,6 @@ public:
                       VUInt64Range::Create(OCK_MMC_METRICS_REPORT_INTERVAL_SECONDS.first, MIN_INTERVAL_SECONDS,
                                            MAX_INTERVAL_SECONDS),
                       0);
-        AddStrConf(OCK_MMC_LOCAL_SERVICE_SSD_SIZE, VNoCheck::Create(), 0);
         AddBoolConf(OCK_MMC_META_HA_ENABLE, VStrEnum::Create(OCK_MMC_META_HA_ENABLE.first, BOOL_ENUM_STR), 0);
         AddStrConf(OCK_MMC_LOG_LEVEL, VStrEnum::Create(OCK_MMC_LOG_LEVEL.first, LOG_LEVEL_ENUM_STR), 0);
         AddStrConf(OCK_MMC_LOG_PATH, VStrLength::Create(OCK_MMC_LOG_PATH.first, PATH_MAX_LEN), 0);
@@ -203,6 +202,10 @@ public:
         AddIntConf(OKC_MMC_EVICT_THRESHOLD_LOW,
                    VIntRange::Create(OKC_MMC_EVICT_THRESHOLD_LOW.first, MIN_EVICT_THRESHOLD, MAX_EVICT_THRESHOLD - 1),
                    0);
+        AddIntConf(OCK_MMC_REWARM_DRAM_WATERMARK,
+                   VIntRange::Create(OCK_MMC_REWARM_DRAM_WATERMARK.first, MIN_PERCENT, MAX_PERCENT), 0);
+        AddBoolConf(OCK_MMC_PREFETCH_ENABLED,
+                    VStrEnum::Create(OCK_MMC_PREFETCH_ENABLED.first, BOOL_ENUM_STR), 0);
         AddIntConf(OCK_MMC_META_LEASE_TTL_MS,
                    VIntRange::Create(OCK_MMC_META_LEASE_TTL_MS.first, MIN_LEASE_TTL_MS, MAX_LEASE_TTL_MS), 0);
 
@@ -246,6 +249,8 @@ public:
 
         config.evictThresholdHigh = GetInt(ConfConstant::OKC_MMC_EVICT_THRESHOLD_HIGH);
         config.evictThresholdLow = GetInt(ConfConstant::OKC_MMC_EVICT_THRESHOLD_LOW);
+        config.rewarmDramWatermark = GetInt(ConfConstant::OCK_MMC_REWARM_DRAM_WATERMARK);
+        config.prefetchEnabled = GetBool(ConfConstant::OCK_MMC_PREFETCH_ENABLED);
         config.leaseTtlMs = static_cast<uint64_t>(GetInt(ConfConstant::OCK_MMC_META_LEASE_TTL_MS));
         config.logRotationFileSize = GetInt(ConfConstant::OCK_MMC_LOG_ROTATION_FILE_SIZE) * MB_NUM;
         config.logRotationFileCount = GetInt(ConfConstant::OCK_MMC_LOG_ROTATION_FILE_COUNT);
@@ -296,7 +301,6 @@ public:
         AddStrConf(OKC_MMC_LOCAL_SERVICE_MAX_DRAM_SIZE, VNoCheck::Create(), 0);
         AddStrConf(OKC_MMC_LOCAL_SERVICE_HBM_SIZE, VNoCheck::Create(), 0);
         AddStrConf(OKC_MMC_LOCAL_SERVICE_MAX_HBM_SIZE, VNoCheck::Create(), 0);
-        AddStrConf(OCK_MMC_LOCAL_SERVICE_SSD_SIZE, VNoCheck::Create(), 0);
 
         // HCOM TLS config
         AddStrConf(OKC_MMC_LOCAL_SERVICE_BM_HCOM_URL, VNoCheck::Create(), 0);
@@ -324,6 +328,8 @@ public:
             OCK_MMC_CLIENT_WRITE_THREAD_POOL_SIZE,
             VIntRange::Create(OCK_MMC_CLIENT_WRITE_THREAD_POOL_SIZE.first, MIN_THREAD_POOL_SIZE, MAX_THREAD_POOL_SIZE),
             0);
+        AddBoolConf(OCK_MMC_LOCAL_SERVICE_STORAGE_ENABLED,
+                    VStrEnum::Create(OCK_MMC_LOCAL_SERVICE_STORAGE_ENABLED.first, BOOL_ENUM_STR), 0);
         AddIntConf(OCK_MMC_CLIENT_AGGREGATE_NUM,
                    VIntRange::Create(OCK_MMC_CLIENT_AGGREGATE_NUM.first, 1, MAX_AGGREGATE_NUM), 0);
         AddStrConf(OCK_MMC_CLIENT_BATCH_CHUNK_SIZE, VNoCheck::Create(), 0);
@@ -345,7 +351,7 @@ public:
             GetUInt64(ConfConstant::OKC_MMC_LOCAL_SERVICE_MAX_DRAM_SIZE.first, config.localDRAMSize);
         config.localHBMSize = GetUInt64(ConfConstant::OKC_MMC_LOCAL_SERVICE_HBM_SIZE.first, 0);
         config.localMaxHBMSize = GetUInt64(ConfConstant::OKC_MMC_LOCAL_SERVICE_MAX_HBM_SIZE.first, config.localHBMSize);
-        config.localSsdSize = GetUInt64(ConfConstant::OCK_MMC_LOCAL_SERVICE_SSD_SIZE.first, 0);
+        config.storageEnabled = GetBool(ConfConstant::OCK_MMC_LOCAL_SERVICE_STORAGE_ENABLED);
         auto protocol = std::string(config.dataOpType);
         std::string logLevelStr = GetString(ConfConstant::OCK_MMC_LOG_LEVEL);
         StringToUpper(logLevelStr);
@@ -437,12 +443,6 @@ public:
             MMC_LOG_ERROR("ock.mmc.local_service.max.hbm.size(" << config.localMaxHBMSize
                                                                 << ") is smaller than ock.mmc.local_service.hbm.size("
                                                                 << config.localHBMSize << ");");
-            return MMC_INVALID_PARAM;
-        }
-
-        if (config.localSsdSize > MAX_SSD_SIZE) {
-            MMC_LOG_ERROR("ock.mmc.local_service.storage.size(" << config.localSsdSize
-                                                            << ") exceeds (" << MAX_SSD_SIZE << ")");
             return MMC_INVALID_PARAM;
         }
 

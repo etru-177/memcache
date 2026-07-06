@@ -58,6 +58,8 @@ typedef struct {
     mmc_tls_config accTlsConfig;
     mmc_tls_config configStoreTlsConfig;
     uint32_t metricsReportIntervalSeconds;
+    uint16_t rewarmDramWatermark;
+    bool prefetchEnabled;
 } mmc_meta_service_config_t;
 
 typedef struct {
@@ -73,7 +75,7 @@ typedef struct {
     uint64_t localMaxDRAMSize;
     uint64_t localHBMSize;
     uint64_t localMaxHBMSize;
-    uint64_t localSsdSize;
+    bool storageEnabled;
     uint32_t flags;
     mmc_tls_config accTlsConfig;
     int32_t logLevel;

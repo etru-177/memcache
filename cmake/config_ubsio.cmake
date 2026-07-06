@@ -24,11 +24,17 @@ if (BUILD_UBSIO)
 
     include(FetchContent)
 
-    FetchContent_Declare(
-        ubs-io
-        GIT_REPOSITORY https://gitcode.com/openeuler/ubs-io.git
-        GIT_TAG develop
-    )
+    set(UBSIO_SRC_DIR "${FETCHCONTENT_BASE_DIR}/ubs-io-src")
+    if (EXISTS "${UBSIO_SRC_DIR}/ubsio-boostio" AND EXISTS "${UBSIO_SRC_DIR}/ubsio-kv")
+        message(STATUS "ubs-io local source found at ${UBSIO_SRC_DIR}, skip clone")
+        FetchContent_Declare(ubs-io SOURCE_DIR ${UBSIO_SRC_DIR})
+    else()
+        FetchContent_Declare(
+            ubs-io
+            GIT_REPOSITORY https://gitcode.com/openeuler/ubs-io.git
+            GIT_TAG develop
+        )
+    endif()
 
     FetchContent_GetProperties(ubs-io)
     if (NOT ubs-io_POPULATED)
@@ -64,6 +70,7 @@ if (BUILD_UBSIO)
     file(GLOB UBSIO_SO_FILES
         ${ubs-io_SOURCE_DIR}/ubsio-boostio/dist/boostio/lib/*.so*
         ${ubs-io_SOURCE_DIR}/ubsio-boostio/dist/3rdparty/libboundscheck/lib/*.so*
+        ${ubs-io_SOURCE_DIR}/ubsio-boostio/dist/3rdparty/libaio/lib/*.so*
         ${ubs-io_SOURCE_DIR}/ubsio-kv/dist/lib/*.so*)
     file(COPY ${UBSIO_SO_FILES} DESTINATION ${UBSIO_OUTPUT_DIR}/lib)
     message(STATUS "ubs-io lib installed to ${UBSIO_OUTPUT_DIR}/lib")

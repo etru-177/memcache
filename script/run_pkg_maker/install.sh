@@ -181,41 +181,10 @@ function uninstall_process()
     print "INFO" "memcache_hybrid $(basename $1) uninstall success!"
 }
 
-function uninstall_ubsio()
-{
-    if [ ! -f /usr/lib64/libubsio_kvc.so ] && [ ! -d /etc/boostio ]; then
-        return
-    fi
-
-    print "INFO" "Removing ubs-io libraries..."
-    local ubsio_so_list=(
-        /usr/lib64/libbio_common.so
-        /usr/lib64/libbio_interceptor_server.so
-        /usr/lib64/libbio_sdk.so /usr/lib64/libbio_sdk.so.1 /usr/lib64/libbio_sdk.so.1.0.0
-        /usr/lib64/libbio_security.so
-        /usr/lib64/libbio_server.so
-        /usr/lib64/libbio_underfs.so
-        /usr/lib64/libboundscheck.so
-        /usr/lib64/libhtracer.so
-        /usr/lib64/libock_interceptor.so
-        /usr/lib64/libock_iofwd_proxy.so
-        /usr/lib64/libubsio_kvc.so /usr/lib64/libubsio_kvc.so.1 /usr/lib64/libubsio_kvc.so.1.0.0
-    )
-    for so in "${ubsio_so_list[@]}"; do
-        [ -f "$so" ] && rm -f "$so"
-    done
-
-    if [ -d /etc/boostio ]; then
-        print "INFO" "Removing ubs-io config from /etc/boostio..."
-        rm -rf /etc/boostio
-    fi
-}
-
 function uninstall()
 {
     install_dir=${default_install_dir}/${version1}
     uninstall_process ${install_dir} y
-    uninstall_ubsio
 }
 
 function check_arch()
@@ -319,13 +288,6 @@ function install_to_path()
     cp -r ${script_dir}/uninstall.sh ${install_dir}/
     cp -r ${script_dir}/../version.info ${install_dir}/
 
-    # install ubs-io (SSD backend) to system paths
-    if [ -d ${script_dir}/../3rdparty/ubsio ]; then
-        print "INFO" "Installing ubs-io to system paths..."
-        cp -r ${script_dir}/../3rdparty/ubsio/lib/* /usr/lib64/
-        mkdir -p /etc/boostio
-        cp -r ${script_dir}/../3rdparty/ubsio/conf/* /etc/boostio/
-    fi
 
     pip_path=$(which pip3 2>/dev/null)
     if [ -z "$pip_path" ]; then
@@ -347,6 +309,7 @@ function generate_set_env()
     cat > "${default_install_dir}/set_env.sh" <<EOF
 PYTHON_LIB_DIR=\$(python3 -c 'import sys,os;print(os.path.join(sys.prefix,"lib"))')
 export MEMCACHE_HYBRID_HOME_PATH=${default_install_dir}/latest
+export UBSIO_BIO_CONFIG_PATH=\${MEMCACHE_HYBRID_HOME_PATH}/config/bio.conf
 export LD_LIBRARY_PATH=${default_install_dir}/latest/${pkg_arch}-${os1}/lib64:\${PYTHON_LIB_DIR}:\$LD_LIBRARY_PATH
 export PATH=${default_install_dir}/latest/${pkg_arch}-${os1}/bin:\$PATH
 EOF

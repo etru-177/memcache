@@ -72,6 +72,8 @@ private:
 
     Result HandleBatchUpdateBlob(const NetContextPtr &context);
 
+    Result HandleUbsIoMetaDelete(const NetContextPtr &context);
+
 private:
     NetEnginePtr engine_;
     MmcMetaServicePtr metaService_;

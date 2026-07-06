@@ -573,7 +573,8 @@ struct BmRegisterRequest : MsgBase {
     std::vector<uint16_t> mediaType_{};
     std::vector<uint64_t> addr_{};
     std::vector<uint64_t> capacity_{};
-    std::map<std::string, MmcMemBlobDesc> blobMap_;
+    std::vector<std::pair<std::string, MmcMemBlobDesc>> blobList_;
+    bool storageEnabled_{false};
 
     BmRegisterRequest() : MsgBase{0, ML_BM_REGISTER_REQ, 0} {}
 
@@ -586,7 +587,8 @@ struct BmRegisterRequest : MsgBase {
         packer.Serialize(mediaType_);
         packer.Serialize(addr_);
         packer.Serialize(capacity_);
-        packer.Serialize(blobMap_);
+        packer.Serialize(blobList_);
+        packer.Serialize(storageEnabled_);
         return MMC_OK;
     }
 
@@ -599,7 +601,8 @@ struct BmRegisterRequest : MsgBase {
         packer.Deserialize(mediaType_);
         packer.Deserialize(addr_);
         packer.Deserialize(capacity_);
-        packer.Deserialize(blobMap_);
+        packer.Deserialize(blobList_);
+        packer.Deserialize(storageEnabled_);
         return MMC_OK;
     }
 };
@@ -711,6 +714,69 @@ struct BlobCopyRequest : public MsgBase {
         packer.Deserialize(key_);
         packer.Deserialize(srcBlob_);
         packer.Deserialize(dstBlob_);
+        return MMC_OK;
+    }
+};
+
+struct BatchBlobCopyRequest : public MsgBase {
+    std::vector<std::string> keys_;
+    std::vector<MmcMemBlobDesc> srcBlobs_;
+    std::vector<MmcMemBlobDesc> dstBlobs_;
+
+    BatchBlobCopyRequest() : MsgBase{0, LM_BATCH_BLOB_COPY_REQ, 0} {}
+
+    BatchBlobCopyRequest(std::vector<std::string> keys,
+                         std::vector<MmcMemBlobDesc> srcBlobs,
+                         std::vector<MmcMemBlobDesc> dstBlobs)
+        : MsgBase{0, LM_BATCH_BLOB_COPY_REQ, 0},
+          keys_(std::move(keys)),
+          srcBlobs_(std::move(srcBlobs)),
+          dstBlobs_(std::move(dstBlobs))
+    {}
+
+    Result Serialize(NetMsgPacker &packer) const override
+    {
+        packer.Serialize(msgVer);
+        packer.Serialize(msgId);
+        packer.Serialize(destRankId);
+        packer.Serialize(keys_);
+        packer.Serialize(srcBlobs_);
+        packer.Serialize(dstBlobs_);
+        return MMC_OK;
+    }
+
+    Result Deserialize(NetMsgUnpacker &packer) override
+    {
+        packer.Deserialize(msgVer);
+        packer.Deserialize(msgId);
+        packer.Deserialize(destRankId);
+        packer.Deserialize(keys_);
+        packer.Deserialize(srcBlobs_);
+        packer.Deserialize(dstBlobs_);
+        return MMC_OK;
+    }
+};
+
+struct BatchBlobCopyResponse : public MsgBase {
+    std::vector<Result> results_;
+
+    BatchBlobCopyResponse() : MsgBase{0, LM_BATCH_BLOB_COPY_RSP, 0} {}
+
+    Result Serialize(NetMsgPacker &packer) const override
+    {
+        packer.Serialize(msgVer);
+        packer.Serialize(msgId);
+        packer.Serialize(destRankId);
+        packer.Serialize(results_);
+        return MMC_OK;
+    }
+
+    Result Deserialize(NetMsgUnpacker &packer) override
+    {
+        packer.Deserialize(msgVer);
+        packer.Deserialize(msgId);
+        packer.Deserialize(destRankId);
+        packer.Deserialize(results_);
         return MMC_OK;
     }
 };
@@ -1045,6 +1111,64 @@ struct BlobDeleteResponse : MsgBase {
         return MMC_OK;
     }
 };
+// UBS IO metadata event type (memcache internal, mirrors UbsioMetaEventTypeC)
+enum UbsIoMetaEventType : int32_t {
+    UBSIO_META_DELETE = 1,
+};
+
+// UBS IO DELETE metadata event: reported from LocalService to MetaService
+struct UbsIoMetaDeleteRequest : MsgBase {
+    uint32_t rank_{0};
+    std::vector<std::string> keys_;
+
+    UbsIoMetaDeleteRequest() : MsgBase{0, ML_UBSIO_META_DELETE_REQ, 0} {}
+
+    Result Serialize(NetMsgPacker &packer) const override
+    {
+        packer.Serialize(msgVer);
+        packer.Serialize(msgId);
+        packer.Serialize(destRankId);
+        packer.Serialize(rank_);
+        packer.Serialize(keys_);
+        return MMC_OK;
+    }
+
+    Result Deserialize(NetMsgUnpacker &packer) override
+    {
+        packer.Deserialize(msgVer);
+        packer.Deserialize(msgId);
+        packer.Deserialize(destRankId);
+        packer.Deserialize(rank_);
+        packer.Deserialize(keys_);
+        return MMC_OK;
+    }
+};
+
+struct UbsIoMetaDeleteResponse : MsgBase {
+    Result ret_ = MMC_ERROR;
+
+    UbsIoMetaDeleteResponse() : MsgBase{0, ML_UBSIO_META_DELETE_RESP, 0} {}
+    explicit UbsIoMetaDeleteResponse(const Result &ret) : MsgBase{0, ML_UBSIO_META_DELETE_RESP, 0}, ret_(ret) {}
+
+    Result Serialize(NetMsgPacker &packer) const override
+    {
+        packer.Serialize(msgVer);
+        packer.Serialize(msgId);
+        packer.Serialize(destRankId);
+        packer.Serialize(ret_);
+        return MMC_OK;
+    }
+
+    Result Deserialize(NetMsgUnpacker &packer) override
+    {
+        packer.Deserialize(msgVer);
+        packer.Deserialize(msgId);
+        packer.Deserialize(destRankId);
+        packer.Deserialize(ret_);
+        return MMC_OK;
+    }
+};
+
 } // namespace mmc
 } // namespace ock
 #endif // MF_HYBRID_MMC_MSG_CLIENT_META_H

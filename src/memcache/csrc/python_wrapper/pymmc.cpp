@@ -152,9 +152,6 @@ void DefineMmcStructModule(py::module_ &m)
             .def_readwrite("aggregate_num", &local_config::aggregate_num, R"pbdoc(
              Aggregate number.
          )pbdoc")
-            .def_readwrite("local_ssd_size", &local_config::local_ssd_size, R"pbdoc(
-             SSD local size (0 means disabled).
-         )pbdoc")
             .def_readwrite("tls_enable", &local_config::tls_enable, R"pbdoc(
              Enable TLS for metaservice.
          )pbdoc")

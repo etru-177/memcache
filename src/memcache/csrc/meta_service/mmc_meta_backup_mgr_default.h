@@ -27,8 +27,6 @@
 
 namespace ock {
 namespace mmc {
-enum BackUpOperate { META_BACKUP_ADD = 0, META_BACKUP_REMOVE = 1 };
-
 struct MetaBackUpOperate {
     uint32_t op_;
     std::string key_;
@@ -122,7 +120,7 @@ public:
         return MMC_OK;
     }
 
-    Result Load(std::map<std::string, MmcMemBlobDesc> &blobMap) override
+    Result Load(std::vector<std::pair<std::string, MmcMemBlobDesc>> &blobList) override
     {
         return MMC_OK;
     }

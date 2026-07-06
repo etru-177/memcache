@@ -34,7 +34,7 @@ public:
 
     virtual Result Remove(const std::string &key, MmcMemBlobDesc &blobDesc) = 0;
 
-    virtual Result Load(std::map<std::string, MmcMemBlobDesc> &blobMap) = 0;
+    virtual Result Load(std::vector<std::pair<std::string, MmcMemBlobDesc>> &blobList) = 0;
 };
 using MMCMetaBackUpMgrPtr = MmcRef<MMCMetaBackUpMgr>;
 } // namespace mmc

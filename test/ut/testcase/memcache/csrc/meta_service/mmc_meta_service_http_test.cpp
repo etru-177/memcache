@@ -218,8 +218,8 @@ void MmcMetaServiceHttpTest::MountSegments()
     initInfos.push_back(MmcLocalMemlInitInfo{kHttpInitInfoRankId, kHttpSegmentCapacityBytes});
     initInfos.push_back(MmcLocalMemlInitInfo{kHttpInitInfoRankId, kHttpSegmentCapacityBytes});
 
-    std::map<std::string, MmcMemBlobDesc> blobMap;
-    ASSERT_EQ(metaManager_->Mount(locations, initInfos, blobMap), MMC_OK);
+    std::vector<std::pair<std::string, MmcMemBlobDesc>> blobMap;
+    ASSERT_EQ(metaManager_->Mount(locations, initInfos, blobMap, false), MMC_OK);
 }
 
 void MmcMetaServiceHttpTest::PrepareAllocatedKey()
@@ -474,8 +474,12 @@ TEST_F(MmcMetaServiceHttpTest, MetricsContract)
     expectedSummary
         << "keys=" << kHttpExpectedBlobCount << " evict=" << snapshot.evictCount
         << " evict_to_ssd=" << snapshot.evictToSsdCount
-        << " ssd_evict_delete=" << snapshot.ssdEvictDeleteCount
+        << " evict_ssd_delete=" << snapshot.evictSsdDeleteCount
+        << " evict_mem_delete=" << snapshot.evictMemDeleteCount
         << " rewarm=" << snapshot.rewarmCount << " rewarm_fail=" << snapshot.rewarmFailCount
+        << " rewarm_bytes_total=" << snapshot.rewarmBytesCount
+        << " rewarm_bytes_current=" << snapshot.rewarmBytesCurrent
+        << " get_hit_dram=" << snapshot.getHitDramCount << " get_hit_ssd=" << snapshot.getHitSsdCount
         << " hbm_used=" << SIZE_32K << "/" << kHttpSegmentCapacityBytes
         << " dram_used=" << kHttpZeroUsedBytes << "/" << kHttpSegmentCapacityBytes
         << " ssd_used=" << kHttpZeroUsedBytes << "/" << kHttpZeroUsedBytes

@@ -16,13 +16,17 @@
 #include <map>
 #include <vector>
 #include <string>
+#include <functional>
 #include "mmc_logger.h"
 #include "mmc_def.h"
 #include "mmc_types.h"
 #include "mmc_ref.h"
+#include "dl_ubsio_api.h"
 
 namespace ock {
 namespace mmc {
+
+using UbsIoMetaCallback = std::function<void(int type, const std::vector<std::string> &keys)>;
 
 class MmcUbsIoProxy : public MmcReferable {
 public:
@@ -33,11 +37,11 @@ public:
     MmcUbsIoProxy(const MmcUbsIoProxy&) = delete;
     MmcUbsIoProxy& operator=(const MmcUbsIoProxy&) = delete;
 
-    Result InitUbsIo(int32_t deviceId = -1, uint64_t ssdSize = 0);
+    Result InitUbsIo(int32_t deviceId = -1);
     void DestroyUbsIo();
     Result Put(const std::string &key, void *buf, size_t length);
     Result Get(const std::string &key, void *buf, size_t length);
-    Result Exist(const std::string &key);
+    bool Exist(const std::string &key);
     Result Delete(const std::string &key);
     Result GetLength(const std::string &key, size_t &length);
     Result BatchPut(const std::vector<std::string> &keys, const std::vector<void *> &bufs,
@@ -52,10 +56,20 @@ public:
         std::vector<int32_t> &results);
     Result BatchGetFree(void **bufs, int keysCount);
 
+    void SetMetaEventCallback(UbsIoMetaCallback callback)
+    {
+        metaEventCallback_ = std::move(callback);
+    }
+
+    Result RegisterMetaEventCallback();
+
 private:
+    static void StaticMetaEventCallback(void *context, const UbsioMetaEventC *events, uint32_t count);
+
     std::string name_;
     bool started_ = false;
     std::mutex mutex_;
+    UbsIoMetaCallback metaEventCallback_;
 };
 
 using MmcUbsIoProxyPtr = MmcRef<MmcUbsIoProxy>;

@@ -81,10 +81,12 @@ using MmcBlobFilterPtr = MmcRef<MmcBlobFilter>;
 
 class MmcMemBlob final : public MmcReferable {
 public:
+    static constexpr uint32_t kRewarmFlag = 1U << 0;
     MmcMemBlob() = delete;
     MmcMemBlob(const uint32_t &rank, const uint64_t &gva, const uint64_t &size, const MediaType &mediaType,
                const BlobState &state, uint64_t defaultTtlMs = MMC_DATA_TTL_MS)
-        : rank_(rank), gva_(gva), size_(size), mediaType_(mediaType), state_(state), metaLeaseManager_(defaultTtlMs)
+        : rank_(rank), gva_(gva), size_(size), mediaType_(mediaType), state_(state),
+          metaLeaseManager_(defaultTtlMs)
     {}
     ~MmcMemBlob() override = default;
 
@@ -136,6 +138,17 @@ public:
     uint16_t Type() const;
 
     /**
+     * @brief Check if the blob originated from rewarm
+     * @return true if rewarm origin, false if PUT origin
+     */
+    bool IsRewarmOrigin() const;
+
+    /**
+     * @brief Mark the blob as rewarm origin
+     */
+    void SetRewarmOrigin();
+
+    /**
      * @brief Get the state of the blob
      * @return state
      */
@@ -162,6 +175,7 @@ public:
     {
         os << "Blob{rank=" << blob.rank_ << ",gva=" << blob.gva_ << ",size=" << blob.size_
            << ",media=" << static_cast<int>(blob.mediaType_) << ",state=" << static_cast<int>(blob.state_)
+           << ",rewarm_flag=" << ((blob.flags_ & MmcMemBlob::kRewarmFlag) != 0 ? 1 : 0)
            << ",prot=" << blob.prot_ << "," << blob.metaLeaseManager_ << "}";
         return os;
     }
@@ -200,6 +214,7 @@ private:
     const enum MediaType mediaType_;   /* media type where blob located */
     BlobState state_{BlobState::NONE}; /* state of the blob */
     uint16_t prot_{0};                 /* prot, i.e. access */
+    uint32_t flags_{0};                /* bit 0: rewarm flag */
     MmcMetaLeaseManager metaLeaseManager_;
     static const StateTransTable stateTransTable_;
 };
@@ -222,6 +237,16 @@ inline uint64_t MmcMemBlob::Size() const
 inline uint16_t MmcMemBlob::Type() const
 {
     return mediaType_;
+}
+
+inline bool MmcMemBlob::IsRewarmOrigin() const
+{
+    return (flags_ & kRewarmFlag) != 0;
+}
+
+inline void MmcMemBlob::SetRewarmOrigin()
+{
+    flags_ |= kRewarmFlag;
 }
 
 inline BlobState MmcMemBlob::State()

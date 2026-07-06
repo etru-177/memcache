@@ -56,7 +56,6 @@ static local_config CreateLocalConfigWithCurrentDefaults()
     config.write_thread_pool_size = 4UL;
     config.aggregate_io = true;
     config.aggregate_num = 122UL;
-    config.local_ssd_size = 0;
     config.tls_enable = false;
     config.config_store_tls_enable = false;
     config.hcom_tls_enable = false;
@@ -331,7 +330,6 @@ TEST_F(TestMmcConfiguration, SetupWithFullConfigTest)
     config.write_thread_pool_size = 8UL;
     config.aggregate_io = true;
     config.aggregate_num = 256UL;
-    config.local_ssd_size = 1;
 
     config.tls_enable = true;
     SafeCopy("/etc/ssl/ca.pem", config.tls_ca_path, sizeof(config.tls_ca_path));
@@ -370,74 +368,6 @@ TEST_F(TestMmcConfiguration, SetupWithFullConfigTest)
     ASSERT_EQ(clientConfig.GetString(ConfConstant::OCK_MMC_CS_TLS_CA_PATH), "/etc/ssl/cs_ca.pem");
     ASSERT_EQ(clientConfig.GetBool(ConfConstant::OCK_MMC_HCOM_TLS_ENABLE), true);
     ASSERT_EQ(clientConfig.GetString(ConfConstant::OCK_MMC_HCOM_TLS_CERT_PATH), "/etc/ssl/hcom_cert.pem");
-}
-
-// Verify SSD capacity config parsing "1TB" → expect correct parse
-TEST_F(TestMmcConfiguration, SsdSizeConfigParsingTest)
-{
-    Configuration configuration;
-    configuration.AddStrConf(ConfConstant::OCK_MMC_LOCAL_SERVICE_SSD_SIZE,  0);
-    configuration.Set(ConfConstant::OCK_MMC_LOCAL_SERVICE_SSD_SIZE.first, std::string("1TB"));
-    ASSERT_EQ(configuration.GetString(ConfConstant::OCK_MMC_LOCAL_SERVICE_SSD_SIZE), "1TB");
-}
-
-
-// ValidateLocalServiceConfig — ssd.size=0 is valid
-TEST_F(TestMmcConfiguration, ValidateLocalServiceConfigSsdSizeZeroValid)
-{
-    mmc_local_service_config_t cfg{};
-    cfg.logLevel = INFO_LEVEL;
-    cfg.accTlsConfig.tlsEnable = false;
-    cfg.hcomTlsConfig.tlsEnable = false;
-    cfg.configStoreTlsConfig.tlsEnable = false;
-    SafeCopy("host_rdma", cfg.dataOpType, PROTOCOL_SIZE);
-    cfg.localDRAMSize = 2UL * 1024UL * 1024UL;
-    cfg.localMaxDRAMSize = 2UL * 1024UL * 1024UL;
-    cfg.localHBMSize = 0;
-    cfg.localMaxHBMSize = 0;
-    cfg.localSsdSize = 0;
-
-    auto ret = ClientConfig::ValidateLocalServiceConfig(cfg);
-    ASSERT_EQ(ret, MMC_OK);
-}
-
-// ValidateLocalServiceConfig — ssd.size exceeds limit (over MAX_SSD_SIZE)
-TEST_F(TestMmcConfiguration, ValidateLocalServiceConfigSsdSizeExceedsMax)
-{
-    mmc_local_service_config_t cfg{};
-    cfg.logLevel = INFO_LEVEL;
-    cfg.accTlsConfig.tlsEnable = false;
-    cfg.hcomTlsConfig.tlsEnable = false;
-    cfg.configStoreTlsConfig.tlsEnable = false;
-    SafeCopy("host_rdma", cfg.dataOpType, PROTOCOL_SIZE);
-    cfg.localDRAMSize = 2UL * 1024UL * 1024UL;
-    cfg.localMaxDRAMSize = 2UL * 1024UL * 1024UL;
-    cfg.localHBMSize = 0;
-    cfg.localMaxHBMSize = 0;
-    cfg.localSsdSize = MAX_SSD_SIZE + 1;
-
-    auto ret = ClientConfig::ValidateLocalServiceConfig(cfg);
-    ASSERT_NE(ret, MMC_OK);
-}
-
-// GetLocalServiceConfig reads ssd.size → expect correct parse
-TEST_F(TestMmcConfiguration, GetLocalServiceConfigReadsSsdSize)
-{
-    ClientConfig clientConfig;
-    clientConfig.AddStrConf(ConfConstant::OCK_MMC_LOCAL_SERVICE_SSD_SIZE, VNoCheck::Create(), 0);
-    clientConfig.SetWithTypeAutoConvert(ConfConstant::OCK_MMC_LOCAL_SERVICE_SSD_SIZE.first, std::string("512MB"));
-
-    mmc_local_service_config_t cfg{};
-    clientConfig.GetLocalServiceConfig(cfg);
-    ASSERT_EQ(cfg.localSsdSize, 512ULL * MB_MEM_BYTES);
-}
-
-// Verify ssd.size default value is 0
-TEST_F(TestMmcConfiguration, SsdSizeDefaultValueIsZero)
-{
-    Configuration configuration;
-    configuration.AddStrConf(ConfConstant::OCK_MMC_LOCAL_SERVICE_SSD_SIZE, VNoCheck::Create(), 0);
-    ASSERT_EQ(configuration.GetString(ConfConstant::OCK_MMC_LOCAL_SERVICE_SSD_SIZE), "0");
 }
 
 TEST_F(TestMmcConfiguration, SetupWithBoundaryValuesTest)

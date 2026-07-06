@@ -91,9 +91,6 @@ typedef struct {
     bool aggregate_io;
     uint32_t aggregate_num;
 
-    // SSD local size (0 means disabled)
-    uint64_t local_ssd_size;
-
     // TLS configurations for metaservice
     bool tls_enable;
     char tls_ca_path[TLS_PATH_SIZE];

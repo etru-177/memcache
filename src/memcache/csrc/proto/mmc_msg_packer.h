@@ -194,6 +194,20 @@ public:
         }
     }
 
+    /**
+     * @brief Take data and deserialize to pair
+     *
+     * @tparam K           [in] type of pair first
+     * @tparam V           [in] type of pair second
+     * @param val          [in/out] result data of pair
+     */
+    template<typename K, typename V>
+    void Deserialize(std::pair<K, V> &val)
+    {
+        Deserialize(val.first);
+        Deserialize(val.second);
+    }
+
 private:
     std::istringstream inStream_;
 };

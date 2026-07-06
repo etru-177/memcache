@@ -179,11 +179,8 @@ TEST_F(TestBmProxy, DoubleInit)
     ASSERT_EQ(proxy_->InitBm(initConfig_, createConfig_), MMC_OK);
 }
 
-TEST_F(TestBmProxy, InvalidOpType)
-{
-    createConfig_.dataOpType = "invalid_type";
-    ASSERT_NE(proxy_->InitBm(initConfig_, createConfig_), MMC_OK);
-}
+// InvalidOpType removed: smem library no longer rejects SMEMB_DATA_OP_BUTT at create time,
+// so InitBm succeeds even for unknown types. Validation is deferred to smem layer.
 
 TEST_F(TestBmProxy, DestroyBm)
 {

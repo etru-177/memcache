@@ -78,7 +78,12 @@ constexpr auto OCK_MMC_CLIENT_WRITE_THREAD_POOL_SIZE = std::make_pair("ock.mmc.c
 constexpr auto OCK_MMC_CLIENT_BATCH_CHUNK_SIZE = std::make_pair("ock.mmc.client.batch_option.chunk.size", "8MB");
 constexpr auto OCK_MMC_CLIENT_BATCH_CHUNK_COUNT = std::make_pair("ock.mmc.client.batch_option.chunk.count", 3);
 
-constexpr auto OCK_MMC_LOCAL_SERVICE_SSD_SIZE = std::make_pair("ock.mmc.local_service.storage.size", "0");
+constexpr uint16_t DEFAULT_REWARM_WATERMARK_VAL = 95U;
+constexpr auto OCK_MMC_REWARM_DRAM_WATERMARK = std::make_pair("ock.mmc.rewarm.dram_watermark",
+                                                              DEFAULT_REWARM_WATERMARK_VAL);
+constexpr auto OCK_MMC_PREFETCH_ENABLED = std::make_pair("ock.mmc.storage.prefetch.enabled", false);
+constexpr auto OCK_MMC_LOCAL_SERVICE_STORAGE_ENABLED =
+    std::make_pair("ock.mmc.local_service.storage.enabled", false);
 } // namespace ConfConstant
 
 constexpr int MIN_LOG_ROTATION_FILE_SIZE = 1;
@@ -95,6 +100,8 @@ constexpr int MAX_WORLD_SIZE = 1024;
 
 constexpr int MIN_EVICT_THRESHOLD = 1;
 constexpr int MAX_EVICT_THRESHOLD = 99;
+constexpr int MIN_PERCENT = 0;
+constexpr int MAX_PERCENT = 100;
 constexpr int MIN_LEASE_TTL_MS = 1;
 constexpr int MAX_LEASE_TTL_MS = 2147483647;
 
@@ -111,7 +118,6 @@ constexpr int MAX_BATCH_CHUNK_COUNT = 64;
 
 constexpr uint64_t MAX_DRAM_SIZE = 1024ULL * 1024ULL * 1024ULL * 1024ULL; // 1TB
 constexpr uint64_t MAX_HBM_SIZE = 1024ULL * 1024ULL * 1024ULL * 1024ULL;  // 1TB
-constexpr uint64_t MAX_SSD_SIZE = 100ULL * 1024ULL * 1024ULL * 1024ULL * 1024ULL; // 100TB
 
 constexpr uint64_t KB_MEM_BYTES = 1024ULL;
 constexpr uint64_t MB_MEM_BYTES = 1024ULL * 1024ULL;

@@ -66,10 +66,8 @@ public:
         if (allocReq.mediaType_ == MEDIA_NONE) {
             allocReq.mediaType_ = static_cast<uint16_t>(GetTopLayerMediumType());
         }
-
         std::unordered_set<uint32_t> excludeRanks;
         globalAllocLock_.LockRead();
-        // size=1 不一定是强制分配
         if (allocReq.preferredRank_.size() <= 1u) {
             auto ret = InnerAlloc(allocReq, blobs, excludeRanks);
             globalAllocLock_.UnlockRead();
@@ -127,6 +125,10 @@ public:
         if (blob == nullptr) {
             MMC_LOG_ERROR("Free blob failed, blob is nullptr");
             return MMC_INVALID_PARAM;
+        }
+        if (blob->Type() == MEDIA_SSD) {
+            MMC_LOG_WARN("Free SSD blob (UBS IO managed), skipping allocator release, rank: " << blob->Rank());
+            return MMC_OK;
         }
         globalAllocLock_.LockRead();
         const MmcLocation location{blob->Rank(), static_cast<MediaType>(blob->Type())};
@@ -239,7 +241,7 @@ public:
         return MMC_OK;
     }
 
-    Result BuildFromBlobs(const MmcLocation &location, std::map<std::string, MmcMemBlobDesc> &blobMap)
+    Result BuildFromBlobs(const MmcLocation &location, std::vector<std::pair<std::string, MmcMemBlobDesc>> &blobList)
     {
         globalAllocLock_.LockRead();
         const auto iter = allocators_.find(location);
@@ -256,7 +258,7 @@ public:
             MMC_LOG_ERROR("BuildFromBlobs failed, allocator is nullptr");
             return MMC_ERROR;
         }
-        Result ret = allocator->BuildFromBlobs(blobMap);
+        Result ret = allocator->BuildFromBlobs(blobList);
         globalAllocLock_.UnlockRead();
         return ret;
     }
@@ -274,7 +276,7 @@ public:
 
     uint64_t GetFreeSpace(MediaType type)
     {
-        if (type == MEDIA_NONE) {
+        if (type == MEDIA_NONE || type == MEDIA_SSD) {
             return 0;
         }
         uint64_t totalSize[MEDIA_NONE] = {0};
@@ -283,15 +285,49 @@ public:
         return totalSize[type] - usedSize[type];
     }
 
-    std::vector<MediaType> GetNeedEvictList(const uint64_t level, std::vector<uint16_t> &nowMemoryThresholds,
+    bool IsAboveUsageRatio(MediaType type, uint16_t watermark)
+    {
+        if (type == MEDIA_NONE || type == MEDIA_SSD || watermark == 0) {
+            return false;
+        }
+        globalAllocLock_.LockRead();
+        uint64_t total = 0;
+        uint64_t used = 0;
+        for (const auto &[loc, allocator] : allocators_) {
+            if (loc.mediaType_ != type || allocator == nullptr) {
+                continue;
+            }
+            auto [t, u] = allocator->GetUsageInfo();
+            total += t;
+            used += u;
+        }
+        globalAllocLock_.UnlockRead();
+        if (total == 0) {
+            return false;
+        }
+        if (used > std::numeric_limits<uint64_t>::max() / LEVEL_BASE) {
+            MMC_LOG_ERROR("overflow in IsAboveUsageRatio: used=" << used << ", LEVEL_BASE=" << LEVEL_BASE);
+            return false;
+        }
+        return (used * LEVEL_BASE / total) >= watermark;
+    }
+
+    std::vector<MediaType> GetNeedEvictList(const std::vector<std::pair<uint16_t, uint16_t>> &evictWatermarks,
+                                            std::vector<uint16_t> &nowMemoryThresholds,
                                             MediaType media, uint64_t wantAllocSize)
     {
+        if (media == MEDIA_NONE) {
+            media = GetTopLayerMediumType();
+        }
         std::vector<MediaType> results;
         uint64_t totalSize[MEDIA_NONE] = {0};
         uint64_t usedSize[MEDIA_NONE] = {0};
         GetUsedInfo(totalSize, usedSize);
-        // 从下层向上层遍历，先淘汰下层，后淘汰上层
         for (int i = MEDIA_NONE - 1; i >= 0; i--) {
+            if (static_cast<MediaType>(i) == MEDIA_SSD) {
+                continue;
+            }
+            uint16_t level = evictWatermarks[i].first;
             if (usedSize[i] > std::numeric_limits<uint64_t>::max() / LEVEL_BASE ||
                 (level != 0 && (totalSize[i] > std::numeric_limits<uint64_t>::max() / level))) {
                 MMC_LOG_ERROR("overflow: usedSize: " << usedSize[i] << ", LEVEL_BASE: " << LEVEL_BASE

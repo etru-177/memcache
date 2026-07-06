@@ -35,6 +35,9 @@ using ClientBlobCopyHandler = std::function<int32_t(const std::string& key, cons
                                                     const MmcMemBlobDesc &dst)>;
 using ClientBlobDeleteHandler = std::function<int32_t(const std::string& key,
                                                     const MmcMemBlobDesc &blob)>;
+using ClientBatchBlobCopyHandler = std::function<std::vector<Result>(
+    const std::vector<std::string>& keys, const std::vector<MmcMemBlobDesc>& srcBlobs,
+    const std::vector<MmcMemBlobDesc>& dstBlobs)>;
 class MetaNetClient : public MmcReferable {
 public:
     explicit MetaNetClient(const std::string &serverUrl, const std::string &inputName = "");
@@ -123,12 +126,14 @@ public:
 
     void RegisterRetryHandler(const ClientRetryHandler &retryHandler, const ClientReplicateHandler &replicateHandler,
                               const ClientBlobCopyHandler &blobCopyHandler,
-                              const ClientBlobDeleteHandler &blobDeleteHandler = nullptr)
+                              const ClientBlobDeleteHandler &blobDeleteHandler = nullptr,
+                              const ClientBatchBlobCopyHandler &batchBlobCopyHandler = nullptr)
     {
         retryHandler_ = retryHandler;
         replicateHandler_ = replicateHandler;
         blobCopyHandler_ = blobCopyHandler;
         blobDeleteHandler_ = blobDeleteHandler;
+        batchBlobCopyHandler_ = batchBlobCopyHandler;
     }
 
 private:
@@ -137,6 +142,7 @@ private:
     Result HandleLinkBroken(const NetLinkPtr &link);
     Result HandleBlobCopy(const NetContextPtr &context);
     Result HandleBlobDelete(const NetContextPtr &context);
+    Result HandleBatchBlobCopy(const NetContextPtr &context);
 
 private:
     NetEnginePtr engine_;
@@ -149,6 +155,7 @@ private:
     ClientReplicateHandler replicateHandler_ = nullptr;
     ClientBlobCopyHandler blobCopyHandler_ = nullptr;
     ClientBlobDeleteHandler blobDeleteHandler_ = nullptr;
+    ClientBatchBlobCopyHandler batchBlobCopyHandler_ = nullptr;
     std::string serverUrl_;
 
     /* not hot used variables */

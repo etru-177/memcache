@@ -24,7 +24,7 @@ namespace mmc {
 std::map<std::string, MmcRef<MmcUbsIoProxy>> MmcUbsIoProxyFactory::instances_;
 std::mutex MmcUbsIoProxyFactory::instanceMutex_;
 
-Result MmcUbsIoProxy::InitUbsIo(int32_t deviceId, uint64_t ssdSize)
+Result MmcUbsIoProxy::InitUbsIo(int32_t deviceId)
 {
     std::lock_guard<std::mutex> lock(mutex_);
     if (started_) {
@@ -34,20 +34,27 @@ Result MmcUbsIoProxy::InitUbsIo(int32_t deviceId, uint64_t ssdSize)
 
     Result result = DlUbsioApi::LoadLibrary();
     if (result != MMC_OK) {
-        MMC_LOG_ERROR("Failed to load ubsio library, deviceId=" << deviceId << ", ssdSize=" << ssdSize
-                       << ", error: " << result);
+        MMC_LOG_ERROR("Failed to load ubsio library, deviceId=" << deviceId << ", error: " << result);
         return result;
     }
-    result = DlUbsioApi::UbsioClientInit(deviceId, ssdSize);
+    // Register meta event callback before UbsioClientInit to avoid missing recovery events
+    if (metaEventCallback_ != nullptr) {
+        result = RegisterMetaEventCallback();
+        if (result != MMC_OK) {
+            MMC_LOG_ERROR("Failed to register meta event callback, error: " << result);
+            DlUbsioApi::CleanupLibrary();
+            return result;
+        }
+    }
+    result = DlUbsioApi::UbsioClientInit(deviceId);
     if (result != MMC_OK) {
-        MMC_LOG_ERROR("Failed to init ubsio, deviceId=" << deviceId << ", ssdSize=" << ssdSize
-                       << ", error: " << result);
+        MMC_LOG_ERROR("Failed to init ubsio, deviceId=" << deviceId << ", error: " << result);
         DlUbsioApi::CleanupLibrary();
         return result;
     }
 
     started_ = true;
-    MMC_LOG_INFO("InitUbsIo success, deviceId=" << deviceId << ", ssdSize=" << ssdSize);
+    MMC_LOG_INFO("InitUbsIo success, deviceId=" << deviceId);
     return MMC_OK;
 }
 
@@ -58,6 +65,31 @@ void MmcUbsIoProxy::DestroyUbsIo()
         started_ = false;
         MMC_LOG_INFO("DestroyUbsIo completed");
     }
+}
+
+void MmcUbsIoProxy::StaticMetaEventCallback(void *context, const UbsioMetaEventC *events, uint32_t count)
+{
+    if (context == nullptr || events == nullptr || count == 0) {
+        return;
+    }
+    auto *proxy = static_cast<MmcUbsIoProxy *>(context);
+    if (proxy->metaEventCallback_ == nullptr) {
+        return;
+    }
+    std::vector<std::string> deleteKeys;
+    for (uint32_t i = 0; i < count; ++i) {
+        if (events[i].type == UBSIO_META_DELETE_C) {
+            deleteKeys.emplace_back(events[i].key, events[i].keyLen);
+        }
+    }
+    if (!deleteKeys.empty()) {
+        proxy->metaEventCallback_(UBSIO_META_DELETE_C, deleteKeys);
+    }
+}
+
+Result MmcUbsIoProxy::RegisterMetaEventCallback()
+{
+    return DlUbsioApi::UbsioRegisterMetaEventCallback(&StaticMetaEventCallback, this);
 }
 
 Result MmcUbsIoProxy::Put(const std::string &key, void *buf, size_t length)
@@ -92,16 +124,16 @@ Result MmcUbsIoProxy::Get(const std::string &key, void *buf, size_t length)
     return ret;
 }
 
-Result MmcUbsIoProxy::Exist(const std::string &key)
+bool MmcUbsIoProxy::Exist(const std::string &key)
 {
     MMC_ASSERT_LOG_AND_RETURN(started_, "started_ = " << started_, false);
     MMC_ASSERT_LOG_AND_RETURN(!key.empty(), "key is empty", false);
 
     uint32_t flags = 0;
     TP_TRACE_BEGIN(TP_MMC_UBS_IO_EXIST);
-    int32_t ret = DlUbsioApi::UbsioExist(key.c_str(), flags);
-    TP_TRACE_END(TP_MMC_UBS_IO_EXIST, MMC_OK);
-    return ret;
+    bool exists = DlUbsioApi::UbsioExist(key.c_str(), flags);
+    TP_TRACE_END(TP_MMC_UBS_IO_EXIST, exists ? MMC_OK : MMC_UNMATCHED_KEY);
+    return exists;
 }
 
 Result MmcUbsIoProxy::Delete(const std::string &key)

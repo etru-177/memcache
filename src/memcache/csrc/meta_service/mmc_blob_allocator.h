@@ -55,7 +55,7 @@ public:
     virtual bool CanAlloc(uint64_t blobSize);
     virtual MmcMemBlobPtr Alloc(uint64_t blobSize);
     virtual Result Release(const MmcMemBlobPtr &blob);
-    virtual Result BuildFromBlobs(std::map<std::string, MmcMemBlobDesc> &blobMap);
+    virtual Result BuildFromBlobs(std::vector<std::pair<std::string, MmcMemBlobDesc>> &blobList);
     void Start()
     {
         spinlock_.lock();
@@ -108,114 +108,12 @@ protected:
     Spinlock spinlock_;
 };
 
-class MmcSsdBlobAllocator : public MmcBlobAllocator {
-public:
-    MmcSsdBlobAllocator(const uint32_t rank, const uint64_t capacity)
-        : MmcBlobAllocator(rank, MEDIA_SSD, 0, capacity)
-    {}
-    ~MmcSsdBlobAllocator() override = default;
-
-    bool CanAlloc(uint64_t blobSize) override
-    {
-        if (!started_) {
-            MMC_LOG_WARN("SsdAllocator rank: " << rank_ << " is stopped");
-            return false;
-        }
-        auto alignedSize = AllocSizeAlignUp(blobSize);
-        if (alignedSize == UINT64_MAX) {
-            return false;
-        }
-        spinlock_.lock();
-        bool can = (capacity_ >= allocatedSize_ + alignedSize);
-        spinlock_.unlock();
-        return can;
-    }
-
-    MmcMemBlobPtr Alloc(uint64_t blobSize) override
-    {
-        if (!started_) {
-            MMC_LOG_WARN("SsdAllocator rank: " << rank_ << " is stopped");
-            return nullptr;
-        }
-        auto alignedSize = AllocSizeAlignUp(blobSize);
-        if (alignedSize == UINT64_MAX) {
-            MMC_LOG_ERROR("SsdAllocator rank: " << rank_ << " blobSize overflow: " << blobSize);
-            return nullptr;
-        }
-        spinlock_.lock();
-        if (allocatedSize_ + alignedSize > capacity_) {
-            spinlock_.unlock();
-            MMC_LOG_WARN("SsdAllocator rank: " << rank_ << ", cap:" << allocatedSize_ << "/" << capacity_ <<
-                         " cannot allocate with size: " << blobSize);
-            return nullptr;
-        }
-        allocatedSize_ += alignedSize;
-        spinlock_.unlock();
-        auto blob = MmcMakeRef<MmcMemBlob>(rank_, 0, blobSize, MEDIA_SSD, ALLOCATED);
-        if (blob == nullptr) {
-            MMC_LOG_ERROR("SsdBlobAllocator MmcMakeRef failed, rank=" << rank_);
-            spinlock_.lock();
-            allocatedSize_ -= alignedSize;
-            spinlock_.unlock();
-            return nullptr;
-        }
-        return blob;
-    }
-
-    Result Release(const MmcMemBlobPtr &blob) override
-    {
-        if (blob == nullptr) {
-            MMC_LOG_ERROR("blob is null");
-            return MMC_ERROR;
-        }
-        auto alignedSize = AllocSizeAlignUp(blob->Size());
-        spinlock_.lock();
-        if (allocatedSize_ < alignedSize) {
-            spinlock_.unlock();
-            MMC_LOG_ERROR("SsdAllocator release failed, allocatedSize: " << allocatedSize_
-                                                                         << " < alignedSize: " << alignedSize);
-            return MMC_ERROR;
-        }
-        allocatedSize_ -= alignedSize;
-        spinlock_.unlock();
-        return MMC_OK;
-    }
-
-    Result BuildFromBlobs(std::map<std::string, MmcMemBlobDesc> &blobMap) override
-    {
-        spinlock_.lock();
-        if (started_) {
-            spinlock_.unlock();
-            MMC_LOG_ERROR("rebuild ssd allocator failed, rank: " << rank_ <<
-                          ", allocator must not started and empty");
-            return MMC_ERROR;
-        }
-        for (auto it = blobMap.begin(); it != blobMap.end();) {
-            if (it->second.rank_ != rank_ || it->second.mediaType_ != MEDIA_SSD) {
-                MMC_LOG_WARN("rebuild ssd blob not match, allocator rank: " << rank_
-                                                                           << ", blob: " << it->second);
-                it = blobMap.erase(it);
-                continue;
-            }
-            allocatedSize_ += AllocSizeAlignUp(it->second.size_);
-            ++it;
-        }
-        spinlock_.unlock();
-        return MMC_OK;
-    }
-};
-
 inline MmcRef<MmcBlobAllocator> MmcBlobAllocator::Create(const MmcLocation &loc, const MmcLocalMemlInitInfo &info)
 {
-    if (loc.mediaType_ == MEDIA_SSD) {
-        return Convert<MmcSsdBlobAllocator, MmcBlobAllocator>(
-            MmcMakeRef<MmcSsdBlobAllocator>(loc.rank_, info.capacity_));
-    }
     return MmcMakeRef<MmcBlobAllocator>(loc.rank_, loc.mediaType_, info.bmAddr_, info.capacity_);
 }
 
 using MmcBlobAllocatorPtr = MmcRef<MmcBlobAllocator>;
-using MmcSsdBlobAllocatorPtr = MmcRef<MmcSsdBlobAllocator>;
 
 } // namespace mmc
 } // namespace ock

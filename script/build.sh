@@ -44,8 +44,8 @@ PROJ_DIR=$(pwd)
 
 if [ "${INCREMENTAL}" != "ON" ]; then
     rm -rf ./build ./output
-    mkdir -p "${PROJ_DIR}/output"
 fi
+mkdir -p "${PROJ_DIR}/output"
 mkdir -p "${PROJ_DIR}/build"
 
 if [ "${BUILD_PYTHON}" != "ON" ]; then

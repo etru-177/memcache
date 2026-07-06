@@ -12,6 +12,10 @@
 
 #include "mmc_meta_metric_manager.h"
 
+#include <cstring>
+
+#include "mmc_logger.h"
+
 namespace prometheus {
 namespace simpleapi {
 auto registry_ptr = std::make_shared<Registry>();
@@ -21,6 +25,18 @@ Registry &registry = *registry_ptr;
 
 namespace ock {
 namespace mmc {
+
+bool MmcMetaMetricManager::IsPerRankEnabled()
+{
+    static const bool enabled = []() {
+        const char *env = std::getenv("MMC_ENABLE_PER_RANK_METRICS");
+        bool on = env != nullptr && (std::strcmp(env, "1") == 0 || std::strcmp(env, "true") == 0 ||
+                                     std::strcmp(env, "ON") == 0 || std::strcmp(env, "on") == 0);
+        MMC_LOG_INFO("MMC_ENABLE_PER_RANK_METRICS=" << (env != nullptr ? env : "(unset)") << ", enabled=" << on);
+        return on;
+    }();
+    return enabled;
+}
 
 MmcMetaMetricManager::MmcMetaMetricManager()
     : allocRequestCounter_("memcache_alloc_requests_total", "Total number of Alloc requests"),
@@ -92,10 +108,17 @@ MmcMetaMetricManager::MmcMetaMetricManager()
       unmountFailureCounter_("memcache_unmount_failures_total", "Total number of Unmount failures"),
       evictCounter_("memcache_evict_operations_total", "Total number of eviction operations"),
       evictToSsdCounter_("memcache_evict_to_ssd_total", "Total number of eviction to SSD operations"),
-      ssdEvictDeleteCounter_("memcache_ssd_evict_delete_total", "Total number of SSD eviction delete operations"),
+      evictSsdDeleteCounter_("memcache_evict_ssd_delete_total", "Total number of SSD eviction delete operations"),
+      evictMemDeleteCounter_("memcache_evict_mem_delete_total",
+                             "Total number of memory tier eviction delete operations"),
       rewarmCounter_("memcache_rewarm_total", "Total number of SSD->DRAM rewarm operations"),
       rewarmFailCounter_("memcache_rewarm_failed_total", "Total number of failed SSD->DRAM rewarm operations"),
+      getHitDramCounter_("memcache_get_hits_dram_total", "Total number of Get hits served from DRAM"),
+      getHitSsdCounter_("memcache_get_hits_ssd_total", "Total number of Get hits served from SSD (rewarm)"),
+      rewarmBytesCounter_("memcache_rewarm_bytes_total", "Total bytes rewarmed from SSD to DRAM"),
+      rewarmBytesCurrentGauge_("memcache_rewarm_bytes_current", "Current bytes occupied by rewarmed data"),
       keyCountGauge_("memcache_stored_keys", "Current number of stored keys")
+      // per-rank counters (pure data, metric names passed at serialization time)
 {}
 
 MmcMetaMetricSnapshot MmcMetaMetricManager::GetSnapshot() const
@@ -161,13 +184,86 @@ MmcMetaMetricSnapshot MmcMetaMetricManager::GetSnapshot() const
     snapshot.unmountFailureCount = static_cast<uint64_t>(unmountFailureCounter_.value());
     snapshot.evictCount = static_cast<uint64_t>(evictCounter_.value());
     snapshot.evictToSsdCount = static_cast<uint64_t>(evictToSsdCounter_.value());
-    snapshot.ssdEvictDeleteCount = static_cast<uint64_t>(ssdEvictDeleteCounter_.value());
+    snapshot.evictSsdDeleteCount = static_cast<uint64_t>(evictSsdDeleteCounter_.value());
+    snapshot.evictMemDeleteCount = static_cast<uint64_t>(evictMemDeleteCounter_.value());
     snapshot.rewarmCount = static_cast<uint64_t>(rewarmCounter_.value());
     snapshot.rewarmFailCount = static_cast<uint64_t>(rewarmFailCounter_.value());
+    snapshot.getHitDramCount = static_cast<uint64_t>(getHitDramCounter_.value());
+    snapshot.getHitSsdCount = static_cast<uint64_t>(getHitSsdCounter_.value());
+    snapshot.rewarmBytesCount = static_cast<uint64_t>(rewarmBytesCounter_.value());
+    snapshot.rewarmBytesCurrent = static_cast<uint64_t>(rewarmBytesCurrentGauge_.value());
     snapshot.keyCount = static_cast<uint64_t>(keyCountGauge_.value());
+
+    // per-rank internal counters
+    if (IsPerRankEnabled()) {
+        snapshot.evictCountByRank = evictRankedCounter_.GetRankMap();
+        snapshot.evictToSsdCountByRank = evictToSsdRankedCounter_.GetRankMap();
+        snapshot.evictSsdDeleteCountByRank = evictSsdDeleteRankedCounter_.GetRankMap();
+        snapshot.evictMemDeleteCountByRank = evictMemDeleteRankedCounter_.GetRankMap();
+        snapshot.getHitDramCountByRank = getHitDramRankedCounter_.GetRankMap();
+        snapshot.getHitSsdCountByRank = getHitSsdRankedCounter_.GetRankMap();
+        snapshot.rewarmCountByRank = rewarmRankedCounter_.GetRankMap();
+        snapshot.rewarmFailCountByRank = rewarmFailRankedCounter_.GetRankMap();
+        snapshot.rewarmBytesByRank = rewarmBytesRankedCounter_.GetRankMap();
+        snapshot.rewarmBytesCurrentByRank = rewarmBytesCurrentRankedCounter_.GetRankMap();
+    }
+
     return snapshot;
 }
 
+void MmcMetaMetricManager::AppendRestApiPerRankMetrics(std::ostringstream &oss) const
+{
+    rankedAlloc_.AppendPerRankToStream(oss,
+        "memcache_alloc_requests_total", "memcache_alloc_successes_total",
+        "memcache_alloc_failures_total", "");
+    rankedBatchAlloc_.AppendPerRankToStream(oss,
+        "memcache_batch_alloc_requests_total", "memcache_batch_alloc_successes_total",
+        "memcache_batch_alloc_failures_total", "");
+    rankedGet_.AppendPerRankToStream(oss,
+        "memcache_get_requests_total", "memcache_get_successes_total",
+        "memcache_get_failures_total", "memcache_get_not_found_total");
+    rankedBatchGet_.AppendPerRankToStream(oss,
+        "memcache_batch_get_requests_total", "memcache_batch_get_successes_total",
+        "memcache_batch_get_failures_total", "memcache_batch_get_not_found_total");
+    rankedRemove_.AppendPerRankToStream(oss,
+        "memcache_remove_requests_total", "memcache_remove_successes_total",
+        "memcache_remove_failures_total", "memcache_remove_not_found_total");
+    rankedBatchRemove_.AppendPerRankToStream(oss,
+        "memcache_batch_remove_requests_total", "memcache_batch_remove_successes_total",
+        "memcache_batch_remove_failures_total", "memcache_batch_remove_not_found_total");
+    rankedRemoveAll_.AppendPerRankToStream(oss,
+        "memcache_remove_all_requests_total", "memcache_remove_all_successes_total",
+        "memcache_remove_all_failures_total", "");
+    rankedUpdateState_.AppendPerRankToStream(oss,
+        "memcache_update_state_requests_total", "memcache_update_state_successes_total",
+        "memcache_update_state_failures_total", "memcache_update_state_not_found_total");
+    rankedBatchUpdateState_.AppendPerRankToStream(oss,
+        "memcache_batch_update_state_requests_total", "memcache_batch_update_state_successes_total",
+        "memcache_batch_update_state_failures_total", "memcache_batch_update_state_not_found_total");
+    rankedQuery_.AppendPerRankToStream(oss,
+        "memcache_query_requests_total", "memcache_query_successes_total",
+        "memcache_query_failures_total", "memcache_query_not_found_total");
+    rankedBatchQuery_.AppendPerRankToStream(oss,
+        "memcache_batch_query_requests_total", "memcache_batch_query_successes_total",
+        "memcache_batch_query_failures_total", "memcache_batch_query_not_found_total");
+    rankedGetAllKeys_.AppendPerRankToStream(oss,
+        "memcache_get_all_keys_requests_total", "memcache_get_all_keys_successes_total",
+        "memcache_get_all_keys_failures_total", "");
+    rankedExistKey_.AppendPerRankToStream(oss,
+        "memcache_exist_key_requests_total", "memcache_exist_key_successes_total",
+        "memcache_exist_key_failures_total", "memcache_exist_key_not_found_total");
+    rankedBatchExistKey_.AppendPerRankToStream(oss,
+        "memcache_batch_exist_key_requests_total", "memcache_batch_exist_key_successes_total",
+        "memcache_batch_exist_key_failures_total", "memcache_batch_exist_key_not_found_total");
+    rankedMount_.AppendPerRankToStream(oss,
+        "memcache_mount_requests_total", "memcache_mount_successes_total",
+        "memcache_mount_failures_total", "");
+    rankedUnmount_.AppendPerRankToStream(oss,
+        "memcache_unmount_requests_total", "memcache_unmount_successes_total",
+        "memcache_unmount_failures_total", "");
+}
+
+// global dispatching (unchanged)
 void MmcMetaMetricManager::IncrementRequestCounter(RestMetricType type)
 {
     switch (type) {
@@ -368,6 +464,229 @@ void MmcMetaMetricManager::IncrementNotFoundCounter(RestMetricType type)
             return;
         case RestMetricType::BATCH_EXIST_KEY:
             batchExistKeyNotFoundCounter_++;
+            return;
+        default:
+            return;
+    }
+}
+
+// per-rank dispatching
+void MmcMetaMetricManager::IncrementRequestCounter(RestMetricType type, uint32_t rank)
+{
+    IncrementRequestCounter(type);
+    if (!IsPerRankEnabled()) {
+        return;
+    }
+    switch (type) {
+        case RestMetricType::ALLOC:
+            rankedAlloc_.IncrementRequest(rank);
+            return;
+        case RestMetricType::BATCH_ALLOC:
+            rankedBatchAlloc_.IncrementRequest(rank);
+            return;
+        case RestMetricType::GET:
+            rankedGet_.IncrementRequest(rank);
+            return;
+        case RestMetricType::BATCH_GET:
+            rankedBatchGet_.IncrementRequest(rank);
+            return;
+        case RestMetricType::REMOVE:
+            rankedRemove_.IncrementRequest(rank);
+            return;
+        case RestMetricType::BATCH_REMOVE:
+            rankedBatchRemove_.IncrementRequest(rank);
+            return;
+        case RestMetricType::REMOVE_ALL:
+            rankedRemoveAll_.IncrementRequest(rank);
+            return;
+        case RestMetricType::UPDATE_STATE:
+            rankedUpdateState_.IncrementRequest(rank);
+            return;
+        case RestMetricType::BATCH_UPDATE_STATE:
+            rankedBatchUpdateState_.IncrementRequest(rank);
+            return;
+        case RestMetricType::QUERY:
+            rankedQuery_.IncrementRequest(rank);
+            return;
+        case RestMetricType::BATCH_QUERY:
+            rankedBatchQuery_.IncrementRequest(rank);
+            return;
+        case RestMetricType::GET_ALL_KEYS:
+            rankedGetAllKeys_.IncrementRequest(rank);
+            return;
+        case RestMetricType::EXIST_KEY:
+            rankedExistKey_.IncrementRequest(rank);
+            return;
+        case RestMetricType::BATCH_EXIST_KEY:
+            rankedBatchExistKey_.IncrementRequest(rank);
+            return;
+        case RestMetricType::MOUNT:
+            rankedMount_.IncrementRequest(rank);
+            return;
+        case RestMetricType::UNMOUNT:
+            rankedUnmount_.IncrementRequest(rank);
+            return;
+        default:
+            return;
+    }
+}
+
+void MmcMetaMetricManager::IncrementSuccessCounter(RestMetricType type, uint32_t rank)
+{
+    IncrementSuccessCounter(type);
+    if (!IsPerRankEnabled()) {
+        return;
+    }
+    switch (type) {
+        case RestMetricType::ALLOC:
+            rankedAlloc_.IncrementSuccess(rank);
+            return;
+        case RestMetricType::BATCH_ALLOC:
+            rankedBatchAlloc_.IncrementSuccess(rank);
+            return;
+        case RestMetricType::GET:
+            rankedGet_.IncrementSuccess(rank);
+            return;
+        case RestMetricType::BATCH_GET:
+            rankedBatchGet_.IncrementSuccess(rank);
+            return;
+        case RestMetricType::REMOVE:
+            rankedRemove_.IncrementSuccess(rank);
+            return;
+        case RestMetricType::BATCH_REMOVE:
+            rankedBatchRemove_.IncrementSuccess(rank);
+            return;
+        case RestMetricType::REMOVE_ALL:
+            rankedRemoveAll_.IncrementSuccess(rank);
+            return;
+        case RestMetricType::UPDATE_STATE:
+            rankedUpdateState_.IncrementSuccess(rank);
+            return;
+        case RestMetricType::BATCH_UPDATE_STATE:
+            rankedBatchUpdateState_.IncrementSuccess(rank);
+            return;
+        case RestMetricType::QUERY:
+            rankedQuery_.IncrementSuccess(rank);
+            return;
+        case RestMetricType::BATCH_QUERY:
+            rankedBatchQuery_.IncrementSuccess(rank);
+            return;
+        case RestMetricType::GET_ALL_KEYS:
+            rankedGetAllKeys_.IncrementSuccess(rank);
+            return;
+        case RestMetricType::EXIST_KEY:
+            rankedExistKey_.IncrementSuccess(rank);
+            return;
+        case RestMetricType::BATCH_EXIST_KEY:
+            rankedBatchExistKey_.IncrementSuccess(rank);
+            return;
+        case RestMetricType::MOUNT:
+            rankedMount_.IncrementSuccess(rank);
+            return;
+        case RestMetricType::UNMOUNT:
+            rankedUnmount_.IncrementSuccess(rank);
+            return;
+        default:
+            return;
+    }
+}
+
+void MmcMetaMetricManager::IncrementFailureCounter(RestMetricType type, uint32_t rank)
+{
+    IncrementFailureCounter(type);
+    if (!IsPerRankEnabled()) {
+        return;
+    }
+    switch (type) {
+        case RestMetricType::ALLOC:
+            rankedAlloc_.IncrementFailure(rank);
+            return;
+        case RestMetricType::BATCH_ALLOC:
+            rankedBatchAlloc_.IncrementFailure(rank);
+            return;
+        case RestMetricType::GET:
+            rankedGet_.IncrementFailure(rank);
+            return;
+        case RestMetricType::BATCH_GET:
+            rankedBatchGet_.IncrementFailure(rank);
+            return;
+        case RestMetricType::REMOVE:
+            rankedRemove_.IncrementFailure(rank);
+            return;
+        case RestMetricType::BATCH_REMOVE:
+            rankedBatchRemove_.IncrementFailure(rank);
+            return;
+        case RestMetricType::REMOVE_ALL:
+            rankedRemoveAll_.IncrementFailure(rank);
+            return;
+        case RestMetricType::UPDATE_STATE:
+            rankedUpdateState_.IncrementFailure(rank);
+            return;
+        case RestMetricType::BATCH_UPDATE_STATE:
+            rankedBatchUpdateState_.IncrementFailure(rank);
+            return;
+        case RestMetricType::QUERY:
+            rankedQuery_.IncrementFailure(rank);
+            return;
+        case RestMetricType::BATCH_QUERY:
+            rankedBatchQuery_.IncrementFailure(rank);
+            return;
+        case RestMetricType::GET_ALL_KEYS:
+            rankedGetAllKeys_.IncrementFailure(rank);
+            return;
+        case RestMetricType::EXIST_KEY:
+            rankedExistKey_.IncrementFailure(rank);
+            return;
+        case RestMetricType::BATCH_EXIST_KEY:
+            rankedBatchExistKey_.IncrementFailure(rank);
+            return;
+        case RestMetricType::MOUNT:
+            rankedMount_.IncrementFailure(rank);
+            return;
+        case RestMetricType::UNMOUNT:
+            rankedUnmount_.IncrementFailure(rank);
+            return;
+        default:
+            return;
+    }
+}
+
+void MmcMetaMetricManager::IncrementNotFoundCounter(RestMetricType type, uint32_t rank)
+{
+    IncrementNotFoundCounter(type);
+    if (!IsPerRankEnabled()) {
+        return;
+    }
+    switch (type) {
+        case RestMetricType::GET:
+            rankedGet_.IncrementNotFound(rank);
+            return;
+        case RestMetricType::BATCH_GET:
+            rankedBatchGet_.IncrementNotFound(rank);
+            return;
+        case RestMetricType::REMOVE:
+            rankedRemove_.IncrementNotFound(rank);
+            return;
+        case RestMetricType::BATCH_REMOVE:
+            rankedBatchRemove_.IncrementNotFound(rank);
+            return;
+        case RestMetricType::UPDATE_STATE:
+            rankedUpdateState_.IncrementNotFound(rank);
+            return;
+        case RestMetricType::BATCH_UPDATE_STATE:
+            rankedBatchUpdateState_.IncrementNotFound(rank);
+            return;
+        case RestMetricType::QUERY:
+            rankedQuery_.IncrementNotFound(rank);
+            return;
+        case RestMetricType::BATCH_QUERY:
+            rankedBatchQuery_.IncrementNotFound(rank);
+            return;
+        case RestMetricType::EXIST_KEY:
+            rankedExistKey_.IncrementNotFound(rank);
+            return;
+        case RestMetricType::BATCH_EXIST_KEY:
+            rankedBatchExistKey_.IncrementNotFound(rank);
             return;
         default:
             return;

@@ -59,8 +59,11 @@ public:
             MMC_LOG_ERROR("Failed to Insert, no medium registered. ");
             return MMC_ERROR;
         }
-        lruLists_[blobType].push_front(key);
-        ValueLruItem lruItem{value, blobType, lruLists_[blobType].begin()};
+        if (blobType != MEDIA_SSD) {
+            lruLists_[blobType].push_front(key);
+        }
+        ValueLruItem lruItem{value, blobType != MEDIA_SSD ? blobType : MEDIA_NONE,
+                             blobType != MEDIA_SSD ? lruLists_[blobType].begin() : lruLists_[MEDIA_NONE].end()};
 
         // insert into map
         auto ret = metaMap_.emplace(key, lruItem);
@@ -100,13 +103,15 @@ public:
         }
         auto valueItem = iter->second;
         value = valueItem.value_;
-        if (metaMap_.erase(key) > 0 && valueItem.mediaType_ != MEDIA_NONE) {
+        if (metaMap_.erase(key) == 0) {
+            MMC_LOG_ERROR("Fail to erase " << key << " from MmcMetaContainer map. ErrCode: " << MMC_ERROR);
+            return MMC_ERROR;
+        }
+        if (valueItem.mediaType_ != MEDIA_NONE) {
             ock::mf::WriteGuard lruLockGuard(lruLock_);
             lruLists_[valueItem.mediaType_].erase(valueItem.lruIter_);
-            return MMC_OK;
         }
-        MMC_LOG_ERROR("Fail to erase " << key << " from MmcMetaContainer. ErrCode: " << MMC_ERROR);
-        return MMC_ERROR;
+        return MMC_OK;
     }
 
     Result EraseAll(std::function<void(const Key &, const Value &)> removeFunc) override
@@ -172,7 +177,7 @@ public:
             return MMC_UNMATCHED_KEY;
         }
         if (iter->second.mediaType_ == MEDIA_NONE) {
-            MMC_LOG_WARN("Skipped promotion for key=" << key << ", mediaType is NONE (key in transition)");
+            MMC_LOG_DEBUG("Skipped promotion for key=" << key << ", mediaType is NONE (key in transition)");
             return MMC_OK;
         }
         UpdateLRU(iter->first, iter->second);
@@ -189,7 +194,7 @@ public:
                 lruLists_[iter->second.mediaType_].erase(iter->second.lruIter_);
                 iter->second.mediaType_ = MEDIA_NONE;
             }
-            if (type != MEDIA_NONE) {
+            if (type != MEDIA_NONE && type != MEDIA_SSD) {
                 lruLists_[type].push_front(key);
                 iter->second.mediaType_ = type;
                 iter->second.lruIter_ = lruLists_[type].begin();
@@ -246,7 +251,7 @@ public:
         return false;
     }
 
-    void MultiLevelElimination(const uint16_t evictThresholdHigh, const uint16_t evictThresholdLow,
+    void MultiLevelElimination(const std::vector<std::pair<uint16_t, uint16_t>> &evictWatermarks,
                                const std::vector<MediaType> &needEvictList,
                                const std::vector<uint16_t> &nowMemoryThresholds,
                                std::function<EvictResult(const Key &, const Value &, MediaType)> moveFunc)
@@ -254,8 +259,15 @@ public:
         for (size_t i = 0; i < needEvictList.size(); ++i) {
             auto mediaType = needEvictList[i];
             auto nowThreshold = nowMemoryThresholds[i];
-            if (mediaType == MEDIA_NONE) {
+            if (mediaType >= MEDIA_NONE || mediaType == MEDIA_SSD) {
                 MMC_LOG_ERROR("Invalid mediaType: " << mediaType);
+                continue;
+            }
+
+            uint16_t high = evictWatermarks[mediaType].first;
+            uint16_t low = evictWatermarks[mediaType].second;
+            if (high == 0) {
+                MMC_LOG_WARN("Skip eviction for mediaType=" << mediaType << ", evictThresholdHigh is 0");
                 continue;
             }
 
@@ -264,10 +276,10 @@ public:
             lruLock_.UnLock();
 
             const size_t numEvictObjs =
-                std::max(std::min(oriNum * (nowThreshold - evictThresholdLow) / evictThresholdHigh, oriNum),
+                std::max(std::min(oriNum * (nowThreshold - low) / high, oriNum),
                          static_cast<size_t>(1));
 
-            for (size_t i = 0; i < numEvictObjs; ++i) {
+            for (size_t j = 0; j < numEvictObjs; ++j) {
                 EvictOneLeastRecentlyUsed(moveFunc, mediaType);
             }
 

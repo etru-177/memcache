@@ -84,6 +84,9 @@ Result ock::mmc::MetaNetServer::Start(NetEngineOptions &options)
     server->RegRequestReceivedHandler(LOCAL_META_OPCODE_REQ::LM_PING_REQ, nullptr);
     server->RegRequestReceivedHandler(LOCAL_META_OPCODE_REQ::LM_META_REPLICATE_REQ, nullptr);
     server->RegRequestReceivedHandler(LOCAL_META_OPCODE_REQ::LM_BLOB_COPY_REQ, nullptr);
+    server->RegRequestReceivedHandler(LOCAL_META_OPCODE_REQ::LM_BATCH_BLOB_COPY_REQ, nullptr);
+    server->RegRequestReceivedHandler(LOCAL_META_OPCODE_REQ::ML_UBSIO_META_DELETE_REQ,
+                                      std::bind(&MetaNetServer::HandleUbsIoMetaDelete, this, std::placeholders::_1));
     server->RegNewLinkHandler(std::bind(&MetaNetServer::HandleNewLink, this, std::placeholders::_1));
     server->RegLinkBrokenHandler(std::bind(&MetaNetServer::HandleLinkBroken, this, std::placeholders::_1));
 
@@ -104,9 +107,11 @@ Result MetaNetServer::HandleBmRegister(const NetContextPtr &context)
     BmRegisterRequest req;
     context->GetRequest<BmRegisterRequest>(req);
     TP_TRACE_BEGIN(TP_MMC_META_BM_REGISTER);
-    auto result = metaService_->BmRegister(req.rank_, req.mediaType_, req.addr_, req.capacity_, req.blobMap_);
+    auto result = metaService_->BmRegister(req.rank_, req.mediaType_, req.addr_, req.capacity_, req.blobList_,
+                                           req.storageEnabled_);
     TP_TRACE_END(TP_MMC_META_BM_REGISTER, result);
-    MMC_LOG_INFO("HandleBmRegister rank: " << req.rank_ << ", rebuild blob size: " << req.blobMap_.size()
+    MMC_LOG_INFO("HandleBmRegister rank: " << req.rank_ << ", storageEnabled: " << req.storageEnabled_
+                                           << ", rebuild blob size: " << req.blobList_.size()
                                            << ", ret: " << result);
     Response resp;
     resp.ret_ = result;
@@ -408,6 +413,22 @@ Result MetaNetServer::HandleBatchQuery(const NetContextPtr &context)
     (void)ret;
     MMC_LOG_DEBUG("HandleBatchQuery keys (size " << req.keys_.size() << ") finish: " << Join(req.keys_));
 
+    return context->Reply(req.msgId, resp);
+}
+
+Result MetaNetServer::HandleUbsIoMetaDelete(const NetContextPtr &context)
+{
+    MMC_ASSERT_LOG_AND_RETURN(metaService_ != nullptr, "metaService_ is nullptr", MMC_ERROR);
+    MMC_ASSERT_LOG_AND_RETURN(context != nullptr, "context is nullptr", MMC_ERROR);
+    UbsIoMetaDeleteRequest req;
+    context->GetRequest<UbsIoMetaDeleteRequest>(req);
+
+    auto &metaMgrProxy = metaService_->GetMetaMgrProxy();
+    Result ret = metaMgrProxy->HandleUbsIoMetaDelete(req);
+    if (ret != MMC_OK) {
+        MMC_LOG_WARN("HandleUbsIoMetaDelete failed, keyCount=" << req.keys_.size() << ", ret=" << ret);
+    }
+    UbsIoMetaDeleteResponse resp(ret);
     return context->Reply(req.msgId, resp);
 }
 

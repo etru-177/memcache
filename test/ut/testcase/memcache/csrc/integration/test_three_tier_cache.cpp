@@ -23,6 +23,8 @@ using namespace std;
 namespace ock {
 namespace mmc {
 
+constexpr uint16_t REWARM_DRAM_WATERMARK = 100U;
+
 // SIZE_32K is defined as macro in mmc_blob_allocator.h: #define SIZE_32K (uint64_t)(32 * 1024)
 
 // ============================================================================
@@ -62,10 +64,10 @@ TEST_F(TestThreeTierCache, PutGet_HbmHit)
     MmcLocation hbmLoc{0, MEDIA_HBM};
     MmcLocalMemlInitInfo hbmInfo{0, 128 * 1024};
 
-    MmcRef<MmcMetaManager> mgr = MmcMakeRef<MmcMetaManager>(2000U, 70U, 60U);
+    MmcRef<MmcMetaManager> mgr = MmcMakeRef<MmcMetaManager>(2000U, 70U, 60U, REWARM_DRAM_WATERMARK);
     ASSERT_EQ(mgr->Start(), MMC_OK);
-    std::map<std::string, MmcMemBlobDesc> blobMap;
-    mgr->Mount(hbmLoc, hbmInfo, blobMap);
+    std::vector<std::pair<std::string, MmcMemBlobDesc>> blobMap;
+    mgr->Mount(hbmLoc, hbmInfo, blobMap, false);
 
     std::string key = "hbm_key";
     AllocOptions allocReq{SIZE_32K, 1, MEDIA_HBM, {0}, 0};
@@ -90,11 +92,11 @@ TEST_F(TestThreeTierCache, EvictDram_CascadingEviction)
     MmcLocation ssdLoc{0, MEDIA_SSD};
     MmcLocalMemlInitInfo ssdInfo{0, 128UL * 1024UL};
 
-    MmcRef<MmcMetaManager> mgr = MmcMakeRef<MmcMetaManager>(2000U, 70U, 50U);
+    MmcRef<MmcMetaManager> mgr = MmcMakeRef<MmcMetaManager>(2000U, 70U, 50U, REWARM_DRAM_WATERMARK);
     ASSERT_EQ(mgr->Start(), MMC_OK);
-    std::map<std::string, MmcMemBlobDesc> blobMap;
-    mgr->Mount(dramLoc, dramInfo, blobMap);
-    mgr->Mount(ssdLoc, ssdInfo, blobMap);
+    std::vector<std::pair<std::string, MmcMemBlobDesc>> blobMap;
+    mgr->Mount(dramLoc, dramInfo, blobMap, false);
+    mgr->Mount(ssdLoc, ssdInfo, blobMap, false);
 
     std::vector<std::string> keys;
     int keySize = 6;
@@ -124,47 +126,6 @@ TEST_F(TestThreeTierCache, EvictDram_CascadingEviction)
     mgr->Stop();
 }
 
-// [3] Three-level full pipeline — SSD allocation + DRAM allocation
-TEST_F(TestThreeTierCache, SsdAndDram_AllocAndGet)
-{
-    MmcLocation dramLoc{0, MEDIA_DRAM};
-    MmcLocalMemlInitInfo dramInfo{0, 256UL * 1024UL};
-    MmcLocation ssdLoc{0, MEDIA_SSD};
-    MmcLocalMemlInitInfo ssdInfo{0, 128UL * 1024UL};
-
-    MmcRef<MmcMetaManager> mgr = MmcMakeRef<MmcMetaManager>(2000U, 70U, 60U);
-    ASSERT_EQ(mgr->Start(), MMC_OK);
-    std::map<std::string, MmcMemBlobDesc> blobMap;
-    mgr->Mount(dramLoc, dramInfo, blobMap);
-    mgr->Mount(ssdLoc, ssdInfo, blobMap);
-
-    // Allocate on SSD
-    std::string ssdKey = "ssd_key";
-    AllocOptions ssdReq{SIZE_32K, 1, MEDIA_SSD, {0}, 0};
-    MmcMemMetaDesc ssdMeta;
-    ASSERT_EQ(mgr->Alloc(ssdKey, ssdReq, 1, ssdMeta), MMC_OK);
-    ASSERT_EQ(mgr->UpdateState(ssdKey, ssdLoc, MMC_WRITE_OK, 1), MMC_OK);
-
-    // Allocate on DRAM
-    std::string dramKey = "dram_key";
-    AllocOptions dramReq{SIZE_32K, 1, MEDIA_DRAM, {0}, 0};
-    MmcMemMetaDesc dramMeta;
-    ASSERT_EQ(mgr->Alloc(dramKey, dramReq, 1, dramMeta), MMC_OK);
-    ASSERT_EQ(mgr->UpdateState(dramKey, dramLoc, MMC_WRITE_OK, 1), MMC_OK);
-
-    // Both keys exist
-    EXPECT_EQ(mgr->ExistKey(ssdKey), MMC_OK);
-    EXPECT_EQ(mgr->ExistKey(dramKey), MMC_OK);
-
-    // Both segments have usage
-    EXPECT_GT(GetSegmentUsed(mgr, "SSD"), 0u);
-    EXPECT_GT(GetSegmentUsed(mgr, "DRAM"), 0u);
-
-    mgr->Remove(ssdKey);
-    mgr->Remove(dramKey);
-    mgr->Stop();
-}
-
 // [4] Massive Put — fill DRAM, verify cascading eviction and system consistency
 TEST_F(TestThreeTierCache, MassivePut_MultiLevelEviction)
 {
@@ -173,11 +134,11 @@ TEST_F(TestThreeTierCache, MassivePut_MultiLevelEviction)
     MmcLocation ssdLoc{0, MEDIA_SSD};
     MmcLocalMemlInitInfo ssdInfo{0, 256UL * 1024UL};
 
-    MmcRef<MmcMetaManager> mgr = MmcMakeRef<MmcMetaManager>(2000U, 70U, 50U);
+    MmcRef<MmcMetaManager> mgr = MmcMakeRef<MmcMetaManager>(2000U, 70U, 50U, REWARM_DRAM_WATERMARK);
     ASSERT_EQ(mgr->Start(), MMC_OK);
-    std::map<std::string, MmcMemBlobDesc> blobMap;
-    mgr->Mount(dramLoc, dramInfo, blobMap);
-    mgr->Mount(ssdLoc, ssdInfo, blobMap);
+    std::vector<std::pair<std::string, MmcMemBlobDesc>> blobMap;
+    mgr->Mount(dramLoc, dramInfo, blobMap, false);
+    mgr->Mount(ssdLoc, ssdInfo, blobMap, false);
 
     // Allocate many keys on DRAM
     std::vector<std::string> keys;
@@ -211,114 +172,16 @@ TEST_F(TestThreeTierCache, MassivePut_MultiLevelEviction)
     mgr->Stop();
 }
 
-// [5] Get hits SSD — returns SSD blob even without rewarm
-TEST_F(TestThreeTierCache, Get_HitsSsd_ReturnsSsdBlob)
-{
-    MmcLocation dramLoc{0, MEDIA_DRAM};
-    MmcLocalMemlInitInfo dramInfo{0, 128UL * 1024UL};
-    MmcLocation ssdLoc{0, MEDIA_SSD};
-    MmcLocalMemlInitInfo ssdInfo{0, 128UL * 1024UL};
-
-    MmcRef<MmcMetaManager> mgr = MmcMakeRef<MmcMetaManager>(2000U, 70U, 60U);
-    ASSERT_EQ(mgr->Start(), MMC_OK);
-    std::map<std::string, MmcMemBlobDesc> blobMap;
-    mgr->Mount(dramLoc, dramInfo, blobMap);
-    mgr->Mount(ssdLoc, ssdInfo, blobMap);
-
-    std::string key = "ssd_hit";
-    AllocOptions allocReq{SIZE_32K, 1, MEDIA_SSD, {0}, 0};
-    MmcMemMetaDesc objMeta;
-    ASSERT_EQ(mgr->Alloc(key, allocReq, 1, objMeta), MMC_OK);
-    ASSERT_EQ(mgr->UpdateState(key, ssdLoc, MMC_WRITE_OK, 1), MMC_OK);
-
-    // Get with READABLE filter — SSD blob matches
-    MmcMemMetaDesc result;
-    MmcBlobFilterPtr filter = MmcMakeRef<MmcBlobFilter>(UINT32_MAX, MEDIA_NONE, READABLE);
-    Result getRet = mgr->Get(key, 1, filter, result);
-    EXPECT_EQ(getRet, MMC_OK);
-    EXPECT_GT(result.NumBlobs(), 0);
-
-    // Verify SSD blob details
-    bool hasSsd = false;
-    for (uint32_t i = 0; i < result.NumBlobs(); i++) {
-        if (result.blobs_[i].mediaType_ == MEDIA_SSD && result.blobs_[i].size_ == SIZE_32K) {
-            hasSsd = true;
-        }
-    }
-    EXPECT_TRUE(hasSsd);
-
-    mgr->Remove(key);
-    mgr->Stop();
-}
-
-// [6] Remove key with SSD blob — key removed from metaContainer
-TEST_F(TestThreeTierCache, RemoveKey_WithSsdBlob)
-{
-    MmcLocation dramLoc{0, MEDIA_DRAM};
-    MmcLocalMemlInitInfo dramInfo{0, 128UL * 1024UL};
-    MmcLocation ssdLoc{0, MEDIA_SSD};
-    MmcLocalMemlInitInfo ssdInfo{0, 128UL * 1024UL};
-
-    MmcRef<MmcMetaManager> mgr = MmcMakeRef<MmcMetaManager>(2000U, 70U, 60U);
-    ASSERT_EQ(mgr->Start(), MMC_OK);
-    std::map<std::string, MmcMemBlobDesc> blobMap;
-    mgr->Mount(dramLoc, dramInfo, blobMap);
-    mgr->Mount(ssdLoc, ssdInfo, blobMap);
-
-    std::string key = "remove_ssd";
-    AllocOptions allocReq{SIZE_32K, 1, MEDIA_SSD, {0}, 0};
-    MmcMemMetaDesc objMeta;
-    ASSERT_EQ(mgr->Alloc(key, allocReq, 1, objMeta), MMC_OK);
-    ASSERT_EQ(mgr->UpdateState(key, ssdLoc, MMC_WRITE_OK, 1), MMC_OK);
-
-    EXPECT_GT(GetSegmentUsed(mgr, "SSD"), 0u);
-
-    mgr->Remove(key);
-
-    // Key is removed from metaContainer
-    EXPECT_EQ(mgr->ExistKey(key), MMC_UNMATCHED_KEY);
-
-    mgr->Stop();
-}
-
-// [7] SSD full — Alloc fails gracefully
-TEST_F(TestThreeTierCache, SsdFull_AllocFails)
-{
-    MmcLocation ssdLoc{0, MEDIA_SSD};
-    MmcLocalMemlInitInfo ssdInfo{0, SIZE_32K};
-
-    MmcRef<MmcMetaManager> mgr = MmcMakeRef<MmcMetaManager>(2000U, 70U, 60U);
-    ASSERT_EQ(mgr->Start(), MMC_OK);
-    std::map<std::string, MmcMemBlobDesc> blobMap;
-    mgr->Mount(ssdLoc, ssdInfo, blobMap);
-
-    // First alloc succeeds
-    std::string key1 = "ssd_full_1";
-    AllocOptions req1{SIZE_32K, 1, MEDIA_SSD, {0}, 0};
-    MmcMemMetaDesc meta1;
-    ASSERT_EQ(mgr->Alloc(key1, req1, 1, meta1), MMC_OK);
-    ASSERT_EQ(mgr->UpdateState(key1, ssdLoc, MMC_WRITE_OK, 1), MMC_OK);
-
-    // Second alloc fails — SSD is full
-    std::string key2 = "ssd_full_2";
-    AllocOptions req2{SIZE_32K, 1, MEDIA_SSD, {0}, 0};
-    MmcMemMetaDesc meta2;
-    EXPECT_NE(mgr->Alloc(key2, req2, 1, meta2), MMC_OK);
-
-    mgr->Remove(key1);
-    mgr->Stop();
-}
-
 // [8] Empty cluster — Get returns UNMATCHED_KEY
 TEST_F(TestThreeTierCache, EmptyCluster_GetReturnsUnmatchedKey)
 {
     MmcLocation dramLoc{0, MEDIA_DRAM};
     MmcLocalMemlInitInfo dramInfo{0, 128UL * 1024UL};
 
-    MmcRef<MmcMetaManager> mgr = MmcMakeRef<MmcMetaManager>(2000U, 70U, 60U);
+    MmcRef<MmcMetaManager> mgr = MmcMakeRef<MmcMetaManager>(2000U, 70U, 60U, REWARM_DRAM_WATERMARK);
     ASSERT_EQ(mgr->Start(), MMC_OK);
-    std::map<std::string, MmcMemBlobDesc> blobMap;
-    mgr->Mount(dramLoc, dramInfo, blobMap);
+    std::vector<std::pair<std::string, MmcMemBlobDesc>> blobMap;
+    mgr->Mount(dramLoc, dramInfo, blobMap, false);
 
     MmcMemMetaDesc result;
     EXPECT_EQ(mgr->Get("nonexistent", 1, nullptr, result), MMC_UNMATCHED_KEY);
@@ -333,10 +196,10 @@ TEST_F(TestThreeTierCache, RepeatedPut_OverwritesOldData)
     MmcLocation dramLoc{0, MEDIA_DRAM};
     MmcLocalMemlInitInfo dramInfo{0, 128UL * 1024UL};
 
-    MmcRef<MmcMetaManager> mgr = MmcMakeRef<MmcMetaManager>(2000U, 70U, 60U);
+    MmcRef<MmcMetaManager> mgr = MmcMakeRef<MmcMetaManager>(2000U, 70U, 60U, REWARM_DRAM_WATERMARK);
     ASSERT_EQ(mgr->Start(), MMC_OK);
-    std::map<std::string, MmcMemBlobDesc> blobMap;
-    mgr->Mount(dramLoc, dramInfo, blobMap);
+    std::vector<std::pair<std::string, MmcMemBlobDesc>> blobMap;
+    mgr->Mount(dramLoc, dramInfo, blobMap, false);
 
     std::string key = "overwrite_key";
 
@@ -369,61 +232,6 @@ TEST_F(TestThreeTierCache, RepeatedPut_OverwritesOldData)
     mgr->Stop();
 }
 
-// [10] Multi-rank SSD — independent allocation per rank
-TEST_F(TestThreeTierCache, MultiRank_SsdIndependentAllocation)
-{
-    MmcLocation rank0Dram{0, MEDIA_DRAM};
-    MmcLocalMemlInitInfo rank0DramInfo{0, 128UL * 1024UL};
-    MmcLocation rank0Ssd{0, MEDIA_SSD};
-    MmcLocalMemlInitInfo rank0SsdInfo{0, 128UL * 1024UL};
-    MmcLocation rank1Dram{1, MEDIA_DRAM};
-    MmcLocalMemlInitInfo rank1DramInfo{1, 128UL * 1024UL};
-    MmcLocation rank1Ssd{1, MEDIA_SSD};
-    MmcLocalMemlInitInfo rank1SsdInfo{1, 128UL * 1024UL};
-
-    MmcRef<MmcMetaManager> mgr = MmcMakeRef<MmcMetaManager>(2000U, 70U, 50U);
-    ASSERT_EQ(mgr->Start(), MMC_OK);
-    std::map<std::string, MmcMemBlobDesc> blobMap;
-    mgr->Mount(rank0Dram, rank0DramInfo, blobMap);
-    mgr->Mount(rank0Ssd, rank0SsdInfo, blobMap);
-    mgr->Mount(rank1Dram, rank1DramInfo, blobMap);
-    mgr->Mount(rank1Ssd, rank1SsdInfo, blobMap);
-
-    // Rank 0 SSD
-    std::string key0 = "r0_ssd";
-    AllocOptions req0{SIZE_32K, 1, MEDIA_SSD, {0}, 0};
-    MmcMemMetaDesc meta0;
-    ASSERT_EQ(mgr->Alloc(key0, req0, 1, meta0), MMC_OK);
-    ASSERT_EQ(mgr->UpdateState(key0, rank0Ssd, MMC_WRITE_OK, 1), MMC_OK);
-
-    // Rank 1 SSD
-    std::string key1 = "r1_ssd";
-    AllocOptions req1{SIZE_32K, 1, MEDIA_SSD, {1}, 0};
-    MmcMemMetaDesc meta1;
-    ASSERT_EQ(mgr->Alloc(key1, req1, 1, meta1), MMC_OK);
-    ASSERT_EQ(mgr->UpdateState(key1, rank1Ssd, MMC_WRITE_OK, 1), MMC_OK);
-
-    // Both keys exist independently
-    EXPECT_EQ(mgr->ExistKey(key0), MMC_OK);
-    EXPECT_EQ(mgr->ExistKey(key1), MMC_OK);
-
-    // Get segment info for both ranks
-    uint64_t r0Used = 0;
-    uint64_t r1Used = 0;
-    for (const auto &s : mgr->GetAllSegmentInfo()) {
-        if (s["medium"] == "SSD") {
-            if (s["rank"] == 0) r0Used += s["allocatedSize"].get<uint64_t>();
-            if (s["rank"] == 1) r1Used += s["allocatedSize"].get<uint64_t>();
-        }
-    }
-    EXPECT_GT(r0Used, 0u) << "Rank 0 SSD should have allocation";
-    EXPECT_GT(r1Used, 0u) << "Rank 1 SSD should have allocation";
-
-    mgr->Remove(key0);
-    mgr->Remove(key1);
-    mgr->Stop();
-}
-
 // ============================================================================
 // 9.2 Exception Tests (Spec 12.2)
 // ============================================================================
@@ -436,11 +244,11 @@ TEST_F(TestThreeTierCache, SsdWriteFailure_EvictionFallsBackToRemove)
     MmcLocation ssdLoc{0, MEDIA_SSD};
     MmcLocalMemlInitInfo ssdInfo{0, 128UL * 1024UL};
 
-    MmcRef<MmcMetaManager> mgr = MmcMakeRef<MmcMetaManager>(2000U, 70U, 50U);
+    MmcRef<MmcMetaManager> mgr = MmcMakeRef<MmcMetaManager>(2000U, 70U, 50U, REWARM_DRAM_WATERMARK);
     ASSERT_EQ(mgr->Start(), MMC_OK);
-    std::map<std::string, MmcMemBlobDesc> blobMap;
-    mgr->Mount(dramLoc, dramInfo, blobMap);
-    mgr->Mount(ssdLoc, ssdInfo, blobMap);
+    std::vector<std::pair<std::string, MmcMemBlobDesc>> blobMap;
+    mgr->Mount(dramLoc, dramInfo, blobMap, false);
+    mgr->Mount(ssdLoc, ssdInfo, blobMap, false);
 
     std::vector<std::string> keys;
     int keySize = 6;
@@ -469,43 +277,16 @@ TEST_F(TestThreeTierCache, SsdWriteFailure_EvictionFallsBackToRemove)
     mgr->Stop();
 }
 
-// [2] SSD read fails (no MetaNetServer) — Get still returns existing SSD blob
-TEST_F(TestThreeTierCache, SsdReadFailure_ReturnsExistingBlob)
-{
-    MmcLocation ssdLoc{0, MEDIA_SSD};
-    MmcLocalMemlInitInfo ssdInfo{0, 128UL * 1024UL};
-
-    MmcRef<MmcMetaManager> mgr = MmcMakeRef<MmcMetaManager>(2000U, 70U, 60U);
-    ASSERT_EQ(mgr->Start(), MMC_OK);
-    std::map<std::string, MmcMemBlobDesc> blobMap;
-    mgr->Mount(ssdLoc, ssdInfo, blobMap);
-
-    std::string key = "ssd_read";
-    AllocOptions allocReq{SIZE_32K, 1, MEDIA_SSD, {0}, 0};
-    MmcMemMetaDesc objMeta;
-    ASSERT_EQ(mgr->Alloc(key, allocReq, 1, objMeta), MMC_OK);
-    ASSERT_EQ(mgr->UpdateState(key, ssdLoc, MMC_WRITE_OK, 1), MMC_OK);
-
-    // Get returns SSD blob even though rewarm can't proceed (no MetaNetServer)
-    MmcMemMetaDesc result;
-    MmcBlobFilterPtr filter = MmcMakeRef<MmcBlobFilter>(UINT32_MAX, MEDIA_NONE, READABLE);
-    EXPECT_EQ(mgr->Get(key, 1, filter, result), MMC_OK);
-    EXPECT_GT(result.NumBlobs(), 0);
-
-    mgr->Remove(key);
-    mgr->Stop();
-}
-
 // [3] RebuildMeta verifies segment info consistency
 TEST_F(TestThreeTierCache, RebuildMeta_SegmentInfoConsistent)
 {
     MmcLocation dramLoc{0, MEDIA_DRAM};
     MmcLocalMemlInitInfo dramInfo{0, 128UL * 1024UL};
 
-    MmcRef<MmcMetaManager> mgr = MmcMakeRef<MmcMetaManager>(2000U, 70U, 60U);
+    MmcRef<MmcMetaManager> mgr = MmcMakeRef<MmcMetaManager>(2000U, 70U, 60U, REWARM_DRAM_WATERMARK);
     ASSERT_EQ(mgr->Start(), MMC_OK);
-    std::map<std::string, MmcMemBlobDesc> blobMap;
-    mgr->Mount(dramLoc, dramInfo, blobMap);
+    std::vector<std::pair<std::string, MmcMemBlobDesc>> blobMap;
+    mgr->Mount(dramLoc, dramInfo, blobMap, false);
 
     std::string key = "rebuild_key";
     AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, 0};
@@ -529,11 +310,11 @@ TEST_F(TestThreeTierCache, SsdFull_DramEviction_HandlesGracefully)
     MmcLocation ssdLoc{0, MEDIA_SSD};
     MmcLocalMemlInitInfo ssdInfo{0, 64UL * 1024UL};
 
-    MmcRef<MmcMetaManager> mgr = MmcMakeRef<MmcMetaManager>(2000U, 70U, 50U);
+    MmcRef<MmcMetaManager> mgr = MmcMakeRef<MmcMetaManager>(2000U, 70U, 50U, REWARM_DRAM_WATERMARK);
     ASSERT_EQ(mgr->Start(), MMC_OK);
-    std::map<std::string, MmcMemBlobDesc> blobMap;
-    mgr->Mount(dramLoc, dramInfo, blobMap);
-    mgr->Mount(ssdLoc, ssdInfo, blobMap);
+    std::vector<std::pair<std::string, MmcMemBlobDesc>> blobMap;
+    mgr->Mount(dramLoc, dramInfo, blobMap, false);
+    mgr->Mount(ssdLoc, ssdInfo, blobMap, false);
 
     std::vector<std::string> keys;
     for (uint i = 0; i < 8U; i++) {
@@ -571,11 +352,11 @@ TEST_F(TestThreeTierCache, NoMetaNetServer_RpcFailsGracefully)
     MmcLocation ssdLoc{0, MEDIA_SSD};
     MmcLocalMemlInitInfo ssdInfo{0, 128UL * 1024UL};
 
-    MmcRef<MmcMetaManager> mgr = MmcMakeRef<MmcMetaManager>(2000U, 70U, 60U);
+    MmcRef<MmcMetaManager> mgr = MmcMakeRef<MmcMetaManager>(2000U, 70U, 60U, REWARM_DRAM_WATERMARK);
     ASSERT_EQ(mgr->Start(), MMC_OK);
-    std::map<std::string, MmcMemBlobDesc> blobMap;
-    mgr->Mount(dramLoc, dramInfo, blobMap);
-    mgr->Mount(ssdLoc, ssdInfo, blobMap);
+    std::vector<std::pair<std::string, MmcMemBlobDesc>> blobMap;
+    mgr->Mount(dramLoc, dramInfo, blobMap, false);
+    mgr->Mount(ssdLoc, ssdInfo, blobMap, false);
 
     // DRAM operations work locally (no RPC needed)
     std::string key = "nometa";
@@ -592,32 +373,6 @@ TEST_F(TestThreeTierCache, NoMetaNetServer_RpcFailsGracefully)
     mgr->Stop();
 }
 
-// [6] Remove with SSD — Delete RPC fails but key still removed from metaContainer
-TEST_F(TestThreeTierCache, RemoveWithSsd_HandlesDeleteFailure)
-{
-    MmcLocation ssdLoc{0, MEDIA_SSD};
-    MmcLocalMemlInitInfo ssdInfo{0, 128UL * 1024UL};
-
-    MmcRef<MmcMetaManager> mgr = MmcMakeRef<MmcMetaManager>(2000U, 70U, 60U);
-    ASSERT_EQ(mgr->Start(), MMC_OK);
-    std::map<std::string, MmcMemBlobDesc> blobMap;
-    mgr->Mount(ssdLoc, ssdInfo, blobMap);
-
-    std::string key = "del_fail";
-    AllocOptions allocReq{SIZE_32K, 1, MEDIA_SSD, {0}, 0};
-    MmcMemMetaDesc meta;
-    ASSERT_EQ(mgr->Alloc(key, allocReq, 1, meta), MMC_OK);
-    ASSERT_EQ(mgr->UpdateState(key, ssdLoc, MMC_WRITE_OK, 1), MMC_OK);
-
-    // Remove: without MetaNetServer, Delete RPC fails, but Remove proceeds
-    mgr->Remove(key);
-
-    // Key removed from metaContainer
-    EXPECT_EQ(mgr->ExistKey(key), MMC_UNMATCHED_KEY);
-
-    mgr->Stop();
-}
-
 // ============================================================================
 // 9.3 Concurrency Tests (Spec 12.3)
 // ============================================================================
@@ -628,10 +383,10 @@ TEST_F(TestThreeTierCache, ConcurrentGet_DuringWrite)
     MmcLocation dramLoc{0, MEDIA_DRAM};
     MmcLocalMemlInitInfo dramInfo{0, 128UL * 1024UL};
 
-    MmcRef<MmcMetaManager> mgr = MmcMakeRef<MmcMetaManager>(2000U, 70U, 60U);
+    MmcRef<MmcMetaManager> mgr = MmcMakeRef<MmcMetaManager>(2000U, 70U, 60U, REWARM_DRAM_WATERMARK);
     ASSERT_EQ(mgr->Start(), MMC_OK);
-    std::map<std::string, MmcMemBlobDesc> blobMap;
-    mgr->Mount(dramLoc, dramInfo, blobMap);
+    std::vector<std::pair<std::string, MmcMemBlobDesc>> blobMap;
+    mgr->Mount(dramLoc, dramInfo, blobMap, false);
 
     std::string key = "conc_key";
 
@@ -663,47 +418,6 @@ TEST_F(TestThreeTierCache, ConcurrentGet_DuringWrite)
     mgr->Stop();
 }
 
-// [2] Multiple concurrent Gets on SSD key — all succeed without duplication
-TEST_F(TestThreeTierCache, ConcurrentGet_SsdHit_AllSucceed)
-{
-    MmcLocation dramLoc{0, MEDIA_DRAM};
-    MmcLocalMemlInitInfo dramInfo{0, 256UL * 1024UL};
-    MmcLocation ssdLoc{0, MEDIA_SSD};
-    MmcLocalMemlInitInfo ssdInfo{0, 128UL * 1024UL};
-
-    MmcRef<MmcMetaManager> mgr = MmcMakeRef<MmcMetaManager>(2000U, 70U, 60U);
-    ASSERT_EQ(mgr->Start(), MMC_OK);
-    std::map<std::string, MmcMemBlobDesc> blobMap;
-    mgr->Mount(dramLoc, dramInfo, blobMap);
-    mgr->Mount(ssdLoc, ssdInfo, blobMap);
-
-    std::string key = "ssd_conc";
-    AllocOptions allocReq{SIZE_32K, 1, MEDIA_SSD, {0}, 0};
-    MmcMemMetaDesc objMeta;
-    ASSERT_EQ(mgr->Alloc(key, allocReq, 1, objMeta), MMC_OK);
-    ASSERT_EQ(mgr->UpdateState(key, ssdLoc, MMC_WRITE_OK, 1), MMC_OK);
-
-    const int numReaders = 4;
-    std::vector<std::thread> readers;
-    std::atomic<int> successCount{0};
-
-    for (int i = 0; i < numReaders; i++) {
-        readers.emplace_back([&]() {
-            MmcMemMetaDesc result;
-            MmcBlobFilterPtr filter = MmcMakeRef<MmcBlobFilter>(UINT32_MAX, MEDIA_NONE, READABLE);
-            if (mgr->Get(key, 1, filter, result) == MMC_OK) {
-                successCount.fetch_add(1);
-            }
-        });
-    }
-
-    for (auto &t : readers) t.join();
-    EXPECT_EQ(successCount.load(), numReaders) << "All concurrent Gets should succeed";
-
-    mgr->Remove(key);
-    mgr->Stop();
-}
-
 // ============================================================================
 // 9.4 Performance Tests (Spec 12.4)
 // ============================================================================
@@ -716,11 +430,11 @@ TEST_F(TestThreeTierCache, GetLatency_Benchmark)
     MmcLocation ssdLoc{0, MEDIA_SSD};
     MmcLocalMemlInitInfo ssdInfo{0, 128UL * 1024UL};
 
-    MmcRef<MmcMetaManager> mgr = MmcMakeRef<MmcMetaManager>(2000U, 70U, 60U);
+    MmcRef<MmcMetaManager> mgr = MmcMakeRef<MmcMetaManager>(2000U, 70U, 60U, REWARM_DRAM_WATERMARK);
     ASSERT_EQ(mgr->Start(), MMC_OK);
-    std::map<std::string, MmcMemBlobDesc> blobMap;
-    mgr->Mount(dramLoc, dramInfo, blobMap);
-    mgr->Mount(ssdLoc, ssdInfo, blobMap);
+    std::vector<std::pair<std::string, MmcMemBlobDesc>> blobMap;
+    mgr->Mount(dramLoc, dramInfo, blobMap, false);
+    mgr->Mount(ssdLoc, ssdInfo, blobMap, false);
 
     std::string key = "perf_get";
     AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, 0};
@@ -752,11 +466,11 @@ TEST_F(TestThreeTierCache, Eviction_Throughput)
     MmcLocation ssdLoc{0, MEDIA_SSD};
     MmcLocalMemlInitInfo ssdInfo{0, 512UL * 1024UL};
 
-    MmcRef<MmcMetaManager> mgr = MmcMakeRef<MmcMetaManager>(2000U, 70U, 50U);
+    MmcRef<MmcMetaManager> mgr = MmcMakeRef<MmcMetaManager>(2000U, 70U, 50U, REWARM_DRAM_WATERMARK);
     ASSERT_EQ(mgr->Start(), MMC_OK);
-    std::map<std::string, MmcMemBlobDesc> blobMap;
-    mgr->Mount(dramLoc, dramInfo, blobMap);
-    mgr->Mount(ssdLoc, ssdInfo, blobMap);
+    std::vector<std::pair<std::string, MmcMemBlobDesc>> blobMap;
+    mgr->Mount(dramLoc, dramInfo, blobMap, false);
+    mgr->Mount(ssdLoc, ssdInfo, blobMap, false);
 
     const int numKeys = 12;
     std::vector<std::string> keys;
@@ -803,12 +517,12 @@ TEST_F(TestThreeTierCache, ThreeTierFullPath_LatencyRegression)
     MmcLocation ssdLoc{0, MEDIA_SSD};
     MmcLocalMemlInitInfo ssdInfo{0, 128UL * 1024UL};
 
-    MmcRef<MmcMetaManager> mgr = MmcMakeRef<MmcMetaManager>(2000U, 70U, 60U);
+    MmcRef<MmcMetaManager> mgr = MmcMakeRef<MmcMetaManager>(2000U, 70U, 60U, REWARM_DRAM_WATERMARK);
     ASSERT_EQ(mgr->Start(), MMC_OK);
-    std::map<std::string, MmcMemBlobDesc> blobMap;
-    mgr->Mount(hbmLoc, hbmInfo, blobMap);
-    mgr->Mount(dramLoc, dramInfo, blobMap);
-    mgr->Mount(ssdLoc, ssdInfo, blobMap);
+    std::vector<std::pair<std::string, MmcMemBlobDesc>> blobMap;
+    mgr->Mount(hbmLoc, hbmInfo, blobMap, false);
+    mgr->Mount(dramLoc, dramInfo, blobMap, false);
+    mgr->Mount(ssdLoc, ssdInfo, blobMap, false);
 
     std::vector<long> getAllocLat;
     std::vector<long> getDramLat;

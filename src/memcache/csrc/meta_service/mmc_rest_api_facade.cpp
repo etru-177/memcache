@@ -65,6 +65,28 @@ std::string BuildUsedText(const ock::mmc::RestUsageSnapshot &usage)
     return std::to_string(usage.usedBytes) + "/" + std::to_string(usage.totalBytes);
 }
 
+void AppendPerRankText(std::ostringstream &oss, const std::string &name,
+                       const std::unordered_map<uint32_t, uint64_t> &rankMap)
+{
+    for (const auto &[rank, val] : rankMap) {
+        if (val == 0 || rank == UINT32_MAX) {
+            continue;
+        }
+        oss << ' ' << name << '_' << rank << '=' << val;
+    }
+}
+
+void AppendPerRankPrometheus(std::ostringstream &oss, const std::string &metricName,
+                             const std::unordered_map<uint32_t, uint64_t> &rankMap)
+{
+    for (const auto &[rank, val] : rankMap) {
+        if (val == 0 || rank == UINT32_MAX) {
+            continue;
+        }
+        oss << metricName << "{rank=\"" << rank << "\"} " << val << '\n';
+    }
+}
+
 void AppendOperationMetrics(std::ostringstream &oss, const std::string &metricName, const std::string &helpName,
                             uint64_t requestCount, uint64_t successCount, uint64_t failureCount,
                             bool hasNotFoundCount = false, uint64_t notFoundCount = 0)
@@ -370,10 +392,12 @@ Result MmcRestApiFacade::BuildCapacityUsage(nlohmann::json &result) const
     RestUsageSnapshot dramUsage;
     ret = BuildUsageFromMedium(segments, kLowerMediumHbm, hbmUsage);
     if (ret != MMC_OK) {
+        MMC_LOG_WARN("BuildUsageFromMedium HBM failed in BuildCapacityUsage, ret=" << ret);
         return ret;
     }
     ret = BuildUsageFromMedium(segments, kLowerMediumDram, dramUsage);
     if (ret != MMC_OK) {
+        MMC_LOG_WARN("BuildUsageFromMedium DRAM failed in BuildCapacityUsage, ret=" << ret);
         return ret;
     }
 
@@ -445,20 +469,29 @@ Result MmcRestApiFacade::BuildMetricsSummary(bool serviceReady, std::string &res
     RestUsageSnapshot ssdUsage;
     ret = BuildUsageFromMedium(segments, kLowerMediumHbm, hbmUsage);
     if (ret != MMC_OK) {
+        MMC_LOG_WARN("BuildUsageFromMedium HBM failed in BuildMetricsSummary, ret=" << ret);
         return ret;
     }
     ret = BuildUsageFromMedium(segments, kLowerMediumDram, dramUsage);
     if (ret != MMC_OK) {
+        MMC_LOG_WARN("BuildUsageFromMedium DRAM failed in BuildMetricsSummary, ret=" << ret);
         return ret;
     }
     // SSD usage 可能为空（未配置 SSD），不阻塞流程
-    BuildUsageFromMedium(segments, kLowerMediumSsd, ssdUsage);
+    ret = BuildUsageFromMedium(segments, kLowerMediumSsd, ssdUsage);
+    if (ret != MMC_OK) {
+        MMC_LOG_WARN("BuildUsageFromMedium SSD failed in BuildMetricsSummary, ret=" << ret);
+    }
 
     std::ostringstream oss;
     oss << "keys=" << keys.size() << " evict=" << metricSnapshot.evictCount
         << " evict_to_ssd=" << metricSnapshot.evictToSsdCount
-        << " ssd_evict_delete=" << metricSnapshot.ssdEvictDeleteCount
+        << " evict_ssd_delete=" << metricSnapshot.evictSsdDeleteCount
+        << " evict_mem_delete=" << metricSnapshot.evictMemDeleteCount
         << " rewarm=" << metricSnapshot.rewarmCount << " rewarm_fail=" << metricSnapshot.rewarmFailCount
+        << " rewarm_bytes_total=" << metricSnapshot.rewarmBytesCount
+        << " rewarm_bytes_current=" << metricSnapshot.rewarmBytesCurrent
+        << " get_hit_dram=" << metricSnapshot.getHitDramCount << " get_hit_ssd=" << metricSnapshot.getHitSsdCount
         << " hbm_used=" << BuildUsedText(hbmUsage)
         << " dram_used=" << BuildUsedText(dramUsage) << " ssd_used=" << BuildUsedText(ssdUsage)
         << " alloc_req=" << metricSnapshot.allocRequestCount
@@ -513,6 +546,18 @@ Result MmcRestApiFacade::BuildMetricsSummary(bool serviceReady, std::string &res
         << " mount_fail=" << metricSnapshot.mountFailureCount << " unmount_req=" << metricSnapshot.unmountRequestCount
         << " unmount_success=" << metricSnapshot.unmountSuccessCount
         << " unmount_fail=" << metricSnapshot.unmountFailureCount;
+    if (MmcMetaMetricManager::IsPerRankEnabled()) {
+        AppendPerRankText(oss, "evict_by_rank", metricSnapshot.evictCountByRank);
+        AppendPerRankText(oss, "evict_to_ssd_by_rank", metricSnapshot.evictToSsdCountByRank);
+        AppendPerRankText(oss, "evict_ssd_delete_by_rank", metricSnapshot.evictSsdDeleteCountByRank);
+        AppendPerRankText(oss, "evict_mem_delete_by_rank", metricSnapshot.evictMemDeleteCountByRank);
+        AppendPerRankText(oss, "get_hit_dram_by_rank", metricSnapshot.getHitDramCountByRank);
+        AppendPerRankText(oss, "get_hit_ssd_by_rank", metricSnapshot.getHitSsdCountByRank);
+        AppendPerRankText(oss, "rewarm_by_rank", metricSnapshot.rewarmCountByRank);
+        AppendPerRankText(oss, "rewarm_fail_by_rank", metricSnapshot.rewarmFailCountByRank);
+        AppendPerRankText(oss, "rewarm_bytes_by_rank", metricSnapshot.rewarmBytesByRank);
+        AppendPerRankText(oss, "rewarm_bytes_current_by_rank", metricSnapshot.rewarmBytesCurrentByRank);
+    }
     result = oss.str();
     return MMC_OK;
 }
@@ -541,18 +586,65 @@ Result MmcRestApiFacade::BuildPrometheusMetrics(bool serviceReady, std::string &
     RestUsageSnapshot ssdUsage;
     ret = BuildUsageFromMedium(segments, kLowerMediumHbm, hbmUsage);
     if (ret != MMC_OK) {
+        MMC_LOG_WARN("BuildUsageFromMedium HBM failed in BuildPrometheusMetrics, ret=" << ret);
         return ret;
     }
     ret = BuildUsageFromMedium(segments, kLowerMediumDram, dramUsage);
     if (ret != MMC_OK) {
+        MMC_LOG_WARN("BuildUsageFromMedium DRAM failed in BuildPrometheusMetrics, ret=" << ret);
         return ret;
     }
+    // SSD usage 可能为空（未配置 SSD），不阻塞流程
     ret = BuildUsageFromMedium(segments, kLowerMediumSsd, ssdUsage);
     if (ret != MMC_OK) {
-        return ret;
+        MMC_LOG_WARN("BuildUsageFromMedium SSD failed in BuildPrometheusMetrics, ret=" << ret);
     }
 
     std::ostringstream oss;
+
+    // per-rank internal counters (SimplePerRankCounter, not in registry)
+    if (MmcMetaMetricManager::IsPerRankEnabled()) {
+        AppendPerRankPrometheus(oss, "memcache_evict_operations_total", metricSnapshot.evictCountByRank);
+        AppendPerRankPrometheus(oss, "memcache_evict_to_ssd_total", metricSnapshot.evictToSsdCountByRank);
+        AppendPerRankPrometheus(oss, "memcache_evict_ssd_delete_total", metricSnapshot.evictSsdDeleteCountByRank);
+        AppendPerRankPrometheus(oss, "memcache_evict_mem_delete_total", metricSnapshot.evictMemDeleteCountByRank);
+        AppendPerRankPrometheus(oss, "memcache_get_hits_dram_total", metricSnapshot.getHitDramCountByRank);
+        AppendPerRankPrometheus(oss, "memcache_get_hits_ssd_total", metricSnapshot.getHitSsdCountByRank);
+        AppendPerRankPrometheus(oss, "memcache_rewarm_total", metricSnapshot.rewarmCountByRank);
+        AppendPerRankPrometheus(oss, "memcache_rewarm_failed_total", metricSnapshot.rewarmFailCountByRank);
+        AppendPerRankPrometheus(oss, "memcache_rewarm_bytes_total", metricSnapshot.rewarmBytesByRank);
+        AppendPerRankPrometheus(oss, "memcache_rewarm_bytes_current", metricSnapshot.rewarmBytesCurrentByRank);
+    }
+
+    // per-rank REST API counters (RankedOpMetrics, not in registry)
+    if (MmcMetaMetricManager::IsPerRankEnabled()) {
+        MmcMetaMetricManager::GetInstance().AppendRestApiPerRankMetrics(oss);
+    }
+
+    // segment + medium capacity (not in registry)
+    AppendMetricHeader(oss, "memcache_segment_capacity_bytes", "Segment total capacity in bytes", "gauge");
+    for (size_t i = 0; i < segments.size(); ++i) {
+        AppendLabeledMetricValue(oss, "memcache_segment_capacity_bytes", "segment", segments[i].segmentName,
+                                 segments[i].totalBytes);
+    }
+    AppendMetricHeader(oss, "memcache_segment_allocated_bytes", "Segment allocated bytes", "gauge");
+    for (size_t i = 0; i < segments.size(); ++i) {
+        AppendLabeledMetricValue(oss, "memcache_segment_allocated_bytes", "segment", segments[i].segmentName,
+                                 segments[i].usedBytes);
+    }
+    AppendMetricHeader(oss, "memcache_total_capacity_bytes", "Total capacity by medium in bytes", "gauge");
+    AppendLabeledMetricValue(oss, "memcache_total_capacity_bytes", "medium", kLowerMediumHbm, hbmUsage.totalBytes);
+    AppendLabeledMetricValue(oss, "memcache_total_capacity_bytes", "medium", kLowerMediumDram, dramUsage.totalBytes);
+    if (ssdUsage.totalBytes > 0 || ssdUsage.usedBytes > 0) {
+        AppendLabeledMetricValue(oss, "memcache_total_capacity_bytes", "medium", kLowerMediumSsd, ssdUsage.totalBytes);
+    }
+    AppendMetricHeader(oss, "memcache_allocated_bytes", "Allocated bytes by medium", "gauge");
+    AppendLabeledMetricValue(oss, "memcache_allocated_bytes", "medium", kLowerMediumHbm, hbmUsage.usedBytes);
+    AppendLabeledMetricValue(oss, "memcache_allocated_bytes", "medium", kLowerMediumDram, dramUsage.usedBytes);
+    if (ssdUsage.totalBytes > 0 || ssdUsage.usedBytes > 0) {
+        AppendLabeledMetricValue(oss, "memcache_allocated_bytes", "medium", kLowerMediumSsd, ssdUsage.usedBytes);
+    }
+
     AppendOperationMetrics(oss, "alloc", "Alloc", metricSnapshot.allocRequestCount, metricSnapshot.allocSuccessCount,
                            metricSnapshot.allocFailureCount);
     AppendOperationMetrics(oss, "batch_alloc", "BatchAlloc", metricSnapshot.batchAllocRequestCount,
@@ -593,43 +685,32 @@ Result MmcRestApiFacade::BuildPrometheusMetrics(bool serviceReady, std::string &
                            metricSnapshot.mountFailureCount);
     AppendOperationMetrics(oss, "unmount", "Unmount", metricSnapshot.unmountRequestCount,
                            metricSnapshot.unmountSuccessCount, metricSnapshot.unmountFailureCount);
-    AppendMetricHeader(oss, "memcache_evict_operations_total", "Total number of evict operations", "counter");
+    AppendMetricHeader(oss, "memcache_evict_operations_total", "Total number of eviction operations", "counter");
     AppendMetricValue(oss, "memcache_evict_operations_total", metricSnapshot.evictCount);
-    AppendMetricHeader(oss, "memcache_evict_to_ssd_total", "Total number of eviction to SSD", "counter");
+    AppendMetricHeader(oss, "memcache_evict_to_ssd_total", "Total number of eviction to SSD operations", "counter");
     AppendMetricValue(oss, "memcache_evict_to_ssd_total", metricSnapshot.evictToSsdCount);
-    AppendMetricHeader(oss, "memcache_ssd_evict_delete_total", "Total number of SSD eviction deletes", "counter");
-    AppendMetricValue(oss, "memcache_ssd_evict_delete_total", metricSnapshot.ssdEvictDeleteCount);
-    AppendMetricHeader(oss, "memcache_rewarm_total", "Total number of rewarm operations", "counter");
+    AppendMetricHeader(oss, "memcache_evict_ssd_delete_total", "Total number of SSD eviction delete operations",
+                       "counter");
+    AppendMetricValue(oss, "memcache_evict_ssd_delete_total", metricSnapshot.evictSsdDeleteCount);
+    AppendMetricHeader(oss, "memcache_evict_mem_delete_total", "Total number of memory tier eviction delete operations",
+                       "counter");
+    AppendMetricValue(oss, "memcache_evict_mem_delete_total", metricSnapshot.evictMemDeleteCount);
+    AppendMetricHeader(oss, "memcache_get_hits_dram_total", "Total number of Get hits served from DRAM", "counter");
+    AppendMetricValue(oss, "memcache_get_hits_dram_total", metricSnapshot.getHitDramCount);
+    AppendMetricHeader(oss, "memcache_get_hits_ssd_total", "Total number of Get hits served from SSD (rewarm)",
+                       "counter");
+    AppendMetricValue(oss, "memcache_get_hits_ssd_total", metricSnapshot.getHitSsdCount);
+    AppendMetricHeader(oss, "memcache_rewarm_total", "Total number of SSD->DRAM rewarm operations", "counter");
     AppendMetricValue(oss, "memcache_rewarm_total", metricSnapshot.rewarmCount);
-    AppendMetricHeader(oss, "memcache_rewarm_failed_total", "Total number of failed rewarm operations", "counter");
+    AppendMetricHeader(oss, "memcache_rewarm_failed_total", "Total number of failed SSD->DRAM rewarm operations",
+                       "counter");
     AppendMetricValue(oss, "memcache_rewarm_failed_total", metricSnapshot.rewarmFailCount);
-    AppendMetricHeader(oss, "memcache_stored_keys", "Total number of stored keys", "gauge");
+    AppendMetricHeader(oss, "memcache_rewarm_bytes_total", "Total bytes rewarmed from SSD to DRAM", "counter");
+    AppendMetricValue(oss, "memcache_rewarm_bytes_total", metricSnapshot.rewarmBytesCount);
+    AppendMetricHeader(oss, "memcache_rewarm_bytes_current", "Current bytes occupied by rewarmed data", "gauge");
+    AppendMetricValue(oss, "memcache_rewarm_bytes_current", metricSnapshot.rewarmBytesCurrent);
+    AppendMetricHeader(oss, "memcache_stored_keys", "Current number of stored keys", "gauge");
     AppendMetricValue(oss, "memcache_stored_keys", keys.size());
-
-    AppendMetricHeader(oss, "memcache_segment_capacity_bytes", "Segment total capacity in bytes", "gauge");
-    for (size_t i = 0; i < segments.size(); ++i) {
-        AppendLabeledMetricValue(oss, "memcache_segment_capacity_bytes", "segment", segments[i].segmentName,
-                                 segments[i].totalBytes);
-    }
-    AppendMetricHeader(oss, "memcache_segment_allocated_bytes", "Segment allocated bytes", "gauge");
-    for (size_t i = 0; i < segments.size(); ++i) {
-        AppendLabeledMetricValue(oss, "memcache_segment_allocated_bytes", "segment", segments[i].segmentName,
-                                 segments[i].usedBytes);
-    }
-
-    AppendMetricHeader(oss, "memcache_total_capacity_bytes", "Total capacity by medium in bytes", "gauge");
-    AppendLabeledMetricValue(oss, "memcache_total_capacity_bytes", "medium", kLowerMediumHbm, hbmUsage.totalBytes);
-    AppendLabeledMetricValue(oss, "memcache_total_capacity_bytes", "medium", kLowerMediumDram, dramUsage.totalBytes);
-    if (ssdUsage.totalBytes > 0 || ssdUsage.usedBytes > 0) {
-        AppendLabeledMetricValue(oss, "memcache_total_capacity_bytes", "medium", kLowerMediumSsd, ssdUsage.totalBytes);
-    }
-
-    AppendMetricHeader(oss, "memcache_allocated_bytes", "Allocated bytes by medium", "gauge");
-    AppendLabeledMetricValue(oss, "memcache_allocated_bytes", "medium", kLowerMediumHbm, hbmUsage.usedBytes);
-    AppendLabeledMetricValue(oss, "memcache_allocated_bytes", "medium", kLowerMediumDram, dramUsage.usedBytes);
-    if (ssdUsage.totalBytes > 0 || ssdUsage.usedBytes > 0) {
-        AppendLabeledMetricValue(oss, "memcache_allocated_bytes", "medium", kLowerMediumSsd, ssdUsage.usedBytes);
-    }
 
     result = oss.str();
     return MMC_OK;
