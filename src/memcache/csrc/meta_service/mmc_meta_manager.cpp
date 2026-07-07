@@ -302,30 +302,65 @@ Result MmcMetaManager::GetByRank(const std::vector<std::string> &keys, uint64_t 
     std::vector<PendingRewarmWait> pendingWaitList;
     ClassifyAndGroupKeys(keys, opRankId, opSeq, objMetas, rankGroups, pendingWaitList);
 
-    if (rankGroups.empty() && pendingWaitList.empty()) {
-        return MMC_OK;
-    }
-
     std::vector<std::future<void>> futures;
-    for (auto &[rank, group] : rankGroups) {
-        futures.push_back(rewarmThreadPool_->Enqueue(
-            [this, rank, &group, &keys, opRankId, opSeq, &objMetas]() {
-                RewarmRankGroup(rank, group, keys, opRankId, opSeq, objMetas);
-            }));
+    if (!rankGroups.empty() || !pendingWaitList.empty()) {
+        for (auto &[rank, group] : rankGroups) {
+            futures.push_back(rewarmThreadPool_->Enqueue(
+                [this, rank, &group, &keys, opRankId, opSeq, &objMetas]() {
+                    RewarmRankGroup(rank, group, keys, opRankId, opSeq, objMetas);
+                }));
+        }
+
+        for (auto &w : pendingWaitList) {
+            futures.push_back(rewarmThreadPool_->Enqueue(
+                [this, &keys, opRankId, opSeq, &objMetas, &w]() {
+                    PendingWaitAndFill(keys, opRankId, opSeq, objMetas, w);
+                }));
+        }
+
+        for (auto &f : futures) {
+            try {
+                f.get();
+            } catch (const std::exception &e) {
+                MMC_LOG_WARN("GetByRank future failed: " << e.what());
+            }
+        }
     }
 
-    for (auto &w : pendingWaitList) {
-        futures.push_back(rewarmThreadPool_->Enqueue(
-            [this, &keys, opRankId, opSeq, &objMetas, &w]() {
-                PendingWaitAndFill(keys, opRankId, opSeq, objMetas, w);
-            }));
-    }
-
-    for (auto &f : futures) {
-        try {
-            f.get();
-        } catch (const std::exception &e) {
-            MMC_LOG_WARN("GetByRank future failed: " << e.what());
+    size_t metaCount = objMetas.size();
+    for (size_t i = 0; i < keys.size() && i < metaCount; ++i) {
+        auto &objMeta = objMetas[i];
+        if (objMeta.numBlobs_ == 0 || objMeta.blobs_.empty()) {
+            continue;
+        }
+        MmcMemObjMetaPtr memObj;
+        if (metaContainer_->Get(keys[i], memObj) != MMC_OK || memObj == nullptr) {
+            MMC_LOG_WARN("GetByRank: deferred READ_START memObj not found for key=" << keys[i]);
+            objMeta.blobs_.clear();
+            objMeta.numBlobs_ = 0;
+            continue;
+        }
+        {
+            std::unique_lock<std::mutex> guard(memObj->Mutex());
+            for (auto &desc : objMeta.blobs_) {
+                MmcBlobFilterPtr filter = MmcMakeRef<MmcBlobFilter>(
+                    desc.rank_, static_cast<MediaType>(desc.mediaType_), READABLE);
+                auto blobs = memObj->GetBlobs(filter);
+                if (blobs.empty()) {
+                    MMC_LOG_WARN("GetByRank: deferred READ_START blob not found for key=" << keys[i]);
+                    objMeta.blobs_.clear();
+                    objMeta.numBlobs_ = 0;
+                    break;
+                }
+                auto ret = blobs[0]->UpdateState(keys[i], opRankId, opSeq, MMC_READ_START);
+                if (ret != MMC_OK) {
+                    MMC_LOG_WARN("GetByRank: deferred READ_START failed for key=" << keys[i]
+                                 << ", ret=" << ret);
+                    objMeta.blobs_.clear();
+                    objMeta.numBlobs_ = 0;
+                    break;
+                }
+            }
         }
     }
 
@@ -384,13 +419,8 @@ void MmcMetaManager::ClassifyAndGroupKeys(const std::vector<std::string> &keys, 
             objMetas[i].prot_ = memObj->Prot();
             objMetas[i].priority_ = memObj->Priority();
             objMetas[i].size_ = memObj->Size();
-            auto updateRet = selectedBlob->UpdateState(keys[i], opRankId, opSeq, MMC_READ_START);
-            if (updateRet == MMC_OK) {
-                objMetas[i].blobs_.push_back(selectedBlob->GetDesc());
-                objMetas[i].numBlobs_ = 1;
-            } else {
-                MMC_LOG_WARN("key: " << keys[i] << " selectedBlob READ_START failed, ret: " << updateRet);
-            }
+            objMetas[i].blobs_.push_back(selectedBlob->GetDesc());
+            objMetas[i].numBlobs_ = 1;
         } else if (pendingBlob != nullptr) {
             // rewarm already in progress by another thread, wait concurrently
             pendingWaitList.push_back({i, memObj, pendingBlob});
@@ -402,13 +432,8 @@ void MmcMetaManager::ClassifyAndGroupKeys(const std::vector<std::string> &keys, 
                 objMetas[i].prot_ = memObj->Prot();
                 objMetas[i].priority_ = memObj->Priority();
                 objMetas[i].size_ = memObj->Size();
-                auto updateRet = lowerBlob->UpdateState(keys[i], opRankId, opSeq, MMC_READ_START);
-                if (updateRet == MMC_OK) {
-                    objMetas[i].blobs_.push_back(lowerBlob->GetDesc());
-                    objMetas[i].numBlobs_ = 1;
-                } else {
-                    MMC_LOG_WARN("key: " << keys[i] << " lowerBlob READ_START failed (no rewarm), ret: " << updateRet);
-                }
+                objMetas[i].blobs_.push_back(lowerBlob->GetDesc());
+                objMetas[i].numBlobs_ = 1;
             } else {
                 auto readRet = lowerBlob->UpdateState(keys[i], opRankId, opSeq, MMC_READ_START);
                 if (readRet != MMC_OK) {
@@ -568,12 +593,7 @@ Result MmcMetaManager::ApplyRewarm(const std::string &key, RewarmEntry &entry,
     objMeta.prot_ = entry.memObj->Prot();
     objMeta.priority_ = entry.memObj->Priority();
     objMeta.size_ = entry.memObj->Size();
-    ret = dstBlob->UpdateState(key, ctx.opRankId, ctx.opSeq, MMC_READ_START);
-    if (ret == MMC_OK) {
-        objMeta.blobs_.push_back(dstBlob->GetDesc());
-    } else {
-        MMC_LOG_WARN("READ_START failed for key=" << key << ", ret=" << ret);
-    }
+    objMeta.blobs_.push_back(dstBlob->GetDesc());
     objMeta.numBlobs_ = objMeta.blobs_.size();
 
     auto finishRet = entry.ssdBlob->UpdateState(key, entry.opRankId, entry.opSeq, MMC_READ_FINISH);
@@ -656,17 +676,12 @@ void MmcMetaManager::PendingWaitAndFill(const std::vector<std::string> &keys, ui
     }
 
     if (w.pendingBlob->State() == READABLE) {
-        auto ret = w.pendingBlob->UpdateState(keys[w.index], opRankId, opSeq, MMC_READ_START);
-        if (ret == MMC_OK) {
-            objMetas[w.index].prot_ = w.memObj->Prot();
-            objMetas[w.index].priority_ = w.memObj->Priority();
-            objMetas[w.index].size_ = w.memObj->Size();
-            objMetas[w.index].blobs_.push_back(w.pendingBlob->GetDesc());
-            objMetas[w.index].numBlobs_ = 1;
-            MmcMetaMetricManager::GetInstance().IncrementGetHitDramCounter(w.pendingBlob->GetDesc().rank_);
-        } else {
-            MMC_LOG_WARN("key: " << keys[w.index] << " pendingBlob READ_START failed, ret: " << ret);
-        }
+        objMetas[w.index].prot_ = w.memObj->Prot();
+        objMetas[w.index].priority_ = w.memObj->Priority();
+        objMetas[w.index].size_ = w.memObj->Size();
+        objMetas[w.index].blobs_.push_back(w.pendingBlob->GetDesc());
+        objMetas[w.index].numBlobs_ = 1;
+        MmcMetaMetricManager::GetInstance().IncrementGetHitDramCounter(w.pendingBlob->GetDesc().rank_);
     } else {
         MMC_LOG_WARN("key: " << keys[w.index] << " pending rewarm timeout or state not readable, state="
                    << static_cast<int>(w.pendingBlob->State()));
@@ -940,6 +955,9 @@ void MmcMetaManager::PushRemoveList(const std::string &key, const MmcMemObjMetaP
             for (auto &blob : blobs) {
                 UnregisterGvaPendingWriteBlob(blob);
             }
+            if (metaL->NumBlobs() == 0) {
+                metaContainer_->Erase(keyL);
+            }
             return MMC_OK;
         },
         key, meta, globalAllocator_, filter, triggerSsdPreFree);
@@ -950,6 +968,9 @@ void MmcMetaManager::PushRemoveList(const std::string &key, const MmcMemObjMetaP
         blobs = meta->FreeBlobs(key, globalAllocator_, filter, true, triggerSsdPreFree);
         for (auto &blob : blobs) {
             UnregisterGvaPendingWriteBlob(blob);
+        }
+        if (meta->NumBlobs() == 0) {
+            metaContainer_->Erase(key);
         }
     }
 }
@@ -1053,7 +1074,8 @@ void MmcMetaManager::TriggerPrefetch(const std::string &key, const MmcMemObjMeta
         ret = RewarmBlob(key, objMeta, guard, ssdBlob->GetDesc(), dstMedia, dstBlob);
         auto finishRet = ssdBlob->UpdateState(key, opRankId, opSeq, MMC_READ_FINISH);
         if (finishRet != MMC_OK) {
-            MMC_LOG_WARN("Failed to release SSD read lease after prefetch rewarm, key=" << key << ", ret=" << finishRet);
+            MMC_LOG_WARN("Failed to release SSD read lease after prefetch rewarm, key=" << key
+                         << ", ret=" << finishRet);
         }
         if (ret != MMC_OK) {
             MMC_LOG_ERROR("Prefetch failed for key " << key << ", ret=" << ret);

@@ -57,7 +57,7 @@ Result MmcLocalServiceDefault::Start(const mmc_local_service_config_t &config)
         }
     }
 
-    ubsioEventPool_ = MmcMakeRef<MmcThreadPool>("ubsio_event_pool", UBSIO_EVENT_POOL_SIZE);
+    ubsioEventPool_ = MmcMakeRef<MmcThreadPool>("io_evt_pool", UBSIO_EVENT_POOL_SIZE);
     MMC_ASSERT_LOG_AND_RETURN(ubsioEventPool_ != nullptr, "ubsioEventPool_ is nullptr", MMC_MALLOC_FAILED);
     MMC_RETURN_ERROR(ubsioEventPool_->Start(), "ubsio event pool start failed");
 
