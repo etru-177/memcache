@@ -161,6 +161,21 @@ TEST_F(TestMmcConfiguration, ValidateLocalServiceConfigTest)
     ASSERT_EQ(deviceConfig.localMaxHBMSize, 2ULL * 1024ULL * 1024ULL * 1024ULL);
     ASSERT_EQ(MmcSmemBmHelper::TransSmemBmDataOpType("device_urma"), SMEMB_DATA_OP_DEVICE_URMA);
 
+    // 测试device_uboe协议，1GB向上对齐
+    SafeCopy("device_uboe", deviceConfig.dataOpType, PROTOCOL_SIZE);
+    deviceConfig.localDRAMSize = 768ULL * 1024ULL * 1024ULL;     // 768MB，应该对齐到1GB
+    deviceConfig.localMaxDRAMSize = 1024ULL * 1024ULL * 1024ULL; // 1GB，已经对齐
+    deviceConfig.localHBMSize = 256ULL * 1024ULL * 1024ULL;      // 256MB，应该对齐到1GB
+    deviceConfig.localMaxHBMSize = 2ULL * 1024ULL * 1024ULL * 1024ULL;
+
+    ret = ClientConfig::ValidateLocalServiceConfig(deviceConfig);
+    ASSERT_EQ(ret, MMC_OK);
+    ASSERT_EQ(deviceConfig.localDRAMSize, 1ULL * 1024ULL * 1024ULL * 1024ULL);
+    ASSERT_EQ(deviceConfig.localMaxDRAMSize, 1ULL * 1024ULL * 1024ULL * 1024ULL);
+    ASSERT_EQ(deviceConfig.localHBMSize, 1ULL * 1024ULL * 1024ULL * 1024ULL);
+    ASSERT_EQ(deviceConfig.localMaxHBMSize, 2ULL * 1024ULL * 1024ULL * 1024ULL);
+    ASSERT_EQ(MmcSmemBmHelper::TransSmemBmDataOpType("device_uboe"), SMEMB_DATA_OP_DEVICE_UBOE);
+
     // 测试device_sdma协议，1GB向上对齐
     SafeCopy("device_sdma", deviceConfig.dataOpType, PROTOCOL_SIZE);
     deviceConfig.localDRAMSize = 512ULL * 1024 * 1024;     // 512MB，应该对齐到1GB

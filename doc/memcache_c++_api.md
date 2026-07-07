@@ -16,7 +16,7 @@ C++语言接口功能齐全，基于面向对象设计，提供统一的 `Object
 - `config_store_url`: 配置存储服务地址
 - `log_level`: 日志级别，如 `debug`、`info`、`warn`、`error`
 - `world_size`: 最大 rank 数
-- `protocol`: 数据传输协议，如 `host_rdma`、`host_urma`、`host_tcp`、`device_rdma`、`device_urma`、`device_sdma`
+- `protocol`: 数据传输协议，如 `host_rdma`、`host_urma`、`host_tcp`、`device_rdma`、`device_urma`、`device_uboe`、`device_sdma`
 - `hcom_url`: HCOM 服务地址
 - `dram_size` / `hbm_size`: 本地服务 DRAM / HBM 容量
 - `max_dram_size` / `max_hbm_size`: 所有本地进程可使用的 DRAM / HBM 总上限。
@@ -44,7 +44,7 @@ static std::shared_ptr<ObjectStore> CreateObjectStore();
 virtual int Setup(const local_config &config);
 ```
 **功能**: 初始化并校验本地配置，供后续 `Init` 使用。
-**注**：如果开启device_urma协议，则`max dram * world_size`的池化总大小必须大于32T
+**注**：如果开启device_urma或device_uboe协议，则`max dram * world_size`的池化总大小必须大于32T
 
 **参数**:
 - `config`: 本地配置（`local_config`）

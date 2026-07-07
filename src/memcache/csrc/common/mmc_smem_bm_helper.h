@@ -31,6 +31,9 @@ public:
         if (dataOpType == "device_urma") {
             return SMEMB_DATA_OP_DEVICE_URMA;
         }
+        if (dataOpType == "device_uboe") {
+            return SMEMB_DATA_OP_DEVICE_UBOE;
+        }
         if (dataOpType == "host_tcp") {
             return SMEMB_DATA_OP_HOST_TCP;
         }
