@@ -628,6 +628,10 @@ PYBIND11_MODULE(_pymmc, m)
              py::arg("flag") = 0)
         .def("batch_get_key_info", &MmcacheStore::BatchGetKeyInfo, py::call_guard<py::gil_scoped_release>(),
              py::arg("keys"), py::arg("flag") = 0)
+        .def("batch_add_lease", &MmcacheStore::BatchAddLease, py::call_guard<py::gil_scoped_release>(),
+             py::arg("keys"), py::arg("leaseTtlMs") = 0)
+        .def("batch_remove_lease", &MmcacheStore::BatchRemoveLease, py::call_guard<py::gil_scoped_release>(),
+             py::arg("keys"))
         .def("close", &MmcacheStore::TearDown)
         .def(
             "register_buffer",

@@ -686,7 +686,7 @@ key_info = store.get_key_info(key, flag=0)
 **参数**:
 
 - `key`: 数据的键
-- `flag`: 查询标志，默认值为 `0`；在单 blob 场景下，可传入 `1` 为后续基于 GVA 的读取流程做准备
+- `flag`: 查询标志，默认值为 `0`
 
 **返回值**:
 
@@ -708,7 +708,7 @@ key_infos = store.batch_get_key_info(keys, flag=0)
 **参数**:
 
 - `keys`: 数据键列表
-- `flag`: 查询标志，默认值为 `0`；在单 blob 场景下，可传入 `1` 为后续基于 GVA 的读取流程做准备
+- `flag`: 查询标志，默认值为 `0`
 
 **返回值**:
 
@@ -724,14 +724,77 @@ key_infos = store.batch_get_key_info(keys, flag=0)
 #### get_key_info / batch_get_key_info 补充说明
 
 - 这两个接口的实际签名分别为 `store.get_key_info(key, flag=0)` 和 `store.batch_get_key_info(keys, flag=0)`
-- 当 `flag` 传入 `1` 时，可在单 blob 场景下为后续基于 GVA 的读取流程做准备
 - `KeyInfo` 除 `size()`、`loc_list()`、`type_list()` 外，还提供 `gva_list()`，用于返回每个 blob 对应的 GVA 列表
 
 ```python
-key_info = store.get_key_info(key, flag=1)
-key_infos = store.batch_get_key_info(keys, flag=1)
+key_info = store.get_key_info(key)
+key_infos = store.batch_get_key_info(keys)
 gvas = key_info.gva_list()
 ```
+
+#### batch_add_lease
+
+```python
+results = store.batch_add_lease(keys, leaseTtlMs=0)
+```
+
+**功能**: 批量为多个 key 增加读租约，并记录后续 GVA 读取所需的读租约状态。
+
+**参数**:
+
+- `keys`: 要增加读租约的 key 列表，不能为空。
+- `leaseTtlMs`: 要增加的租约时间，单位为毫秒，默认为 `0`。为 `0` 时使用 meta 侧配置项
+  `ock.mmc.meta.lease_ttl_ms`。
+
+**返回值**:
+
+- `List[int]`: 每个元素表示对应 key 的处理结果，`0` 表示成功，其他值表示失败
+  返回列表长度与 `keys` 一致。
+
+**使用说明**:
+
+- 该接口返回每个 key 的错误码，不返回 `KeyInfo`。
+- 该接口为非事务接口；某个 key 失败不会回滚其他 key 已经成功增加的读租约。
+- `leaseTtlMs` 为 `0` 时，meta 侧使用配置项 `ock.mmc.meta.lease_ttl_ms` 的值增加租约。
+- 调用方应只对返回值为 `0` 的 key 继续执行后续基于 GVA 的读取流程。
+- 典型用法是先通过 `batch_get_key_info(keys, flag=0)` 获取 GVA，再调用 `batch_add_lease(keys)`
+  为后续基于 GVA 的读取流程建立读租约状态。
+- 同一进程对同一 key 重复调用时，会复用当前进程中已有的读租约并在 meta 侧续租；
+  完成读取后调用一次 `batch_remove_lease` 即可释放。
+
+```python
+key_infos = store.batch_get_key_info(keys, flag=0)
+gvas = [info.gva_list()[0] for info in key_infos]
+results = store.batch_add_lease(keys)
+valid_indices = [idx for idx, ret in enumerate(results) if ret == 0]
+store.batch_copy(
+    [gvas[idx] for idx in valid_indices],
+    [buffer_ptrs[idx] for idx in valid_indices],
+    [sizes[idx] for idx in valid_indices],
+    direct=SMEMB_COPY_G2L,
+)
+store.batch_remove_lease([keys[idx] for idx in valid_indices])
+```
+
+#### batch_remove_lease
+
+```python
+ret = store.batch_remove_lease(keys)
+```
+
+**功能**: 批量移除多个 key 的读租约，并清理当前进程中对应的 GVA 读取状态。
+
+**参数**:
+
+- `keys`: 要移除读租约的 key 列表，不能为空。
+
+**返回值**:
+
+- `int`: `0` 表示本地读租约检查通过并已触发移除租约请求发送流程；其他值表示失败。
+
+**使用说明**:
+
+- 调用方完成基于 GVA 的读取后，应调用该接口显式释放由 `batch_add_lease` 建立的读租约。
 
 #### batch_alloc
 
@@ -796,7 +859,10 @@ result = store.batch_copy_layers(gva_ptrs, buffer_ptrs, sizes, direct=SMEMB_COPY
 - `0`: 成功
 - 其他: 失败
 
-> 典型 GVA 流程：`batch_alloc -> batch_copy`（写入）-> `get_key_info(..., flag=1)` 或 `batch_get_key_info(..., flag=1)` -> `batch_copy` / `batch_copy_layers`（读取）
+> 典型 GVA 跨进程读取流程：
+> - 写进程：`batch_alloc -> batch_copy`（写入），完成数据写入并使 GVA 进入可读状态。
+> - 读进程：`batch_get_key_info(...)` 获取 GVA -> `batch_add_lease(...)` 增加读租约并准备 GVA 读取状态 ->
+>   `batch_copy` / `batch_copy_layers`（读取）-> `batch_remove_lease(...)` 显式释放读租约。
 
 #### register_buffer
 

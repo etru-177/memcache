@@ -195,7 +195,7 @@ virtual KeyInfo GetKeyInfo(const std::string &key, uint32_t flag = 0) = 0;
 
 **参数**:
 - `key`: 数据的键，长度小于256个字节
-- `flag`: 查询标志，默认值为 `0`；在单 blob 场景下，可传入 `MMC_QUERY_FLAG_GVA_READ_START` 为后续基于 GVA 的读取流程做准备
+- `flag`: 查询标志，默认值为 `0`
 
 **返回值**:
 返回 KeyInfo，包含：
@@ -206,7 +206,7 @@ virtual KeyInfo GetKeyInfo(const std::string &key, uint32_t flag = 0) = 0;
 - `gva_`: 数据副本对应的 GVA 列表
 
 > 补充说明：
-> `GetKeyInfo` 的实际签名带 `flag` 参数。默认值为 `0`；在单 blob 场景下，可传入 `MMC_QUERY_FLAG_GVA_READ_START` 为后续基于 GVA 的读取流程做准备。
+> `GetKeyInfo` 的实际签名带 `flag` 参数。默认值为 `0`
 > `KeyInfo` 除 `size_`、`blobNum_`、`loc_`、`type_` 外，还包含 `gva_`，用于描述每个 blob 对应的 GVA 列表。
 
 ### 4. 批量操作接口
@@ -279,7 +279,7 @@ virtual std::vector<KeyInfo> BatchGetKeyInfo(const std::vector<std::string> &key
 
 **参数**:
 - `keys`: 数据键列表（每个键长度 < 256字节）
-- `flag`: 查询标志，默认值为 `0`；在单 blob 场景下，可传入 `MMC_QUERY_FLAG_GVA_READ_START` 为后续基于 GVA 的读取流程做准备
+- `flag`: 查询标志，默认值为 `0`
 
 **返回值**:
 返回KeyInfo列表，每个KeyInfo包含：
@@ -288,6 +288,46 @@ virtual std::vector<KeyInfo> BatchGetKeyInfo(const std::vector<std::string> &key
 - `loc_`: 数据副本所在位置列表
 - `type_`: 数据副本所在介质类型列表
 - `gva_`: 数据副本对应的 GVA 列表
+
+#### BatchAddLease
+```c++
+virtual std::vector<int> BatchAddLease(const std::vector<std::string> &keys, uint64_t leaseTtlMs = 0) = 0;
+```
+**功能**: 批量为多个 key 增加读租约，并记录后续 GVA 读取所需的读租约状态。
+
+**参数**:
+- `keys`: 要增加读租约的 key 列表（每个键长度 < 256字节），不能为空
+- `leaseTtlMs`: 要增加的租约时间，单位为毫秒，默认为 `0`。为 `0` 时使用 meta 侧配置项
+  `ock.mmc.meta.lease_ttl_ms`
+
+**返回值**:
+- `std::vector<int>`: 每个元素表示对应 key 的处理结果，`0` 表示成功，其他值表示失败
+  返回列表长度与 `keys` 一致。
+
+**使用说明**:
+- 该接口返回每个 key 的错误码，不返回 `KeyInfo`。
+- 该接口为非事务接口；某个 key 失败不会回滚其他 key 已经成功增加的读租约。
+- `leaseTtlMs` 为 `0` 时，meta 侧使用配置项 `ock.mmc.meta.lease_ttl_ms` 的值增加租约。
+- 调用方应只对返回值为 `0` 的 key 继续执行后续基于 GVA 的读取流程。
+- 典型用法是先通过 `BatchGetKeyInfo(keys)` 获取 GVA，再调用 `BatchAddLease(keys)`
+  为后续基于 GVA 的读取流程建立读租约状态。
+- 同一进程对同一 key 重复调用时，会复用当前进程中已有的读租约并在 meta 侧续租；
+  完成读取后调用一次 `BatchRemoveLease` 即可释放。
+
+#### BatchRemoveLease
+```c++
+virtual int BatchRemoveLease(const std::vector<std::string> &keys) = 0;
+```
+**功能**: 批量移除多个 key 的读租约，并清理当前进程中对应的 GVA 读取状态。
+
+**参数**:
+- `keys`: 要移除读租约的 key 列表（每个键长度 < 256字节），不能为空
+
+**返回值**:
+- `int`: `0` 表示本地读租约检查通过并已触发移除租约请求发送流程；其他值表示失败。
+
+**使用说明**:
+- 调用方完成基于 GVA 的读取后，应调用该接口显式释放由 `BatchAddLease` 建立的读租约。
 
 #### BatchMalloc
 ```c++
@@ -322,7 +362,10 @@ virtual int BatchCopy(std::vector<void *> &gvas, std::vector<void *> &buffers, s
 - `0`: 成功
 - 其他: 失败
 
-> 典型 GVA 流程：`BatchMalloc -> BatchCopy`（写入）-> `GetKeyInfo(..., MMC_QUERY_FLAG_GVA_READ_START)` 或 `BatchGetKeyInfo(..., MMC_QUERY_FLAG_GVA_READ_START)` -> `BatchCopy`（读取）
+> 典型 GVA 跨进程读取流程：
+> - 写进程：`BatchMalloc -> BatchCopy`（写入），完成数据写入并使 GVA 进入可读状态。
+> - 读进程：`BatchGetKeyInfo(keys, 0)` 获取 GVA -> `BatchAddLease(...)` 增加读租约并准备 GVA 读取状态 ->
+>   `BatchCopy`（读取）-> `BatchRemoveLease(...)` 显式释放读租约。
 
 ### 5. 分层张量操作
 

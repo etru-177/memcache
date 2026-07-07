@@ -144,7 +144,7 @@ Result LocalGvaBlobInfo::ConsumePendingHole(uint64_t gva, uint64_t size, size_t 
                                                                         << ", rangeEnd:" << rangeEnd
                                                                         << ", coveredUpTo:" << coveredUpTo
                                                                         << ", holeCount:" << holes.size());
-            return MMC_ERROR;
+            return MMC_GVA_RANGE_ALREADY_WRITTEN;
         }
         coveredUpTo = std::min(rangeEnd, validateIt->second);
         ++validateIt;
@@ -190,6 +190,27 @@ bool LocalGvaBlobInfo::TryClaimReadFinish()
     }
     bool expected = false;
     return readFinishInFlight.compare_exchange_strong(expected, true);
+}
+
+Result LocalGvaBlobTracker::FindReadLeaseByKey(const std::string &key, LocalGvaBlobInfoPtr &info)
+{
+    info = nullptr;
+    std::lock_guard<std::mutex> guard(mutex_);
+    auto keyIt = blobStartByKey_.find(key);
+    if (keyIt == blobStartByKey_.end()) {
+        return MMC_UNMATCHED_KEY;
+    }
+
+    auto blobIt = blobsByStart_.find(keyIt->second);
+    if (blobIt == blobsByStart_.end() || blobIt->second == nullptr) {
+        return MMC_UNMATCHED_KEY;
+    }
+
+    info = blobIt->second;
+    if (!info->IsReadable()) {
+        return MMC_UNMATCHED_STATE;
+    }
+    return MMC_OK;
 }
 
 Result LocalGvaBlobTracker::FindReadable(uint64_t gva, uint64_t size, LocalGvaBlobInfoPtr &info)
@@ -362,6 +383,16 @@ void LocalGvaBlobTracker::Remove(uint64_t blobStartGva)
 {
     std::lock_guard<std::mutex> guard(mutex_);
     RemoveBlobLocked(blobStartGva);
+}
+
+void LocalGvaBlobTracker::RemoveByKey(const std::string &key)
+{
+    std::lock_guard<std::mutex> guard(mutex_);
+    auto keyIt = blobStartByKey_.find(key);
+    if (keyIt == blobStartByKey_.end()) {
+        return;
+    }
+    RemoveBlobLocked(keyIt->second);
 }
 
 void LocalGvaBlobTracker::MarkWriteSuccess(uint64_t blobStartGva)

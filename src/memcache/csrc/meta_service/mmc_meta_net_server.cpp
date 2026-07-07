@@ -77,6 +77,8 @@ Result ock::mmc::MetaNetServer::Start(NetEngineOptions &options)
                                       std::bind(&MetaNetServer::HandleQuery, this, std::placeholders::_1));
     server->RegRequestReceivedHandler(LOCAL_META_OPCODE_REQ::ML_BATCH_QUERY_REQ,
                                       std::bind(&MetaNetServer::HandleBatchQuery, this, std::placeholders::_1));
+    server->RegRequestReceivedHandler(LOCAL_META_OPCODE_REQ::ML_BATCH_UPDATE_LEASE_REQ,
+                                      std::bind(&MetaNetServer::HandleBatchUpdateLease, this, std::placeholders::_1));
     server->RegRequestReceivedHandler(LOCAL_META_OPCODE_REQ::ML_BATCH_ALLOC_REQ,
                                       std::bind(&MetaNetServer::HandleBatchAlloc, this, std::placeholders::_1));
     server->RegRequestReceivedHandler(LOCAL_META_OPCODE_REQ::ML_BATCH_UPDATE_BLOB_REQ,
@@ -429,6 +431,22 @@ Result MetaNetServer::HandleUbsIoMetaDelete(const NetContextPtr &context)
         MMC_LOG_WARN("HandleUbsIoMetaDelete failed, keyCount=" << req.keys_.size() << ", ret=" << ret);
     }
     UbsIoMetaDeleteResponse resp(ret);
+    return context->Reply(req.msgId, resp);
+}
+
+Result MetaNetServer::HandleBatchUpdateLease(const NetContextPtr &context)
+{
+    BatchUpdateLeaseRequest req;
+    BatchUpdateLeaseResponse resp;
+    context->GetRequest<BatchUpdateLeaseRequest>(req);
+
+    auto &metaMgrProxy = metaService_->GetMetaMgrProxy();
+    TP_TRACE_BEGIN(TP_MMC_META_BATCH_UPDATE_LEASE);
+    auto ret = metaMgrProxy->BatchUpdateLease(req, resp);
+    TP_TRACE_END(TP_MMC_META_BATCH_UPDATE_LEASE, ret);
+    (void)ret;
+    MMC_LOG_DEBUG("HandleBatchUpdateLease keys (size " << req.keys_.size() << ") finish: " << Join(req.keys_));
+
     return context->Reply(req.msgId, resp);
 }
 

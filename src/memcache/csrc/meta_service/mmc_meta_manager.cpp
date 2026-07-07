@@ -26,6 +26,66 @@ namespace mmc {
 
 constexpr int TIMEOUT_SECOND = 60;
 
+namespace {
+constexpr size_t kSingleBlobCount = 1U;
+constexpr size_t kSsdRewarmBlobCount = 2U;
+
+bool IsGvaReadableMedia(MediaType mediaType)
+{
+    return mediaType == MEDIA_HBM || mediaType == MEDIA_DRAM;
+}
+
+Result SelectReadableGvaBlob(const std::vector<MmcMemBlobPtr> &blobs, MmcMemBlobPtr &selectedBlob)
+{
+    selectedBlob = nullptr;
+    if (blobs.size() != kSingleBlobCount && blobs.size() != kSsdRewarmBlobCount) {
+        return MMC_UNMATCHED_STATE;
+    }
+
+    size_t ssdBlobCount = 0;
+    size_t gvaReadableBlobCount = 0;
+    for (const auto &blob : blobs) {
+        if (blob == nullptr) {
+            return MMC_UNMATCHED_STATE;
+        }
+
+        MediaType mediaType = static_cast<MediaType>(blob->Type());
+        if (mediaType == MEDIA_SSD) {
+            ++ssdBlobCount;
+            continue;
+        }
+
+        if (!IsGvaReadableMedia(mediaType)) {
+            return MMC_UNMATCHED_STATE;
+        }
+        ++gvaReadableBlobCount;
+        selectedBlob = blob;
+    }
+
+    if (gvaReadableBlobCount != kSingleBlobCount || selectedBlob == nullptr || selectedBlob->State() != READABLE) {
+        return MMC_UNMATCHED_STATE;
+    }
+    if (blobs.size() == kSingleBlobCount && ssdBlobCount != 0) {
+        return MMC_UNMATCHED_STATE;
+    }
+    if (blobs.size() == kSsdRewarmBlobCount && ssdBlobCount != kSingleBlobCount) {
+        return MMC_UNMATCHED_STATE;
+    }
+    return MMC_OK;
+}
+
+void FillSingleBlobQueryInfo(const MmcMemObjMetaPtr &objMeta, const MmcMemBlobPtr &blob, MemObjQueryInfo &queryInfo)
+{
+    queryInfo.blobs_.clear();
+    queryInfo.blobs_.reserve(kSingleBlobCount);
+    queryInfo.blobs_.push_back(blob->GetDesc());
+    queryInfo.numBlobs_ = static_cast<uint8_t>(queryInfo.blobs_.size());
+    queryInfo.size_ = objMeta->Size();
+    queryInfo.prot_ = objMeta->Prot();
+    queryInfo.valid_ = true;
+}
+} // namespace
+
 Result MmcMetaManager::RegisterGvaPendingWriteBlob(const std::string &key, uint64_t operateId,
                                                    const MmcMemObjMetaPtr &objMeta, const MmcMemBlobPtr &blob)
 {
@@ -1191,6 +1251,8 @@ nlohmann::json MmcMetaManager::GetAllSegmentInfo() const
 
 Result MmcMetaManager::Query(const std::string &key, uint64_t operateId, uint32_t flags, MemObjQueryInfo &queryInfo)
 {
+    (void)operateId;
+    (void)flags;
     MmcMemObjMetaPtr objMeta;
     if (metaContainer_->Get(key, objMeta) != MMC_OK || objMeta == nullptr) {
         MMC_LOG_WARN("Cannot find MmcMemObjMeta with key : " << key);
@@ -1198,19 +1260,6 @@ Result MmcMetaManager::Query(const std::string &key, uint64_t operateId, uint32_
     }
 
     std::unique_lock<std::mutex> guard(objMeta->Mutex());
-    if ((flags & MMC_QUERY_FLAG_GVA_READ_START) != 0) {
-        std::vector<MmcMemBlobPtr> readableCandidates = objMeta->GetBlobs();
-        if (readableCandidates.size() == 1 && readableCandidates[0] != nullptr &&
-            readableCandidates[0]->State() == READABLE) {
-            uint32_t opRankId = GetRankIdByOperateId(operateId);
-            uint32_t opSeq = GetSequenceByOperateId(operateId);
-            Result ret = readableCandidates[0]->UpdateState(key, opRankId, opSeq, MMC_READ_START);
-            if (ret != MMC_OK) {
-                MMC_LOG_ERROR("Query update state to READ_START failed for key:" << key << ", ret:" << ret);
-                return ret;
-            }
-        }
-    }
     std::vector<MmcMemBlobDesc> blobs;
     objMeta->GetBlobsDesc(blobs);
     queryInfo.blobs_.clear();
@@ -1227,6 +1276,67 @@ Result MmcMetaManager::Query(const std::string &key, uint64_t operateId, uint32_
     queryInfo.size_ = objMeta->Size();
     queryInfo.prot_ = objMeta->Prot();
     queryInfo.valid_ = true;
+    return MMC_OK;
+}
+
+Result MmcMetaManager::AddLease(const std::string &key, uint64_t operateId, uint64_t leaseTtlMs,
+                                MemObjQueryInfo &queryInfo)
+{
+    const uint64_t actualLeaseTtlMs = leaseTtlMs == 0 ? defaultTtlMs_ : leaseTtlMs;
+    MmcMemObjMetaPtr objMeta;
+    if (metaContainer_->Get(key, objMeta) != MMC_OK || objMeta == nullptr) {
+        MMC_LOG_WARN("Cannot find MmcMemObjMeta with key : " << key);
+        return MMC_UNMATCHED_KEY;
+    }
+
+    std::unique_lock<std::mutex> guard(objMeta->Mutex());
+    std::vector<MmcMemBlobPtr> blobs = objMeta->GetBlobs();
+    MmcMemBlobPtr selectedBlob = nullptr;
+    Result ret = SelectReadableGvaBlob(blobs, selectedBlob);
+    if (ret != MMC_OK) {
+        MMC_LOG_ERROR("AddLease requires one readable GVA blob, optionally with one SSD blob, key:"
+                      << key << ", blobNum:" << blobs.size());
+        return ret;
+    }
+
+    uint32_t opRankId = GetRankIdByOperateId(operateId);
+    uint32_t opSeq = GetSequenceByOperateId(operateId);
+    ret = selectedBlob->ExtendLease(opRankId, opSeq, actualLeaseTtlMs);
+    if (ret != MMC_OK) {
+        MMC_LOG_ERROR("AddLease failed for key:" << key << ", ret:" << ret
+                                                 << ", leaseTtlMs:" << actualLeaseTtlMs);
+        return ret;
+    }
+
+    FillSingleBlobQueryInfo(objMeta, selectedBlob, queryInfo);
+    return MMC_OK;
+}
+
+Result MmcMetaManager::RemoveLease(const std::string &key, uint64_t operateId)
+{
+    MmcMemObjMetaPtr objMeta;
+    if (metaContainer_->Get(key, objMeta) != MMC_OK || objMeta == nullptr) {
+        MMC_LOG_WARN("Cannot find MmcMemObjMeta with key : " << key);
+        return MMC_UNMATCHED_KEY;
+    }
+
+    std::unique_lock<std::mutex> guard(objMeta->Mutex());
+    std::vector<MmcMemBlobPtr> blobs = objMeta->GetBlobs();
+    MmcMemBlobPtr selectedBlob = nullptr;
+    Result ret = SelectReadableGvaBlob(blobs, selectedBlob);
+    if (ret != MMC_OK) {
+        MMC_LOG_ERROR("RemoveLease requires one readable GVA blob, optionally with one SSD blob, key:"
+                      << key << ", blobNum:" << blobs.size());
+        return ret;
+    }
+
+    uint32_t opRankId = GetRankIdByOperateId(operateId);
+    uint32_t opSeq = GetSequenceByOperateId(operateId);
+    ret = selectedBlob->UpdateState(key, opRankId, opSeq, MMC_READ_FINISH);
+    if (ret != MMC_OK) {
+        MMC_LOG_ERROR("RemoveLease failed for key:" << key << ", ret:" << ret);
+        return ret;
+    }
     return MMC_OK;
 }
 

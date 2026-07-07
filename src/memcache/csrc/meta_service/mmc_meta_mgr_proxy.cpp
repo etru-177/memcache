@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <cctype>
 #include <future>
+#include <utility>
 
 namespace {
 
@@ -191,6 +192,68 @@ Result MmcMetaMgrProxy::BatchUpdateBlobState(const BatchUpdateBlobRequest &req, 
                                              << ", action:" << req.actionResults_[i] << " failed, error: " << ret);
         }
         resp.results_.push_back(ret);
+    }
+    return MMC_OK;
+}
+
+Result MmcMetaMgrProxy::BatchUpdateLease(const BatchUpdateLeaseRequest &req, BatchUpdateLeaseResponse &resp)
+{
+    resp.ret_ = MMC_OK;
+    resp.results_.clear();
+    resp.batchQueryInfos_.clear();
+    if (req.keys_.empty()) {
+        MMC_LOG_ERROR("BatchUpdateLease invalid input, key count:" << req.keys_.size());
+        resp.ret_ = MMC_INVALID_PARAM;
+        return MMC_OK;
+    }
+    if (req.operateIds_.size() != req.keys_.size()) {
+        MMC_LOG_ERROR("BatchUpdateLease invalid operateId count, key count:" << req.keys_.size()
+                                                                             << ", operateId count:"
+                                                                             << req.operateIds_.size());
+        resp.ret_ = MMC_INVALID_PARAM;
+        return MMC_OK;
+    }
+
+    if (req.flag_ != 0 && req.flag_ != 1) {
+        MMC_LOG_ERROR("BatchUpdateLease invalid flag:" << req.flag_);
+        resp.ret_ = MMC_INVALID_PARAM;
+        return MMC_OK;
+    }
+
+    resp.results_.resize(req.keys_.size(), MMC_ERROR);
+    if (req.flag_ == 1) {
+        for (size_t i = 0; i < req.keys_.size(); ++i) {
+            const auto &key = req.keys_[i];
+            Result ret = metaMangerPtr_->RemoveLease(key, req.operateIds_[i]);
+            if (ret != MMC_OK) {
+                MMC_LOG_ERROR("BatchUpdateLease remove lease failed for key:" << key << ", ret:" << ret);
+                resp.results_[i] = ret;
+                continue;
+            }
+            resp.results_[i] = MMC_OK;
+        }
+        return MMC_OK;
+    }
+
+    resp.batchQueryInfos_.resize(req.keys_.size());
+    constexpr size_t singleBlobCount = 1U;
+    for (size_t i = 0; i < req.keys_.size(); ++i) {
+        const auto &key = req.keys_[i];
+        MemObjQueryInfo queryInfo;
+        Result ret = metaMangerPtr_->AddLease(key, req.operateIds_[i], req.leaseTtlMs_, queryInfo);
+        if (ret != MMC_OK) {
+            MMC_LOG_ERROR("BatchUpdateLease add lease failed for key:" << key << ", ret:" << ret);
+            resp.results_[i] = ret;
+            continue;
+        }
+
+        if (!queryInfo.valid_ || queryInfo.numBlobs_ != singleBlobCount || queryInfo.blobs_.size() != singleBlobCount) {
+            MMC_LOG_ERROR("BatchUpdateLease got invalid query info for key:" << key);
+            resp.results_[i] = MMC_ERROR;
+            continue;
+        }
+        resp.results_[i] = MMC_OK;
+        resp.batchQueryInfos_[i] = std::move(queryInfo);
     }
     return MMC_OK;
 }

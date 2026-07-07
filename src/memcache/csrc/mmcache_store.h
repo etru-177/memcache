@@ -132,6 +132,10 @@ public:
 
     std::vector<KeyInfo> BatchGetKeyInfo(const std::vector<std::string> &keys, uint32_t flag = 0) override;
 
+    std::vector<int> BatchAddLease(const std::vector<std::string> &keys, uint64_t leaseTtlMs = 0) override;
+
+    int BatchRemoveLease(const std::vector<std::string> &keys) override;
+
     std::vector<uintptr_t> BatchMalloc(const std::vector<std::string> &keys, const std::vector<size_t> &sizes,
                                        uint16_t media) override;
 

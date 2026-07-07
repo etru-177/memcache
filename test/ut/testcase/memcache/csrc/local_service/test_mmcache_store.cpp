@@ -389,18 +389,23 @@ TEST_F(TestMmcacheStore, BatchMalloc)
     EXPECT_EQ(ret, MMC_UNMATCHED_STATE);
     ret = store->BatchCopy(gvas, buffer2, sizes, 1);
     EXPECT_EQ(ret, MMC_UNMATCHED_STATE);
-    auto infos = store->BatchGetKeyInfo(keys, MMC_QUERY_FLAG_GVA_READ_START);
+    auto infos = store->BatchGetKeyInfo(keys);
     EXPECT_EQ(infos.size(), keys.size());
+    auto leaseResults = store->BatchAddLease(keys);
+    EXPECT_EQ(leaseResults, std::vector<int>(keys.size(), MMC_OK));
     ret = store->BatchCopy(gvas, buffer2, sizes, 1);
     EXPECT_EQ(ret, 0);
     for (auto i = 0; i < sizes.size(); ++i) {
         ret = memcmp(buffer1[i], buffer2[i], sizes[i]);
     }
-    auto leaseInfos = store->BatchGetKeyInfo(keys, MMC_QUERY_FLAG_GVA_READ_START);
-    EXPECT_EQ(leaseInfos.size(), keys.size());
+    auto removeLeaseRet = store->BatchRemoveLease(keys);
+    EXPECT_EQ(removeLeaseRet, MMC_OK);
+    leaseResults = store->BatchAddLease(keys);
+    EXPECT_EQ(leaseResults, std::vector<int>(keys.size(), MMC_OK));
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
     ret = store->BatchCopy(gvas, buffer2, sizes, 1);
     EXPECT_EQ(ret, MMC_LEASE_EXPIRED);
+    store->BatchRemoveLease(keys);
 
     store->BatchRemove(keys);
     store->TearDown();
@@ -874,8 +879,10 @@ TEST_F(TestMmcacheStore, BatchMallocLeaseCleanUp)
     ret = store->BatchCopy(gvas, buffer1, sizes, 0);
     EXPECT_EQ(ret, 0);
 
-    auto infos = store->BatchGetKeyInfo(keys, MMC_QUERY_FLAG_GVA_READ_START);
+    auto infos = store->BatchGetKeyInfo(keys);
     EXPECT_EQ(infos.size(), keys.size());
+    auto leaseResults = store->BatchAddLease(keys);
+    EXPECT_EQ(leaseResults, std::vector<int>(keys.size(), MMC_OK));
 
     std::this_thread::sleep_for(std::chrono::seconds(4));
     ret = store->BatchCopy(gvas, buffer2, sizes, 1);

@@ -76,6 +76,10 @@ public:
     Result BatchQuery(const std::vector<std::string> &keys, std::vector<mmc_data_info> &query_infos,
                       uint32_t flags);
 
+    Result BatchAddLease(const std::vector<std::string> &keys, uint64_t leaseTtlMs, std::vector<int> &results);
+
+    Result BatchRemoveLease(const std::vector<std::string> &keys);
+
     Result BatchMalloc(const std::vector<std::string> &keys, const std::vector<size_t> &sizes,
                        const mmc_put_options &options, std::vector<uintptr_t> &gvas);
 
@@ -143,6 +147,8 @@ private:
                       std::vector<int> &batchResult);
     void SyncUpdateState(BatchUpdateRequest &updateRequest);
     void AsyncUpdateState(BatchUpdateRequest &updateRequest);
+    void SyncUpdateLease(BatchUpdateLeaseRequest &request);
+    void AsyncUpdateLease(BatchUpdateLeaseRequest &request);
     Result SyncUpdateBlobByGva(BatchUpdateBlobRequest &updateRequest);
     std::future<int32_t> SubmitPutTask(BatchCopyDesc &copyDesc, MediaType mediaType, bool asyncExec);
     std::future<int32_t> SubmitGetTask(BatchCopyDesc &copyDesc, MediaType mediaType, bool asyncExec);
@@ -153,7 +159,7 @@ private:
     Result BatchCopyReadPath(std::vector<void *> &gvas, std::vector<void *> &buffers,
                              std::vector<size_t> &sizes, int32_t direct);
     Result NotifyUpdateBlobByGva(const std::vector<void *> &gvas, const std::vector<size_t> &sizes,
-                                 const std::vector<BlobActionResult> &actions);
+                                  const std::vector<BlobActionResult> &actions);
     Result RegisterPeriodicTask(const std::string &taskName, uint32_t intervalSeconds, MmcPeriodicTask::Task task);
     void ProcessExpiredReadLeases();
     Result ExecuteConcurrently(const std::vector<void *> &gvas, const std::vector<void *> &buffers,

@@ -19,7 +19,6 @@
 #define PROTOCOL_SIZE      64
 #define TLS_PATH_SIZE      256
 #define TLS_PATH_MAX_LEN   (TLS_PATH_SIZE - 1)
-#define MMC_QUERY_FLAG_GVA_READ_START (1U << 0)
 
 #ifdef __cplusplus
 extern "C" {

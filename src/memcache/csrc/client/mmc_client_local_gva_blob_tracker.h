@@ -48,6 +48,7 @@ public:
     Result RegisterFromBatchAlloc(const std::string &key, const MmcMemBlobDesc &blob);
     Result UpdateFromQuery(const std::string &key, const MmcMemBlobDesc &blob, uint64_t operateId,
                            uint64_t leaseDeadlineMs);
+    Result FindReadLeaseByKey(const std::string &key, LocalGvaBlobInfoPtr &info);
     Result FindWritable(uint64_t gva, uint64_t size, LocalGvaBlobInfoPtr &info);
     Result FindReadable(uint64_t gva, uint64_t size, LocalGvaBlobInfoPtr &info);
     Result FinalizeWriteTracking(const std::vector<void *> &gvas, const std::vector<size_t> &sizes,
@@ -61,6 +62,7 @@ public:
     void MarkWriteSuccess(uint64_t blobStartGva);
     void CollectExpired(std::vector<LocalGvaBlobInfoPtr> &infos);
     void Remove(uint64_t blobStartGva);
+    void RemoveByKey(const std::string &key);
     void Clear();
 
 private:

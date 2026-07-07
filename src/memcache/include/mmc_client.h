@@ -103,6 +103,51 @@ int32_t mmcc_query(const char *key, mmc_data_info *info, uint32_t flags);
 int32_t mmcc_batch_query(const char **keys, size_t keys_count, mmc_data_info *info, uint32_t flags);
 
 /**
+ * @brief Add read leases for multiple keys
+ *
+ * @param keys             [in] keys of data, the length of key is less than 256
+ * @param keys_count       [in] Count of keys
+ * @param lease_ttl_ms     [in] Lease time to add, in milliseconds. If 0, use meta service configured lease TTL
+ * @param results          [out] Results of each add lease operation
+ * @return 0 if successfully
+ */
+int32_t mmcc_batch_add_lease(const char **keys, uint32_t keys_count, uint64_t lease_ttl_ms, int32_t *results);
+
+/**
+ * @brief Remove read leases for multiple keys
+ *
+ * @param keys             [in] keys of data, the length of key is less than 256
+ * @param keys_count       [in] Count of keys
+ * @return 0 if local remove-lease handling succeeds
+ */
+int32_t mmcc_batch_remove_lease(const char **keys, uint32_t keys_count);
+
+/**
+ * @brief Allocate GVA blobs for multiple keys
+ *
+ * @param keys             [in] keys of data, the length of key is less than 256
+ * @param keys_count       [in] Count of keys
+ * @param sizes            [in] Size of each GVA blob
+ * @param options          [in] Options for allocation
+ * @param gvas             [out] Allocated GVA of each key, 0 if allocation failed for that key
+ * @return 0 if successfully
+ */
+int32_t mmcc_batch_malloc(const char **keys, uint32_t keys_count, const size_t *sizes, mmc_put_options options,
+                          uint64_t *gvas);
+
+/**
+ * @brief Copy data between GVA addresses and local buffers
+ *
+ * @param gvas             [in] GVA addresses
+ * @param buffers          [in/out] Local buffers
+ * @param sizes            [in] Copy size of each GVA range
+ * @param count            [in] Count of GVA ranges
+ * @param direct           [in] Copy direction
+ * @return 0 if successfully
+ */
+int32_t mmcc_batch_copy(const uint64_t *gvas, void **buffers, const size_t *sizes, uint32_t count, int32_t direct);
+
+/**
  * @brief Remove the object with key from Distributed Memory Cache
  * This data operation supports both sync and async
  *

@@ -54,6 +54,7 @@ enum LOCAL_META_OPCODE_REQ : int16_t {
     LM_BLOB_DELETE_REQ = 20,   /* delete SSD blob data */
     LM_BATCH_BLOB_COPY_REQ = 21, /* batch copy blobs for rewarm by rank */
     ML_UBSIO_META_DELETE_REQ = 23,  /* UBS IO DELETE metadata event from LS to MS */
+    ML_BATCH_UPDATE_LEASE_REQ = 24, /* add or remove read leases by keys in batch */
 };
 
 enum LOCAL_META_OPCODE_RESP : int16_t {
@@ -69,6 +70,7 @@ enum LOCAL_META_OPCODE_RESP : int16_t {
     ML_QUERY_RESP = 9,
     ML_BATCH_QUERY_RESP = 10,
     ML_BATCH_UPDATE_RESP = 11,
+    ML_BATCH_UPDATE_LEASE_RESP = 12,
     LM_BLOB_DELETE_RSP = 20,   /* delete SSD blob data response */
     LM_BATCH_BLOB_COPY_RSP = 21, /* batch copy blobs response */
     ML_UBSIO_META_DELETE_RESP = 23,  /* UBS IO DELETE metadata event response */

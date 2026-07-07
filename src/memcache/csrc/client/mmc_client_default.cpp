@@ -17,6 +17,7 @@
 #include "mmc_montotonic.h"
 #include "mmc_ptracer.h"
 
+#include <algorithm>
 #include <chrono>
 
 namespace ock {
@@ -621,15 +622,6 @@ Result MmcClientDefault::Query(const std::string &key, mmc_data_info &query_info
         query_info.types[i] = response.queryInfo_.blobs_[i].mediaType_;
         query_info.gvas[i] = response.queryInfo_.blobs_[i].gva_;
     }
-    if ((flags & MMC_QUERY_FLAG_GVA_READ_START) != 0 && query_info.valid && query_info.numBlobs == 1 &&
-        !response.queryInfo_.blobs_.empty()) {
-        Result trackRet = gvaBlobTracker_.UpdateFromQuery(key, response.queryInfo_.blobs_[0], operateId,
-            ToLocalLeaseDeadlineMs(response.queryInfo_.blobs_[0]));
-        if (trackRet != MMC_OK) {
-            MMC_LOG_ERROR("failed to track query result for key " << key << ", ret:" << trackRet);
-            return trackRet;
-        }
-    }
     return MMC_OK;
 }
 
@@ -677,16 +669,106 @@ Result MmcClientDefault::BatchQuery(const std::vector<std::string> &keys, std::v
         outInfo.size = info.size_;
         outInfo.prot = info.prot_;
         outInfo.numBlobs = static_cast<uint8_t>(queryBlobCount);
-        if ((flags & MMC_QUERY_FLAG_GVA_READ_START) != 0 && outInfo.valid && outInfo.numBlobs == 1 &&
-            !info.blobs_.empty()) {
-            Result trackRet = gvaBlobTracker_.UpdateFromQuery(keys[idx], info.blobs_[0],
-                operateId, ToLocalLeaseDeadlineMs(info.blobs_[0]));
-            if (trackRet != MMC_OK) {
-                MMC_LOG_ERROR("failed to track batch query result for key " << keys[idx] << ", ret:" << trackRet);
-                outInfo = {};
-            }
-        }
         query_infos.push_back(outInfo);
+    }
+    return MMC_OK;
+}
+
+Result MmcClientDefault::BatchAddLease(const std::vector<std::string> &keys, uint64_t leaseTtlMs,
+                                       std::vector<int> &results)
+{
+    results.assign(keys.size(), MMC_INVALID_PARAM);
+    if (metaNetClient_ == nullptr) {
+        results.assign(keys.size(), MMC_CLIENT_NOT_INIT);
+        MMC_LOG_ERROR("MetaNetClient is null");
+        return MMC_CLIENT_NOT_INIT;
+    }
+    if (keys.empty()) {
+        MMC_LOG_ERROR("client " << name_ << " batch add lease invalid input, key size:" << keys.size());
+        return MMC_INVALID_PARAM;
+    }
+
+    const uint64_t newOperateId = GenerateOperateId(rankId_);
+    std::vector<uint64_t> operateIds;
+    operateIds.reserve(keys.size());
+    for (const auto &key : keys) {
+        LocalGvaBlobInfoPtr info{};
+        Result findRet = gvaBlobTracker_.FindReadLeaseByKey(key, info);
+        operateIds.push_back(findRet == MMC_OK && info != nullptr ? info->operateId : newOperateId);
+    }
+    BatchUpdateLeaseRequest request{keys, operateIds, leaseTtlMs};
+    BatchUpdateLeaseResponse response;
+    Result rpcRet = metaNetClient_->SyncCall(request, response, rpcRetryTimeOut_);
+    if (rpcRet != MMC_OK) {
+        MMC_LOG_ERROR("client " << name_ << " batch add lease failed");
+        results.assign(keys.size(), rpcRet);
+        return rpcRet;
+    }
+    if (response.ret_ != MMC_OK) {
+        results.assign(keys.size(), response.ret_);
+        return response.ret_;
+    }
+
+    if (response.results_.size() != keys.size() || response.batchQueryInfos_.size() != keys.size()) {
+        MMC_LOG_ERROR("client " << name_ << " batch add lease response size mismatch: expected " << keys.size()
+                                << ", result size:" << response.results_.size()
+                                << ", info size:" << response.batchQueryInfos_.size());
+        results.assign(keys.size(), MMC_ERROR);
+        return MMC_ERROR;
+    }
+
+    results = response.results_;
+    for (size_t i = 0; i < response.batchQueryInfos_.size(); ++i) {
+        if (results[i] != MMC_OK) {
+            continue;
+        }
+        const auto &queryInfo = response.batchQueryInfos_[i];
+        if (!queryInfo.valid_ || queryInfo.numBlobs_ != 1U || queryInfo.blobs_.size() != 1U) {
+            MMC_LOG_ERROR("client " << name_ << " batch add lease got invalid query info for key " << keys[i]);
+            results[i] = MMC_ERROR;
+            continue;
+        }
+
+        const auto &blob = queryInfo.blobs_[0];
+        Result trackRet = gvaBlobTracker_.UpdateFromQuery(keys[i], blob, operateIds[i],
+                                                          ToLocalLeaseDeadlineMs(blob));
+        if (trackRet != MMC_OK) {
+            MMC_LOG_ERROR("client " << name_ << " batch add lease track failed for key " << keys[i]
+                                    << ", ret:" << trackRet);
+            results[i] = trackRet;
+        }
+    }
+    return MMC_OK;
+}
+
+Result MmcClientDefault::BatchRemoveLease(const std::vector<std::string> &keys)
+{
+    if (metaNetClient_ == nullptr) {
+        MMC_LOG_ERROR("MetaNetClient is null");
+        return MMC_CLIENT_NOT_INIT;
+    }
+    if (keys.empty()) {
+        MMC_LOG_ERROR("client " << name_ << " batch remove lease invalid input, key size:" << keys.size());
+        return MMC_INVALID_PARAM;
+    }
+
+    std::vector<uint64_t> operateIds;
+    operateIds.reserve(keys.size());
+    for (size_t i = 0; i < keys.size(); ++i) {
+        LocalGvaBlobInfoPtr info{};
+        Result findRet = gvaBlobTracker_.FindReadLeaseByKey(keys[i], info);
+        if (findRet != MMC_OK) {
+            MMC_LOG_ERROR("client " << name_ << " batch remove lease find local gva info failed, key:" << keys[i]
+                                    << ", ret:" << findRet);
+            return findRet;
+        }
+        operateIds.push_back(info->operateId);
+    }
+
+    BatchUpdateLeaseRequest request{keys, operateIds, 0, 1};
+    AsyncUpdateLease(request);
+    for (const auto &key : keys) {
+        gvaBlobTracker_.RemoveByKey(key);
     }
     return MMC_OK;
 }
@@ -786,6 +868,41 @@ void MmcClientDefault::AsyncUpdateState(BatchUpdateRequest &updateRequest)
                                        updateRequest);
     if (!future.valid()) {
         SyncUpdateState(updateRequest);
+    }
+}
+
+void MmcClientDefault::SyncUpdateLease(BatchUpdateLeaseRequest &request)
+{
+    TP_TRACE_BEGIN(TP_MMC_LOCAL_BATCH_UPDATE);
+    BatchUpdateLeaseResponse response;
+    Result updateResult = metaNetClient_->SyncCall(request, response, rpcRetryTimeOut_);
+    TP_TRACE_END(TP_MMC_LOCAL_BATCH_UPDATE, updateResult);
+    if (updateResult != MMC_OK) {
+        MMC_LOG_ERROR("client " << name_ << " batch update lease failed:" << updateResult);
+        return;
+    }
+    if (response.ret_ != MMC_OK) {
+        MMC_LOG_ERROR("client " << name_ << " batch update lease response failed:" << response.ret_);
+        return;
+    }
+    if (response.results_.size() != request.keys_.size()) {
+        MMC_LOG_ERROR("client " << name_ << " batch update lease response size mismatch, key size:"
+                                << request.keys_.size() << ", ret size:" << response.results_.size());
+        return;
+    }
+    for (size_t i = 0; i < request.keys_.size() && i < response.results_.size(); ++i) {
+        if (response.results_[i] != MMC_OK) {
+            MMC_LOG_ERROR("client " << name_ << " batch update lease for key " << request.keys_[i]
+                                    << " failed:" << response.results_[i]);
+        }
+    }
+}
+
+void MmcClientDefault::AsyncUpdateLease(BatchUpdateLeaseRequest &request)
+{
+    auto future = threadPool_->Enqueue([&](BatchUpdateLeaseRequest requestL) { SyncUpdateLease(requestL); }, request);
+    if (!future.valid()) {
+        SyncUpdateLease(request);
     }
 }
 
@@ -1141,9 +1258,7 @@ Result MmcClientDefault::BatchCopyReadPath(std::vector<void *> &gvas, std::vecto
                                            std::vector<size_t> &sizes, int32_t direct)
 {
     std::vector<LocalGvaBlobInfoPtr> readInfos;
-    std::vector<LocalGvaBlobInfoPtr> claimedInfos;
     readInfos.reserve(gvas.size());
-    claimedInfos.reserve(gvas.size());
     for (size_t i = 0; i < gvas.size(); ++i) {
         LocalGvaBlobInfoPtr info{};
         Result findRet = gvaBlobTracker_.FindReadable(reinterpret_cast<uint64_t>(gvas[i]), sizes[i], info);
@@ -1161,21 +1276,12 @@ Result MmcClientDefault::BatchCopyReadPath(std::vector<void *> &gvas, std::vecto
         return readResult;
     }
 
-    bool hasLeaseExpired = false;
-    Result claimRet = gvaBlobTracker_.ConsumeReadRangesAndCollectClaims(gvas, sizes, readInfos, hasLeaseExpired,
-                                                                        claimedInfos);
-    if (claimRet != MMC_OK) {
-        return claimRet;
-    }
-
-    Result finishRet = NotifyReadFinishClaims(claimedInfos);
-    if (finishRet != MMC_OK) {
-        MMC_LOG_ERROR("client " << name_ << " batch copy read notify read finish failed.");
-        return finishRet;
-    }
-    if (hasLeaseExpired) {
-        MMC_LOG_ERROR("client " << name_ << " batch copy read lease expired.");
-        return MMC_LEASE_EXPIRED;
+    const uint64_t nowMs = NowMs();
+    for (const auto &info : readInfos) {
+        if (info != nullptr && info->IsLeaseExpired(nowMs)) {
+            MMC_LOG_ERROR("client " << name_ << " batch copy read lease expired.");
+            return MMC_LEASE_EXPIRED;
+        }
     }
     return MMC_OK;
 }

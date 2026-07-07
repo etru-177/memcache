@@ -946,6 +946,39 @@ std::vector<mmc_buffer> MmcacheStore::GetBatch(const std::vector<std::string> &k
     return buffers;
 }
 
+std::vector<int> MmcacheStore::BatchAddLease(const std::vector<std::string> &keys, uint64_t leaseTtlMs)
+{
+    if (keys.empty()) {
+        MMC_LOG_ERROR("Invalid batch add lease input, key size:" << keys.size());
+        return {};
+    }
+    std::vector<int> results(keys.size(), MMC_INVALID_PARAM);
+    std::vector<const char *> keyArray(keys.size());
+    for (size_t i = 0; i < keys.size(); ++i) {
+        keyArray[i] = keys[i].c_str();
+    }
+    TP_TRACE_BEGIN(TP_MMC_PY_BATCH_ADD_LEASE);
+    Result ret = mmcc_batch_add_lease(keyArray.data(), keys.size(), leaseTtlMs, results.data());
+    TP_TRACE_END(TP_MMC_PY_BATCH_ADD_LEASE, ret);
+    return results;
+}
+
+int MmcacheStore::BatchRemoveLease(const std::vector<std::string> &keys)
+{
+    if (keys.empty()) {
+        MMC_LOG_ERROR("Invalid batch remove lease input, key size:" << keys.size());
+        return MMC_INVALID_PARAM;
+    }
+    std::vector<const char *> keyArray(keys.size());
+    for (size_t i = 0; i < keys.size(); ++i) {
+        keyArray[i] = keys[i].c_str();
+    }
+    TP_TRACE_BEGIN(TP_MMC_PY_BATCH_REMOVE_LEASE);
+    Result ret = mmcc_batch_remove_lease(keyArray.data(), keys.size());
+    TP_TRACE_END(TP_MMC_PY_BATCH_REMOVE_LEASE, ret);
+    return ret;
+}
+
 std::vector<uintptr_t> MmcacheStore::BatchMalloc(const std::vector<std::string> &keys, const std::vector<size_t> &sizes,
                                                  uint16_t media)
 {
@@ -967,14 +1000,36 @@ std::vector<uintptr_t> MmcacheStore::BatchMalloc(const std::vector<std::string> 
     options.policy = NATIVE_AFFINITY;
     options.replicaNum = 1;
     std::fill(std::begin(options.preferredLocalServiceIDs), std::end(options.preferredLocalServiceIDs), -1);
-    MmcClientDefault::GetInstance()->BatchMalloc(keys, sizes, options, gvas);
+    std::vector<const char *> keyArray(keys.size());
+    for (size_t i = 0; i < keys.size(); ++i) {
+        keyArray[i] = keys[i].c_str();
+    }
+    std::vector<uint64_t> gvaValues(keys.size(), 0);
+    TP_TRACE_BEGIN(TP_MMC_PY_BATCH_ALLOC);
+    Result ret = mmcc_batch_malloc(keyArray.data(), keys.size(), sizes.data(), options, gvaValues.data());
+    TP_TRACE_END(TP_MMC_PY_BATCH_ALLOC, ret);
+    for (size_t i = 0; i < gvaValues.size(); ++i) {
+        gvas[i] = static_cast<uintptr_t>(gvaValues[i]);
+    }
     return gvas;
 }
 
 int MmcacheStore::BatchCopy(std::vector<void *> &gvas, std::vector<void *> &buffers, std::vector<size_t> &sizes,
                             const int32_t direct)
 {
-    return MmcClientDefault::GetInstance()->BatchCopy(gvas, buffers, sizes, direct);
+    if (gvas.size() != buffers.size() || gvas.size() != sizes.size()) {
+        MMC_LOG_ERROR("Input vector sizes mismatch: gvas=" << gvas.size() << ", buffers=" << buffers.size()
+                                                           << ", sizes=" << sizes.size());
+        return MMC_INVALID_PARAM;
+    }
+    std::vector<uint64_t> gvaValues(gvas.size(), 0);
+    for (size_t i = 0; i < gvas.size(); ++i) {
+        gvaValues[i] = reinterpret_cast<uint64_t>(gvas[i]);
+    }
+    TP_TRACE_BEGIN(TP_MMC_PY_BATCH_COPY);
+    Result ret = mmcc_batch_copy(gvaValues.data(), buffers.data(), sizes.data(), sizes.size(), direct);
+    TP_TRACE_END(TP_MMC_PY_BATCH_COPY, ret);
+    return ret;
 }
 
 } // namespace mmc

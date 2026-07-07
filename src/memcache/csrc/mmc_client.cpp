@@ -18,6 +18,20 @@ using namespace ock::mmc;
 namespace {
 constexpr int BUF_TYPE_BASE = 2;
 constexpr int MAX_KEY_LEN = 256;
+
+Result ValidateBatchKey(const char *key, size_t index)
+{
+    if (key == nullptr) {
+        MMC_LOG_ERROR("Get invalid key nullptr on idx [" << index << "]");
+        return MMC_INVALID_PARAM;
+    }
+    size_t keyLen = strlen(key);
+    if (keyLen == 0 || keyLen > MAX_KEY_LEN) {
+        MMC_LOG_ERROR("Get invalid key: \"" << key << "\" on idx [" << index << "]");
+        return MMC_INVALID_PARAM;
+    }
+    return MMC_OK;
+}
 } // namespace
 
 MMC_API int32_t mmcc_init(mmc_client_config_t *config)
@@ -148,6 +162,126 @@ MMC_API int32_t mmcc_batch_query(const char **keys, size_t keys_count, mmc_data_
         }
     }
     return MMC_OK;
+}
+
+MMC_API int32_t mmcc_batch_add_lease(const char **keys, uint32_t keys_count, uint64_t lease_ttl_ms, int32_t *results)
+{
+    MMC_VALIDATE_RETURN(MmcClientDefault::GetInstance() != nullptr, "client is not initialize", MMC_CLIENT_NOT_INIT);
+    MMC_VALIDATE_RETURN(keys != nullptr, "invalid param, keys is null", MMC_INVALID_PARAM);
+    MMC_VALIDATE_RETURN(keys_count != 0, "invalid param, keys_count: " << keys_count, MMC_INVALID_PARAM);
+    MMC_VALIDATE_RETURN(results != nullptr, "invalid param, results is null", MMC_INVALID_PARAM);
+
+    std::vector<std::string> keysVector;
+    std::vector<size_t> validIndices;
+    keysVector.reserve(keys_count);
+    validIndices.reserve(keys_count);
+    for (size_t i = 0; i < keys_count; ++i) {
+        results[i] = MMC_INVALID_PARAM;
+        Result keyRet = ValidateBatchKey(keys[i], i);
+        if (keyRet != MMC_OK) {
+            results[i] = keyRet;
+            continue;
+        }
+        keysVector.emplace_back(keys[i]);
+        validIndices.emplace_back(i);
+    }
+    if (keysVector.empty()) {
+        return MMC_INVALID_PARAM;
+    }
+
+    std::vector<int> leaseResults;
+    Result ret = MmcClientDefault::GetInstance()->BatchAddLease(keysVector, lease_ttl_ms, leaseResults);
+    if (leaseResults.size() != keysVector.size()) {
+        MMC_LOG_ERROR("invalid add lease results' size (" << leaseResults.size() << "), should be "
+                                                          << keysVector.size());
+        for (auto index : validIndices) {
+            results[index] = ret == MMC_OK ? MMC_ERROR : ret;
+        }
+        return ret == MMC_OK ? MMC_ERROR : ret;
+    }
+    for (size_t i = 0; i < leaseResults.size(); ++i) {
+        results[validIndices[i]] = leaseResults[i];
+    }
+    return ret;
+}
+
+MMC_API int32_t mmcc_batch_remove_lease(const char **keys, uint32_t keys_count)
+{
+    MMC_VALIDATE_RETURN(MmcClientDefault::GetInstance() != nullptr, "client is not initialize", MMC_CLIENT_NOT_INIT);
+    MMC_VALIDATE_RETURN(keys != nullptr, "invalid param, keys is null", MMC_INVALID_PARAM);
+    MMC_VALIDATE_RETURN(keys_count != 0, "invalid param, keys_count: " << keys_count, MMC_INVALID_PARAM);
+
+    std::vector<std::string> keysVector;
+    keysVector.reserve(keys_count);
+    for (size_t i = 0; i < keys_count; ++i) {
+        MMC_RETURN_ERROR(ValidateBatchKey(keys[i], i), "invalid key for batch remove lease");
+        keysVector.emplace_back(keys[i]);
+    }
+    return MmcClientDefault::GetInstance()->BatchRemoveLease(keysVector);
+}
+
+MMC_API int32_t mmcc_batch_malloc(const char **keys, uint32_t keys_count, const size_t *sizes,
+                                  mmc_put_options options, uint64_t *gvas)
+{
+    MMC_VALIDATE_RETURN(MmcClientDefault::GetInstance() != nullptr, "client is not initialize", MMC_CLIENT_NOT_INIT);
+    MMC_VALIDATE_RETURN(keys != nullptr, "invalid param, keys is null", MMC_INVALID_PARAM);
+    MMC_VALIDATE_RETURN(keys_count != 0, "invalid param, keys_count: " << keys_count, MMC_INVALID_PARAM);
+    MMC_VALIDATE_RETURN(sizes != nullptr, "invalid param, sizes is null", MMC_INVALID_PARAM);
+    MMC_VALIDATE_RETURN(gvas != nullptr, "invalid param, gvas is null", MMC_INVALID_PARAM);
+
+    for (size_t i = 0; i < keys_count; ++i) {
+        gvas[i] = 0;
+    }
+
+    std::vector<std::string> keysVector;
+    std::vector<size_t> sizesVector;
+    keysVector.reserve(keys_count);
+    sizesVector.reserve(keys_count);
+    for (size_t i = 0; i < keys_count; ++i) {
+        MMC_RETURN_ERROR(ValidateBatchKey(keys[i], i), "invalid key for batch malloc");
+        keysVector.emplace_back(keys[i]);
+        sizesVector.emplace_back(sizes[i]);
+    }
+
+    std::vector<uintptr_t> gvaVector;
+    Result ret = MmcClientDefault::GetInstance()->BatchMalloc(keysVector, sizesVector, options, gvaVector);
+    if (gvaVector.size() != keys_count) {
+        MMC_LOG_ERROR("invalid batch malloc gva size (" << gvaVector.size() << "), should be " << keys_count);
+        return ret == MMC_OK ? MMC_ERROR : ret;
+    }
+    for (size_t i = 0; i < gvaVector.size(); ++i) {
+        gvas[i] = static_cast<uint64_t>(gvaVector[i]);
+    }
+    return ret;
+}
+
+MMC_API int32_t mmcc_batch_copy(const uint64_t *gvas, void **buffers, const size_t *sizes, uint32_t count,
+                                int32_t direct)
+{
+    MMC_VALIDATE_RETURN(MmcClientDefault::GetInstance() != nullptr, "client is not initialize", MMC_CLIENT_NOT_INIT);
+    if (count == 0) {
+        return MMC_OK;
+    }
+    MMC_VALIDATE_RETURN(gvas != nullptr, "invalid param, gvas is null", MMC_INVALID_PARAM);
+    MMC_VALIDATE_RETURN(buffers != nullptr, "invalid param, buffers is null", MMC_INVALID_PARAM);
+    MMC_VALIDATE_RETURN(sizes != nullptr, "invalid param, sizes is null", MMC_INVALID_PARAM);
+
+    std::vector<void *> gvaVector;
+    std::vector<void *> bufferVector;
+    std::vector<size_t> sizeVector;
+    gvaVector.reserve(count);
+    bufferVector.reserve(count);
+    sizeVector.reserve(count);
+    for (size_t i = 0; i < count; ++i) {
+        MMC_VALIDATE_RETURN(gvas[i] != 0, "invalid param, gva is null on idx [" << i << "]", MMC_INVALID_PARAM);
+        MMC_VALIDATE_RETURN(buffers[i] != nullptr, "invalid param, buffer is null on idx [" << i << "]",
+                            MMC_INVALID_PARAM);
+        MMC_VALIDATE_RETURN(sizes[i] != 0, "invalid param, size is zero on idx [" << i << "]", MMC_INVALID_PARAM);
+        gvaVector.emplace_back(reinterpret_cast<void *>(static_cast<uintptr_t>(gvas[i])));
+        bufferVector.emplace_back(buffers[i]);
+        sizeVector.emplace_back(sizes[i]);
+    }
+    return MmcClientDefault::GetInstance()->BatchCopy(gvaVector, bufferVector, sizeVector, direct);
 }
 
 MMC_API int32_t mmcc_remove(const char *key, uint32_t flags)

@@ -277,8 +277,7 @@ inline MmcMemBlobDesc MmcMemBlob::GetDesc() const
 
 Result MmcMemBlob::ExtendLease(const uint32_t id, const uint32_t requestId, uint64_t ttl)
 {
-    metaLeaseManager_.Add(id, requestId, ttl);
-    return MMC_OK;
+    return metaLeaseManager_.Add(id, requestId, ttl);
 }
 bool MmcMemBlob::IsLeaseExpired()
 {

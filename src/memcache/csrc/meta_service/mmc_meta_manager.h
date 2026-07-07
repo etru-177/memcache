@@ -249,10 +249,26 @@ public:
       * @brief Get blob query info with key
       * @param key            [in] key of the meta object
       * @param operateId      [in] operateId of the meta object
-      * @param flags          [int] the flags of query operation, see MMC_QUERY_FLAG_GVA_READ_START
+      * @param flags          [int] the flags of query operation
       * @param queryInfo      [out] the query info of the meta object
       */
     Result Query(const std::string &key, uint64_t operateId, uint32_t flags, MemObjQueryInfo &queryInfo);
+
+    /**
+      * @brief Add a read lease for a readable single-blob key and fill query info
+      * @param key            [in] key of the meta object
+      * @param operateId      [in] operateId of the lease
+      * @param leaseTtlMs     [in] lease time to add, in milliseconds. If 0, use configured default TTL
+      * @param queryInfo      [out] the query info of the meta object
+      */
+    Result AddLease(const std::string &key, uint64_t operateId, uint64_t leaseTtlMs, MemObjQueryInfo &queryInfo);
+
+    /**
+      * @brief Remove a read lease for a readable single-blob key
+      * @param key            [in] key of the meta object
+      * @param operateId      [in] operateId of the lease
+      */
+    Result RemoveLease(const std::string &key, uint64_t operateId);
 
     /**
      * @brief Get all keys

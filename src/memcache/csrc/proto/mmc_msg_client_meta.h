@@ -1035,6 +1035,95 @@ struct BatchQueryResponse : MsgBase {
     }
 };
 
+struct BatchUpdateLeaseRequest : MsgBase {
+    std::vector<uint64_t> operateIds_;
+    uint64_t leaseTtlMs_{0};
+    uint32_t flag_{0};
+    std::vector<std::string> keys_;
+
+    BatchUpdateLeaseRequest() : MsgBase{0, ML_BATCH_UPDATE_LEASE_REQ, 0} {}
+    explicit BatchUpdateLeaseRequest(const std::vector<std::string> &keys,
+                                     const std::vector<uint64_t> &operateIds = {}, uint64_t leaseTtlMs = 0,
+                                     uint32_t flag = 0)
+        : MsgBase{0, ML_BATCH_UPDATE_LEASE_REQ, 0}, operateIds_(operateIds), leaseTtlMs_(leaseTtlMs), flag_(flag),
+          keys_(keys)
+    {}
+
+    Result Serialize(NetMsgPacker &packer) const override
+    {
+        packer.Serialize(msgVer);
+        packer.Serialize(msgId);
+        packer.Serialize(destRankId);
+        packer.Serialize(operateIds_);
+        packer.Serialize(leaseTtlMs_);
+        packer.Serialize(flag_);
+        packer.Serialize(keys_);
+        return MMC_OK;
+    }
+
+    Result Deserialize(NetMsgUnpacker &packer) override
+    {
+        packer.Deserialize(msgVer);
+        packer.Deserialize(msgId);
+        packer.Deserialize(destRankId);
+        packer.Deserialize(operateIds_);
+        packer.Deserialize(leaseTtlMs_);
+        packer.Deserialize(flag_);
+        packer.Deserialize(keys_);
+        return MMC_OK;
+    }
+};
+
+struct BatchUpdateLeaseResponse : MsgBase {
+    Result ret_{MMC_OK};
+    std::vector<Result> results_;
+    std::vector<MemObjQueryInfo> batchQueryInfos_;
+
+    BatchUpdateLeaseResponse() : MsgBase{0, ML_BATCH_UPDATE_LEASE_RESP, 0} {}
+    explicit BatchUpdateLeaseResponse(Result ret, const std::vector<Result> &results,
+                                      const std::vector<MemObjQueryInfo> &batchQueryInfos)
+        : MsgBase{0, ML_BATCH_UPDATE_LEASE_RESP, 0}, ret_(ret), results_(results), batchQueryInfos_(batchQueryInfos)
+    {}
+
+    Result Serialize(NetMsgPacker &packer) const override
+    {
+        packer.Serialize(msgVer);
+        packer.Serialize(msgId);
+        packer.Serialize(destRankId);
+        packer.Serialize(ret_);
+        packer.Serialize(results_);
+        const std::size_t size = batchQueryInfos_.size();
+        packer.Serialize(size);
+        for (const auto &queryInfo : batchQueryInfos_) {
+            SerializeMemObjQueryInfo(packer, queryInfo);
+        }
+        return MMC_OK;
+    }
+
+    Result Deserialize(NetMsgUnpacker &packer) override
+    {
+        packer.Deserialize(msgVer);
+        packer.Deserialize(msgId);
+        packer.Deserialize(destRankId);
+        packer.Deserialize(ret_);
+        packer.Deserialize(results_);
+        std::size_t size = 0;
+        packer.Deserialize(size);
+        if (size > MAX_CONTAINER_SIZE) {
+            MMC_LOG_ERROR("container size: " << size << " exceeds limit: " << MAX_CONTAINER_SIZE);
+            return MMC_ERROR;
+        }
+        batchQueryInfos_.clear();
+        batchQueryInfos_.reserve(size);
+        for (std::size_t i = 0; i < size; ++i) {
+            MemObjQueryInfo queryInfo;
+            DeserializeMemObjQueryInfo(packer, queryInfo);
+            batchQueryInfos_.push_back(std::move(queryInfo));
+        }
+        return MMC_OK;
+    }
+};
+
 struct RemoveAllRequest : MsgBase {
     RemoveAllRequest() : MsgBase{0, LM_REMOVE_ALL_REQ, 0} {}
 

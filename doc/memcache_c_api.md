@@ -244,6 +244,76 @@ int32_t mmcc_batch_query(const char **keys, size_t keys_count, mmc_data_info *in
 - `0`: 成功
 - 其他: 失败
 
+#### mmcc_batch_add_lease
+```c
+int32_t mmcc_batch_add_lease(const char **keys, uint32_t keys_count, uint64_t lease_ttl_ms, int32_t *results);
+```
+**功能**: 批量增加多个 key 的读租约，并记录后续 GVA 读取所需的读租约状态。
+
+**参数**:
+
+- `keys`: 数据键数组，每个键长度小于256个字节
+- `keys_count`: 键的数量
+- `lease_ttl_ms`: 要增加的租约时间，单位为毫秒；为 `0` 时使用 MetaService 配置的默认租期
+- `results`: 每个增加租约操作的结果，`0` 表示成功，其他值表示失败
+
+**返回值**:
+- `0`: 调用成功，逐 key 结果见 `results`
+- 其他: 失败
+
+#### mmcc_batch_remove_lease
+```c
+int32_t mmcc_batch_remove_lease(const char **keys, uint32_t keys_count);
+```
+**功能**: 批量移除多个 key 的读租约，并清理当前进程中对应的 GVA 读取状态。
+
+**参数**:
+
+- `keys`: 数据键数组，每个键长度小于256个字节
+- `keys_count`: 键的数量
+
+**返回值**:
+- `0`: 本地读租约检查通过并已触发移除租约请求发送流程
+- 其他: 失败
+
+#### mmcc_batch_malloc
+```c
+int32_t mmcc_batch_malloc(const char **keys, uint32_t keys_count, const size_t *sizes,
+                          mmc_put_options options, uint64_t *gvas);
+```
+**功能**: 批量为多个 key 申请 GVA blob，并返回每个 key 对应的 GVA 起始地址。
+
+**参数**:
+
+- `keys`: 数据键数组，每个键长度小于256个字节
+- `keys_count`: 键的数量
+- `sizes`: 每个 key 对应的 GVA blob 大小
+- `options`: 申请 GVA blob 的选项
+- `gvas`: 输出的 GVA 起始地址数组；对应 key 申请失败时该元素为 `0`
+
+**返回值**:
+- `0`: 成功
+- 其他: 失败
+
+#### mmcc_batch_copy
+```c
+int32_t mmcc_batch_copy(const uint64_t *gvas, void **buffers, const size_t *sizes,
+                        uint32_t count, int32_t direct);
+```
+**功能**: 批量在 GVA 地址和本地 buffer 之间进行数据拷贝。
+
+**参数**:
+
+- `gvas`: GVA 起始地址数组
+- `buffers`: 本地 buffer 地址数组
+- `sizes`: 每段 GVA 地址要拷贝的数据大小
+- `count`: GVA 地址段数量
+- `direct`: 数据拷贝方向
+
+**返回值**:
+- `0`: 成功
+- 其他: 失败
+
 #### mmcc_batch_remove
 ```c
 int32_t mmcc_batch_remove(const char **keys, uint32_t keys_count, int32_t *remove_results, uint32_t flags);

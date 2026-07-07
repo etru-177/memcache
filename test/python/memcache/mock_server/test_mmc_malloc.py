@@ -27,6 +27,7 @@ from memcache_hybrid import MetaService
 
 
 WORKER_DEFAULT_SHAPE = (61, 10, 1024)
+BATCH_ADD_LEASE_TTL_MS = 3000
 
 
 def start_meta_service():
@@ -137,7 +138,7 @@ def reader_worker(keys, shape, device_id, barrier, barrier_timeout_seconds, erro
         wait_process_barrier(barrier, "writer_finished", barrier_timeout_seconds)
 
         read_tensors, read_buffers, sizes = build_read_tensors(num_tensors=len(keys), shape=shape)
-        infos = store.batch_get_key_info(keys, 1)
+        infos = store.batch_get_key_info(keys)
         if len(infos) != len(keys):
             raise AssertionError(f"batch_get_key_info returned {len(infos)} infos, expect {len(keys)}")
 
@@ -147,6 +148,10 @@ def reader_worker(keys, shape, device_id, barrier, barrier_timeout_seconds, erro
             if len(gva_list) != 1:
                 raise AssertionError(f"expect a single gva for each key, got {gva_list}")
             queried_gvas.append(gva_list[0])
+
+        results = store.batch_add_lease(keys, BATCH_ADD_LEASE_TTL_MS)
+        if results != [0] * len(keys):
+            raise AssertionError(f"batch_add_lease failed, results={results}")
 
         ret = store.batch_copy(queried_gvas, read_buffers, sizes, G2L)
         if ret != 0:
@@ -159,6 +164,10 @@ def reader_worker(keys, shape, device_id, barrier, barrier_timeout_seconds, erro
         read_sums = [tensor.sum().item() for tensor in read_tensors]
         if read_sums != expected_sums:
             raise AssertionError(f"read_sums={read_sums} mismatch expected_sums={expected_sums}")
+
+        ret = store.batch_remove_lease(keys)
+        if ret != 0:
+            raise AssertionError(f"batch_remove_lease failed, ret={ret}")
 
         wait_process_barrier(barrier, "reader_verified", barrier_timeout_seconds)
     except AssertionError:
@@ -268,8 +277,10 @@ class TestExample(unittest.TestCase):
             ret = store.batch_copy(gvas, buffers, sizes, L2G)
             self.assertEqual(ret, 0)
 
-            infos = store.batch_get_key_info(keys, 1)
+            infos = store.batch_get_key_info(keys)
             self.assertEqual(len(infos), len(keys))
+            lease_results = store.batch_add_lease(keys, BATCH_ADD_LEASE_TTL_MS)
+            self.assertEqual(lease_results, [0] * len(keys))
 
             ret = store.batch_copy(gvas, read_buffers, sizes, G2L)
             self.assertEqual(ret, 0)
@@ -277,6 +288,9 @@ class TestExample(unittest.TestCase):
 
             for read_tensor, write_tensor in zip(read_tensors, write_tensors):
                 self.assertEqual(read_tensor.sum().item(), write_tensor.sum().item())
+
+            remove_lease_ret = store.batch_remove_lease(keys)
+            self.assertEqual(remove_lease_ret, 0)
 
             ret = store.batch_get_into(keys, read2_buffers, sizes, G2L)
             self.assertEqual(ret, [0] * len(keys))

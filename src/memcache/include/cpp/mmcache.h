@@ -328,9 +328,39 @@ public:
      */
     virtual std::vector<KeyInfo> BatchGetKeyInfo(const std::vector<std::string> &keys, uint32_t flag = 0) = 0;
 
+    /**
+     * @brief Add read leases for keys and cache returned blob infos locally
+     * @param keys Vector of keys to add lease
+     * @param leaseTtlMs Lease time to add, in milliseconds. If 0, use meta service configured lease TTL
+     * @return Vector of add-lease results for each key, 0 if success, negative value on error
+     */
+    virtual std::vector<int> BatchAddLease(const std::vector<std::string> &keys, uint64_t leaseTtlMs = 0) = 0;
+
+    /**
+     * @brief Remove read leases for keys and clear local GVA read state
+     * @param keys Vector of keys to remove lease
+     * @return 0 if local remove-lease handling succeeds, negative value on error
+     */
+    virtual int BatchRemoveLease(const std::vector<std::string> &keys) = 0;
+
+    /**
+     * @brief Allocate GVA blobs for keys
+     * @param keys Vector of keys to allocate
+     * @param sizes Vector of blob sizes, must have the same length as keys
+     * @param media Media type of allocated blobs, such as MEDIA_HBM or MEDIA_DRAM
+     * @return Vector of allocated GVA start addresses, 0 for keys whose allocation failed
+     */
     virtual std::vector<uintptr_t> BatchMalloc(const std::vector<std::string> &keys, const std::vector<size_t> &sizes,
                                                uint16_t media) = 0;
 
+    /**
+     * @brief Copy data between GVA addresses and local buffers
+     * @param gvas Vector of GVA addresses
+     * @param buffers Vector of local buffer addresses
+     * @param sizes Vector of copy sizes, must have the same length as gvas and buffers
+     * @param direct Copy direction, such as SMEMB_COPY_L2G, SMEMB_COPY_H2G, SMEMB_COPY_G2L or SMEMB_COPY_G2H
+     * @return 0 if success, negative value on error
+     */
     virtual int BatchCopy(std::vector<void *> &gvas, std::vector<void *> &buffers, std::vector<size_t> &sizes,
                           const int32_t direct = 3) = 0;
 };
