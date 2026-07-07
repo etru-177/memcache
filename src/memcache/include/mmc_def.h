@@ -47,6 +47,7 @@ typedef struct {
     char configStoreURL[DISCOVERY_URL_SIZE]; /* composed by schema and url, e.g. tcp:// or etcd:// or zk:// */
     char httpURL[DISCOVERY_URL_SIZE];
     bool haEnable;
+    bool backupEnable;
     int32_t logLevel;
     char logPath[PATH_MAX_SIZE];
     int32_t logRotationFileSize;
