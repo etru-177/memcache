@@ -703,5 +703,3 @@ TEST_F(TestMmcGlobalAllocator, SsdCanUnmountWhenEmpty)
     auto ret = allocator->Unmount(loc);
     EXPECT_EQ(ret, MMC_OK);
 }
-
-

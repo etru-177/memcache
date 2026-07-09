@@ -23,7 +23,7 @@ High-performance distributed key-value cache
 
 ## 🔜 Roadmap&发布策略
 
-MemCache roadmap详见： [**Roadmap**](https://gitcode.com/Ascend/memcache/wiki/Roadmap.md)    
+MemCache roadmap详见： [**Roadmap**](https://gitcode.com/Ascend/memcache/wiki/Roadmap.md)
 MemCache 分支发布策略：[**分支发布策略**](https://gitcode.com/Ascend/memcache/wiki/%E5%BC%80%E5%8F%91%E4%B8%8E%E5%8F%91%E5%B8%83%E8%8A%82%E5%A5%8F%E5%8E%9F%E5%88%99.md)
 
 ## 🎉概述
@@ -48,10 +48,10 @@ MemCache包含LocalService和MetaService两大核心组件：
 - **MetaService**：
   - 负责管理整个集群中内存池空间的分配和管理，处理LocalService的加入与退出。
   - MetaService作为独立进程运行，提供两种启动方式：python API启动；二进制启动，详见 [whl安装使用](./doc/install_whl.md) 和 [run安装使用](./doc/install_run.md)
-  - MetaService支持两种部署形态：   
-  ***1、单点模式***：MetaService由单个进程组成，部署方式简单，但存在单点故障的问题。如果MetaService进程崩溃或无法访问，系统将无法继续提供服务，直至重新恢复为止。     
+  - MetaService支持两种部署形态：
+  ***1、单点模式***：MetaService由单个进程组成，部署方式简单，但存在单点故障的问题。如果MetaService进程崩溃或无法访问，系统将无法继续提供服务，直至重新恢复为止。
   ***2、HA模式***：该模式基于K8S的的ClusterIP Service和Lease资源构建，部署较为复杂，该模式会部署多个MetaService进程实例，实现多活高可用。部署详见[怎么部署一个MemCache的HA集群](https://gitcode.com/Ascend/memcache/wiki/%E6%80%8E%E4%B9%88%E9%83%A8%E7%BD%B2%E4%B8%80%E4%B8%AAmemcache%E7%9A%84HA%E9%9B%86%E7%BE%A4.md)
-                
+
 
 - **LocalService**：负责承担如下功能：
   - **客户端**：作为客户端，以whl/so形式作为共享库被应用进程加载调用API

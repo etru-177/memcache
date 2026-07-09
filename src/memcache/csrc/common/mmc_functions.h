@@ -110,7 +110,7 @@ inline Result Func::LibraryRealPath(const std::string &libDirPath, const std::st
  */
 inline int ValidatePathNotSymlink(const char *path)
 {
-    struct stat path_stat{};
+    struct stat path_stat {};
 
     if (path == nullptr) {
         MMC_LOG_ERROR("null path");

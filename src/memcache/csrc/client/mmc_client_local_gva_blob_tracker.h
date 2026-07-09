@@ -56,8 +56,7 @@ public:
                                  Result updateRet);
     void CollectExpiredReadFinishClaims(uint64_t nowMs, std::vector<LocalGvaBlobInfoPtr> &claimedInfos);
     Result ConsumeReadRangesAndCollectClaims(const std::vector<void *> &gvas, const std::vector<size_t> &sizes,
-                                             const std::vector<LocalGvaBlobInfoPtr> &readInfos,
-                                             bool &hasLeaseExpired,
+                                             const std::vector<LocalGvaBlobInfoPtr> &readInfos, bool &hasLeaseExpired,
                                              std::vector<LocalGvaBlobInfoPtr> &claimedInfos);
     void MarkWriteSuccess(uint64_t blobStartGva);
     void CollectExpired(std::vector<LocalGvaBlobInfoPtr> &infos);

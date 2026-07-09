@@ -58,13 +58,13 @@ Result DlUbsioApi::LoadLibrary()
     DL_LOAD_SYM(pUbsioExist, ubsio_existFunc, ubsioHandle, "UbsioKvCacheExist");
     DL_LOAD_SYM(pUbsioDelete, ubsio_deleteFunc, ubsioHandle, "UbsioKvCacheDelete");
     DL_LOAD_SYM(pUbsioGetLength, ubsio_get_lengthFunc, ubsioHandle, "UbsioKvCacheGetLength");
-    DL_LOAD_SYM(pUbsioBatchPut, ubsio_batch_putFunc, ubsioHandle,  "UbsioKvCacheBatchPut");
-    DL_LOAD_SYM(pUbsioBatchGet, ubsio_batch_getFunc, ubsioHandle,  "UbsioKvCacheBatchGet");
-    DL_LOAD_SYM(pUbsioBatchGetWithHBM, ubsio_batch_get_hbmFunc, ubsioHandle,  "UbsioKvCacheBatchGetDirect");
-    DL_LOAD_SYM(pUbsioBatchExist, ubsio_batch_existFunc, ubsioHandle,  "UbsioKvCacheBatchExist");
-    DL_LOAD_SYM(pUbsioBatchDelete, ubsio_batch_deleteFunc, ubsioHandle,  "UbsioKvCacheBatchDelete");
-    DL_LOAD_SYM(pUbsioBatchGetLength, ubsio_batch_get_lengthFunc, ubsioHandle,  "UbsioKvCacheBatchGetLength");
-    DL_LOAD_SYM(pUbsioBatchFreeAddress, ubsio_batch_free_addressFunc, ubsioHandle,  "UbsioKvCacheBatchFree");
+    DL_LOAD_SYM(pUbsioBatchPut, ubsio_batch_putFunc, ubsioHandle, "UbsioKvCacheBatchPut");
+    DL_LOAD_SYM(pUbsioBatchGet, ubsio_batch_getFunc, ubsioHandle, "UbsioKvCacheBatchGet");
+    DL_LOAD_SYM(pUbsioBatchGetWithHBM, ubsio_batch_get_hbmFunc, ubsioHandle, "UbsioKvCacheBatchGetDirect");
+    DL_LOAD_SYM(pUbsioBatchExist, ubsio_batch_existFunc, ubsioHandle, "UbsioKvCacheBatchExist");
+    DL_LOAD_SYM(pUbsioBatchDelete, ubsio_batch_deleteFunc, ubsioHandle, "UbsioKvCacheBatchDelete");
+    DL_LOAD_SYM(pUbsioBatchGetLength, ubsio_batch_get_lengthFunc, ubsioHandle, "UbsioKvCacheBatchGetLength");
+    DL_LOAD_SYM(pUbsioBatchFreeAddress, ubsio_batch_free_addressFunc, ubsioHandle, "UbsioKvCacheBatchFree");
     DL_LOAD_SYM(pUbsioRegisterMetaEventCallback, ubsio_register_meta_event_callbackFunc, ubsioHandle,
                 "UbsioKvCacheRegisterMetaEventCallback");
 
@@ -100,5 +100,5 @@ void DlUbsioApi::CleanupLibrary()
     }
     gLoaded = false;
 }
-}  // namespace mmc
-}  // namespace ock
+} // namespace mmc
+} // namespace ock

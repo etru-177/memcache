@@ -22,7 +22,7 @@ std::map<std::string, std::string> gUbsioStorage;
 std::mutex gUbsioMutex;
 
 // 存储分配的内存，以便后续释放
-std::vector<void*> gAllocatedBuffers;
+std::vector<void *> gAllocatedBuffers;
 std::mutex gBufferMutex;
 
 // UBS IO meta event types
@@ -56,10 +56,10 @@ extern "C" int32_t UbsioKvCachePut(const char *key, void *buf, size_t length, ui
     if (key == nullptr || buf == nullptr) {
         return -1;
     }
-    
+
     std::lock_guard<std::mutex> lock(gUbsioMutex);
     std::string keyStr(key);
-    std::string valueStr(static_cast<char*>(buf), length);
+    std::string valueStr(static_cast<char *>(buf), length);
     gUbsioStorage[keyStr] = valueStr;
     return 0;
 }
@@ -71,19 +71,19 @@ extern "C" int32_t UbsioKvCacheGet(const char *key, void *buf, size_t length, ui
     if (key == nullptr || buf == nullptr) {
         return -1;
     }
-    
+
     std::lock_guard<std::mutex> lock(gUbsioMutex);
     std::string keyStr(key);
     auto it = gUbsioStorage.find(keyStr);
     if (it == gUbsioStorage.end()) {
         return -1;
     }
-    
-    const std::string& value = it->second;
+
+    const std::string &value = it->second;
     if (value.size() > length) {
         return -1;
     }
-    
+
     memcpy(buf, value.c_str(), value.size());
     return 0;
 }
@@ -95,7 +95,7 @@ extern "C" bool UbsioKvCacheExist(const char *key, uint32_t flags)
     if (key == nullptr) {
         return false;
     }
-    
+
     std::lock_guard<std::mutex> lock(gUbsioMutex);
     std::string keyStr(key);
     return gUbsioStorage.find(keyStr) != gUbsioStorage.end();
@@ -108,7 +108,7 @@ extern "C" int32_t UbsioKvCacheDelete(const char *key, uint32_t flags)
     if (key == nullptr) {
         return -1;
     }
-    
+
     std::lock_guard<std::mutex> lock(gUbsioMutex);
     std::string keyStr(key);
     size_t erased = gUbsioStorage.erase(keyStr);
@@ -122,14 +122,14 @@ extern "C" int32_t UbsioKvCacheGetLength(const char *key, size_t *length, uint32
     if (key == nullptr || length == nullptr) {
         return -1;
     }
-    
+
     std::lock_guard<std::mutex> lock(gUbsioMutex);
     std::string keyStr(key);
     auto it = gUbsioStorage.find(keyStr);
     if (it == gUbsioStorage.end()) {
         return -1;
     }
-    
+
     *length = it->second.size();
     return 0;
 }
@@ -142,16 +142,16 @@ extern "C" int32_t UbsioKvCacheBatchPut(const char **keys, uint32_t keys_count, 
     if (keys == nullptr || bufs == nullptr || lengths == nullptr || results == nullptr) {
         return -1;
     }
-    
+
     std::lock_guard<std::mutex> lock(gUbsioMutex);
     for (uint32_t i = 0; i < keys_count; ++i) {
         if (keys[i] == nullptr || bufs[i] == nullptr) {
             results[i] = -1;
             continue;
         }
-        
+
         std::string keyStr(keys[i]);
-        std::string valueStr(static_cast<char*>(bufs[i]), lengths[i]);
+        std::string valueStr(static_cast<char *>(bufs[i]), lengths[i]);
         gUbsioStorage[keyStr] = valueStr;
         results[i] = 0;
     }
@@ -166,38 +166,38 @@ extern "C" int32_t UbsioKvCacheBatchGet(const char **keys, uint32_t keys_count, 
     if (keys == nullptr || bufs == nullptr || lengths == nullptr || results == nullptr) {
         return -1;
     }
-    
+
     std::lock_guard<std::mutex> lock(gUbsioMutex);
     for (uint32_t i = 0; i < keys_count; ++i) {
         if (keys[i] == nullptr) {
             results[i] = -1;
             continue;
         }
-        
+
         std::string keyStr(keys[i]);
         auto it = gUbsioStorage.find(keyStr);
         if (it == gUbsioStorage.end()) {
             results[i] = -1;
             continue;
         }
-        
-        const std::string& value = it->second;
+
+        const std::string &value = it->second;
         // UBSIO为buf分配内存
-        void* allocatedBuf = malloc(value.size() + 1);
+        void *allocatedBuf = malloc(value.size() + 1);
         if (allocatedBuf == nullptr) {
             results[i] = -1;
             continue;
         }
-        
+
         memcpy(allocatedBuf, value.c_str(), value.size());
-        static_cast<char*>(allocatedBuf)[value.size()] = '\0';
-        
+        static_cast<char *>(allocatedBuf)[value.size()] = '\0';
+
         // 存储分配的内存
         {
             std::lock_guard<std::mutex> bufLock(gBufferMutex);
             gAllocatedBuffers.push_back(allocatedBuf);
         }
-        
+
         // 设置返回值
         bufs[i] = allocatedBuf;
         lengths[i] = value.size();
@@ -213,14 +213,14 @@ extern "C" int32_t UbsioKvCacheBatchExist(const char **keys, uint32_t keys_count
     if (keys == nullptr || results == nullptr) {
         return -1;
     }
-    
+
     std::lock_guard<std::mutex> lock(gUbsioMutex);
     for (uint32_t i = 0; i < keys_count; ++i) {
         if (keys[i] == nullptr) {
             results[i] = false;
             continue;
         }
-        
+
         std::string keyStr(keys[i]);
         results[i] = (gUbsioStorage.find(keyStr) != gUbsioStorage.end());
     }
@@ -234,14 +234,14 @@ extern "C" int32_t UbsioKvCacheBatchDelete(const char **keys, uint32_t keys_coun
     if (keys == nullptr || results == nullptr) {
         return -1;
     }
-    
+
     std::lock_guard<std::mutex> lock(gUbsioMutex);
     for (uint32_t i = 0; i < keys_count; ++i) {
         if (keys[i] == nullptr) {
             results[i] = -1;
             continue;
         }
-        
+
         std::string keyStr(keys[i]);
         size_t erased = gUbsioStorage.erase(keyStr);
         results[i] = (erased > 0) ? 0 : -1;
@@ -250,28 +250,28 @@ extern "C" int32_t UbsioKvCacheBatchDelete(const char **keys, uint32_t keys_coun
 }
 
 // 批量获取长度函数
-extern "C" int32_t UbsioKvCacheBatchGetLength(const char **keys, uint32_t keys_count, size_t *lengths,
-                                              int32_t *results, uint32_t flags)
+extern "C" int32_t UbsioKvCacheBatchGetLength(const char **keys, uint32_t keys_count, size_t *lengths, int32_t *results,
+                                              uint32_t flags)
 {
     (void)flags;
     if (keys == nullptr || lengths == nullptr || results == nullptr) {
         return -1;
     }
-    
+
     std::lock_guard<std::mutex> lock(gUbsioMutex);
     for (uint32_t i = 0; i < keys_count; ++i) {
         if (keys[i] == nullptr) {
             results[i] = -1;
             continue;
         }
-        
+
         std::string keyStr(keys[i]);
         auto it = gUbsioStorage.find(keyStr);
         if (it == gUbsioStorage.end()) {
             results[i] = -1;
             continue;
         }
-        
+
         lengths[i] = it->second.size();
         results[i] = 0;
     }
@@ -284,13 +284,13 @@ extern "C" int32_t UbsioKvCacheBatchFree(void **bufs, uint32_t keys_count)
     if (bufs == nullptr) {
         return -1;
     }
-    
+
     std::lock_guard<std::mutex> bufLock(gBufferMutex);
     for (uint32_t i = 0; i < keys_count; ++i) {
         if (bufs[i] != nullptr) {
             // 释放分配的内存
             free(bufs[i]);
-            
+
             // 从跟踪列表中移除
             auto it = std::find(gAllocatedBuffers.begin(), gAllocatedBuffers.end(), bufs[i]);
             if (it != gAllocatedBuffers.end()) {
@@ -303,7 +303,8 @@ extern "C" int32_t UbsioKvCacheBatchFree(void **bufs, uint32_t keys_count)
 
 // 批量直接读取函数（带HBM）
 extern "C" int32_t UbsioKvCacheBatchGetDirect(const char **keys, uint32_t keys_count, void ***bufs, size_t **lengths,
-    uint32_t lengths_rows, uint32_t lengths_cols, int *results, uint32_t flags)
+                                              uint32_t lengths_rows, uint32_t lengths_cols, int *results,
+                                              uint32_t flags)
 {
     (void)flags;
     (void)bufs;
@@ -313,7 +314,7 @@ extern "C" int32_t UbsioKvCacheBatchGetDirect(const char **keys, uint32_t keys_c
     if (keys == nullptr || results == nullptr) {
         return -1;
     }
-    
+
     // 简化实现，标记所有为成功
     for (uint32_t i = 0; i < keys_count; ++i) {
         results[i] = 0;

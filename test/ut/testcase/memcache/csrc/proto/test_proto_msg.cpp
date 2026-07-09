@@ -94,6 +94,5 @@ TEST_F(TestProtoMsg, BlobDeleteRequest_MsgIdMatchesMetaNetClientRegistration)
     EXPECT_NE(resp.msgId, 0);
 
     // LM_* REQ/RSP 对共享同一 ID 值，与其他 LM_* 对不冲突
-    EXPECT_EQ(static_cast<int16_t>(LM_BLOB_DELETE_REQ),
-              static_cast<int16_t>(LM_BLOB_DELETE_RSP));
+    EXPECT_EQ(static_cast<int16_t>(LM_BLOB_DELETE_REQ), static_cast<int16_t>(LM_BLOB_DELETE_RSP));
 }

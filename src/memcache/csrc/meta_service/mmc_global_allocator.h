@@ -313,8 +313,8 @@ public:
     }
 
     std::vector<MediaType> GetNeedEvictList(const std::vector<std::pair<uint16_t, uint16_t>> &evictWatermarks,
-                                            std::vector<uint16_t> &nowMemoryThresholds,
-                                            MediaType media, uint64_t wantAllocSize)
+                                            std::vector<uint16_t> &nowMemoryThresholds, MediaType media,
+                                            uint64_t wantAllocSize)
     {
         if (media == MEDIA_NONE) {
             media = GetTopLayerMediumType();

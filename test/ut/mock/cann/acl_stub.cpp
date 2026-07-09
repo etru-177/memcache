@@ -18,14 +18,14 @@ constexpr int32_t RETURN_ERROR = -1;
 constexpr uint64_t START_ADDR = 0x100000000000ULL;
 
 enum class aclrtMemLocationType {
-    ACL_MEM_LOCATION_TYPE_HOST = 0,   // Host内存
-    ACL_MEM_LOCATION_TYPE_DEVICE,     // Device内存
+    ACL_MEM_LOCATION_TYPE_HOST = 0, // Host内存
+    ACL_MEM_LOCATION_TYPE_DEVICE,   // Device内存
 };
 
 using aclrtMemLocation = struct aclrtMemLocation;
 struct aclrtMemLocation {
     uint32_t id;
-    aclrtMemLocationType type;    // 内存所在位置
+    aclrtMemLocationType type; // 内存所在位置
 };
 
 using aclrtMemcpyBatchAttr = struct aclrtMemcpyBatchAttr;
@@ -96,10 +96,8 @@ int32_t aclrtMemcpyAsync(void *dst, size_t destMax, const void *src, size_t coun
     return RETURN_OK;
 }
 
-int32_t aclrtMemcpyBatch(void **dsts, size_t *destMax,
-                         void **srcs, size_t *sizes, size_t numBatches,
-                         aclrtMemcpyBatchAttr *attrs, size_t *attrsIndexes,
-                         size_t numAttrs, size_t *failIndex)
+int32_t aclrtMemcpyBatch(void **dsts, size_t *destMax, void **srcs, size_t *sizes, size_t numBatches,
+                         aclrtMemcpyBatchAttr *attrs, size_t *attrsIndexes, size_t numAttrs, size_t *failIndex)
 {
     return RETURN_OK;
 }

@@ -91,10 +91,10 @@ std::string WriteTempConfigFile()
     ofs << "ock.mmc.local_service.protocol=host_rdma\n";
     ofs << "ock.mmc.local_service.dram.size=1GB\n";
     ofs.close();
-    
+
     // 删除 mkstemp 创建的临时文件
     std::remove(fileNameTemplate);
-    
+
     return filePath;
 }
 } // namespace
@@ -160,8 +160,7 @@ TEST_F(TestMmcConfigurationUrlResolve, Setup_InvalidUrlKeepsOriginalValue)
     ASSERT_TRUE(ret);
 
     EXPECT_EQ(clientConfig.GetString(ConfConstant::OCK_MMC_META_SERVICE_URL), std::string(INVALID_META_URL));
-    EXPECT_EQ(clientConfig.GetString(ConfConstant::OKC_MMC_LOCAL_SERVICE_BM_IP_PORT),
-              std::string(INVALID_CFG_URL));
+    EXPECT_EQ(clientConfig.GetString(ConfConstant::OKC_MMC_LOCAL_SERVICE_BM_IP_PORT), std::string(INVALID_CFG_URL));
     EXPECT_EQ(clientConfig.GetString(ConfConstant::OKC_MMC_LOCAL_SERVICE_BM_HCOM_URL), std::string(INVALID_HCOM_URL));
 }
 

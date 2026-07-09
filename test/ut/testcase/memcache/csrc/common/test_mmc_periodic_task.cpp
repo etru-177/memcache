@@ -173,12 +173,8 @@ TEST_F(TestMmcPeriodicTask, MultipleDueTasksExecuteInRegistrationOrder)
     std::atomic<int> firstOrder{0};
     std::atomic<int> secondOrder{0};
 
-    ASSERT_TRUE(scheduler.RegisterTask("first_task", 1, [&step, &firstOrder]() {
-        firstOrder.store(++step);
-    }));
-    ASSERT_TRUE(scheduler.RegisterTask("second_task", 1, [&step, &secondOrder]() {
-        secondOrder.store(++step);
-    }));
+    ASSERT_TRUE(scheduler.RegisterTask("first_task", 1, [&step, &firstOrder]() { firstOrder.store(++step); }));
+    ASSERT_TRUE(scheduler.RegisterTask("second_task", 1, [&step, &secondOrder]() { secondOrder.store(++step); }));
     ASSERT_TRUE(scheduler.Start());
 
     for (int i = 0; i < 20UL && secondOrder.load() == 0; ++i) {

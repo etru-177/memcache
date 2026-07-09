@@ -88,30 +88,28 @@ Result LocalGvaBlobInfo::ConsumePendingHole(uint64_t gva, uint64_t size, size_t 
 {
     remainingHoleCount = 0;
     if (removed.load()) {
-        MMC_LOG_ERROR("ConsumePendingHole hit removed blob before lock, key:" << key << ", blobGva:" << blob.gva_
-                                                                               << ", blobSize:" << blob.size_
-                                                                               << ", reqGva:" << gva
-                                                                               << ", reqSize:" << size);
+        MMC_LOG_ERROR("ConsumePendingHole hit removed blob before lock, key:"
+                      << key << ", blobGva:" << blob.gva_ << ", blobSize:" << blob.size_ << ", reqGva:" << gva
+                      << ", reqSize:" << size);
         return MMC_UNMATCHED_KEY;
     }
     if (blob.gva_ == UINT64_MAX || blob.size_ == 0 || size == 0 || gva < blob.gva_) {
         MMC_LOG_ERROR("ConsumePendingHole got invalid range, key:" << key << ", blobGva:" << blob.gva_
-                                                                    << ", blobSize:" << blob.size_
-                                                                    << ", reqGva:" << gva << ", reqSize:" << size);
+                                                                   << ", blobSize:" << blob.size_ << ", reqGva:" << gva
+                                                                   << ", reqSize:" << size);
         return MMC_INVALID_PARAM;
     }
     if (gva > std::numeric_limits<uint64_t>::max() - size) {
         MMC_LOG_ERROR("ConsumePendingHole range overflow, key:" << key << ", blobGva:" << blob.gva_
-                                                                 << ", blobSize:" << blob.size_ << ", reqGva:" << gva
-                                                                 << ", reqSize:" << size);
+                                                                << ", blobSize:" << blob.size_ << ", reqGva:" << gva
+                                                                << ", reqSize:" << size);
         return MMC_INVALID_PARAM;
     }
     const uint64_t blobOffset = gva - blob.gva_;
     if (blobOffset > blob.size_ || size > (blob.size_ - blobOffset)) {
-        MMC_LOG_ERROR("ConsumePendingHole range exceeds blob, key:" << key << ", blobGva:" << blob.gva_
-                                                                     << ", blobSize:" << blob.size_
-                                                                     << ", reqGva:" << gva << ", reqSize:" << size
-                                                                     << ", blobOffset:" << blobOffset);
+        MMC_LOG_ERROR("ConsumePendingHole range exceeds blob, key:"
+                      << key << ", blobGva:" << blob.gva_ << ", blobSize:" << blob.size_ << ", reqGva:" << gva
+                      << ", reqSize:" << size << ", blobOffset:" << blobOffset);
         return MMC_INVALID_PARAM;
     }
 
@@ -119,10 +117,9 @@ Result LocalGvaBlobInfo::ConsumePendingHole(uint64_t gva, uint64_t size, size_t 
     const uint64_t rangeEnd = gva + size;
     std::lock_guard<std::mutex> guard(mutex);
     if (removed.load()) {
-        MMC_LOG_ERROR("ConsumePendingHole hit removed blob after lock, key:" << key << ", blobGva:" << blob.gva_
-                                                                              << ", blobSize:" << blob.size_
-                                                                              << ", reqGva:" << gva
-                                                                              << ", reqSize:" << size);
+        MMC_LOG_ERROR("ConsumePendingHole hit removed blob after lock, key:"
+                      << key << ", blobGva:" << blob.gva_ << ", blobSize:" << blob.size_ << ", reqGva:" << gva
+                      << ", reqSize:" << size);
         return MMC_UNMATCHED_KEY;
     }
 
@@ -138,12 +135,10 @@ Result LocalGvaBlobInfo::ConsumePendingHole(uint64_t gva, uint64_t size, size_t 
     while (coveredUpTo < rangeEnd) {
         if (validateIt == holes.end() || validateIt->first > coveredUpTo || validateIt->second <= coveredUpTo) {
             remainingHoleCount = holes.size();
-            MMC_LOG_ERROR("ConsumePendingHole validation failed, key:" << key << ", blobGva:" << blob.gva_
-                                                                        << ", blobSize:" << blob.size_
-                                                                        << ", rangeStart:" << rangeStart
-                                                                        << ", rangeEnd:" << rangeEnd
-                                                                        << ", coveredUpTo:" << coveredUpTo
-                                                                        << ", holeCount:" << holes.size());
+            MMC_LOG_ERROR("ConsumePendingHole validation failed, key:"
+                          << key << ", blobGva:" << blob.gva_ << ", blobSize:" << blob.size_
+                          << ", rangeStart:" << rangeStart << ", rangeEnd:" << rangeEnd
+                          << ", coveredUpTo:" << coveredUpTo << ", holeCount:" << holes.size());
             return MMC_GVA_RANGE_ALREADY_WRITTEN;
         }
         coveredUpTo = std::min(rangeEnd, validateIt->second);
@@ -249,8 +244,8 @@ Result LocalGvaBlobTracker::FindWritable(uint64_t gva, uint64_t size, LocalGvaBl
 }
 
 Result LocalGvaBlobTracker::FinalizeWriteTracking(const std::vector<void *> &gvas, const std::vector<size_t> &sizes,
-                                                  const std::vector<LocalGvaBlobInfoPtr> &writeInfos,
-                                                  Result putResult, Result updateRet)
+                                                  const std::vector<LocalGvaBlobInfoPtr> &writeInfos, Result putResult,
+                                                  Result updateRet)
 {
     if (updateRet != MMC_OK) {
         return MMC_OK;
@@ -266,8 +261,8 @@ Result LocalGvaBlobTracker::FinalizeWriteTracking(const std::vector<void *> &gva
                 return MMC_UNMATCHED_KEY;
             }
             size_t remainingHoleCount = 0;
-            Result trackRet = writeInfos[i]->ConsumePendingHole(reinterpret_cast<uint64_t>(gvas[i]), sizes[i],
-                                                                remainingHoleCount);
+            Result trackRet =
+                writeInfos[i]->ConsumePendingHole(reinterpret_cast<uint64_t>(gvas[i]), sizes[i], remainingHoleCount);
             if (trackRet != MMC_OK) {
                 MMC_LOG_ERROR("client " << name_ << " mark batch copy write range failed, gva:"
                                         << reinterpret_cast<uint64_t>(gvas[i]) << ", size:" << sizes[i]
@@ -316,8 +311,7 @@ Result LocalGvaBlobTracker::FinalizeWriteTracking(const std::vector<void *> &gva
     return MMC_OK;
 }
 
-void LocalGvaBlobTracker::CollectExpiredReadFinishClaims(uint64_t nowMs,
-                                                         std::vector<LocalGvaBlobInfoPtr> &claimedInfos)
+void LocalGvaBlobTracker::CollectExpiredReadFinishClaims(uint64_t nowMs, std::vector<LocalGvaBlobInfoPtr> &claimedInfos)
 {
     std::vector<LocalGvaBlobInfoPtr> expiredInfos;
     CollectExpired(expiredInfos);
@@ -353,9 +347,9 @@ Result LocalGvaBlobTracker::ConsumeReadRangesAndCollectClaims(const std::vector<
         size_t remainingHoleCount = 0;
         Result updateRet = info->ConsumePendingHole(reinterpret_cast<uint64_t>(gvas[i]), sizes[i], remainingHoleCount);
         if (updateRet != MMC_OK) {
-            MMC_LOG_ERROR("client " << name_ << " mark batch copy read range failed, gva:"
-                                    << reinterpret_cast<uint64_t>(gvas[i]) << ", size:" << sizes[i]
-                                    << ", ret:" << updateRet);
+            MMC_LOG_ERROR("client " << name_
+                                    << " mark batch copy read range failed, gva:" << reinterpret_cast<uint64_t>(gvas[i])
+                                    << ", size:" << sizes[i] << ", ret:" << updateRet);
             return updateRet;
         }
         if (remainingHoleCount == 0 && info->TryClaimReadFinish()) {

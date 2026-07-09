@@ -96,13 +96,12 @@ struct MmcMetaExtConfig {
 
 class MmcMetaManager : public MmcReferable {
     friend class TestMmcMetaManager;
+
 public:
-    explicit MmcMetaManager(uint64_t defaultTtl, uint16_t evictThresholdHigh,
-                            uint16_t evictThresholdLow, uint16_t rewarmDramWatermark,
-                            const MmcMetaExtConfig &extConfig = {})
+    explicit MmcMetaManager(uint64_t defaultTtl, uint16_t evictThresholdHigh, uint16_t evictThresholdLow,
+                            uint16_t rewarmDramWatermark, const MmcMetaExtConfig &extConfig = {})
         : defaultTtlMs_(defaultTtl == 0 ? MMC_DATA_TTL_MS : defaultTtl), evictThresholdHigh_(evictThresholdHigh),
-          evictThresholdLow_(evictThresholdLow), rewarmDramWatermark_(rewarmDramWatermark),
-          extConfig_(extConfig)
+          evictThresholdLow_(evictThresholdLow), rewarmDramWatermark_(rewarmDramWatermark), extConfig_(extConfig)
     {}
 
     ~MmcMetaManager() override
@@ -134,7 +133,7 @@ public:
                 Result ret = BlobDeleteRpc(key, desc);
                 if (ret != MMC_OK) {
                     MMC_LOG_WARN("BlobDeleteRpc failed for key: " << key << ", rank: " << desc.rank_
-                                                                   << ", ret: " << ret);
+                                                                  << ", ret: " << ret);
                 }
             });
         };
@@ -175,8 +174,7 @@ public:
      * @param operateId    [in] operate id
      * @param objMetas     [out] meta descriptors per key
      */
-    Result GetByRank(const std::vector<std::string> &keys, uint64_t operateId,
-                     std::vector<MmcMemMetaDesc> &objMetas);
+    Result GetByRank(const std::vector<std::string> &keys, uint64_t operateId, std::vector<MmcMemMetaDesc> &objMetas);
 
     /**
      * @brief Update the state
@@ -232,18 +230,14 @@ public:
      * @param objMeta       [in] meta object (already looked up, lock held)
      * @param guard         [in/out] lock on objMeta, may be unlocked/relocked for RPC
      */
-    Result RewarmBlob(const std::string &key, const MmcMemObjMetaPtr &objMeta,
-                      std::unique_lock<std::mutex> &guard, const MmcMemBlobDesc &srcDesc,
-                      MediaType dstMediaType, MmcMemBlobPtr &dstBlob);
+    Result RewarmBlob(const std::string &key, const MmcMemObjMetaPtr &objMeta, std::unique_lock<std::mutex> &guard,
+                      const MmcMemBlobDesc &srcDesc, MediaType dstMediaType, MmcMemBlobPtr &dstBlob);
 
-    Result RewarmAllocBlob(const std::string &key, const MmcMemBlobDesc &srcDesc,
-                           MediaType dstMediaType, const MmcMemObjMetaPtr &objMeta,
-                           MmcMemBlobPtr &outBlob, MmcMemBlobDesc &outDesc);
-    void RewarmFinalize(const std::string &key, const MmcMemBlobPtr &blob,
-                        MediaType dstMediaType, uint32_t srcRank);
+    Result RewarmAllocBlob(const std::string &key, const MmcMemBlobDesc &srcDesc, MediaType dstMediaType,
+                           const MmcMemObjMetaPtr &objMeta, MmcMemBlobPtr &outBlob, MmcMemBlobDesc &outDesc);
+    void RewarmFinalize(const std::string &key, const MmcMemBlobPtr &blob, MediaType dstMediaType, uint32_t srcRank);
 
-    void TriggerPrefetch(const std::string &key, const MmcMemObjMetaPtr &objMeta,
-                            const MmcMemBlobPtr &ssdBlob);
+    void TriggerPrefetch(const std::string &key, const MmcMemObjMetaPtr &objMeta, const MmcMemBlobPtr &ssdBlob);
 
     /**
       * @brief Get blob query info with key
@@ -348,53 +342,45 @@ private:
                                   const MmcMemObjMetaPtr &memObj, MmcMemMetaDesc &objMeta);
 
     Result TryRewarmForGet(const std::string &key, uint64_t operateId, const MmcMemObjMetaPtr &memObj,
-                           MmcMemBlobPtr &lowerBlob, std::unique_lock<std::mutex> &guard,
-                           MmcMemBlobPtr &selectedBlob);
+                           MmcMemBlobPtr &lowerBlob, std::unique_lock<std::mutex> &guard, MmcMemBlobPtr &selectedBlob);
 
-    Result CopyBlob(const std::string& key, const MmcMemObjMetaPtr &objMeta,
-                    std::unique_lock<std::mutex> &guard,
+    Result CopyBlob(const std::string &key, const MmcMemObjMetaPtr &objMeta, std::unique_lock<std::mutex> &guard,
                     const MmcMemBlobDesc &srcBlob, const MmcLocation &dstLoc);
 
-    Result CopyBlobToSsd(const std::string& key, const MmcMemObjMetaPtr &objMeta,
-                         std::unique_lock<std::mutex> &guard,
+    Result CopyBlobToSsd(const std::string &key, const MmcMemObjMetaPtr &objMeta, std::unique_lock<std::mutex> &guard,
                          const MmcMemBlobDesc &srcBlob, const MmcLocation &dstLoc);
 
-    Result CopyBlobAlloc(const std::string& key, const MmcMemObjMetaPtr &objMeta,
-                         const MmcMemBlobDesc &srcBlob, const MmcLocation &dstLoc,
-                         MmcMemBlobPtr &outBlob, MmcMemBlobDesc &outDesc);
+    Result CopyBlobAlloc(const std::string &key, const MmcMemObjMetaPtr &objMeta, const MmcMemBlobDesc &srcBlob,
+                         const MmcLocation &dstLoc, MmcMemBlobPtr &outBlob, MmcMemBlobDesc &outDesc);
 
-    Result CopyBlobToDram(const std::string& key, const MmcMemObjMetaPtr &objMeta,
-                          std::unique_lock<std::mutex> &guard,
+    Result CopyBlobToDram(const std::string &key, const MmcMemObjMetaPtr &objMeta, std::unique_lock<std::mutex> &guard,
                           const MmcMemBlobDesc &srcBlob, const MmcLocation &dstLoc);
 
-    bool HandleMoveBlobExistingDst(const std::string &key, const MmcMemObjMetaPtr &objMeta,
-                                   const MmcLocation &src, const MmcLocation &dst,
-                                   uint32_t srcRank, std::unique_lock<std::mutex> &guard);
+    bool HandleMoveBlobExistingDst(const std::string &key, const MmcMemObjMetaPtr &objMeta, const MmcLocation &src,
+                                   const MmcLocation &dst, uint32_t srcRank, std::unique_lock<std::mutex> &guard);
 
     Result RebuildMeta(std::vector<std::pair<std::string, MmcMemBlobDesc>> &blobList);
 
-    void PushRemoveList(const std::string &key, const MmcMemObjMetaPtr &meta,
-                        const MmcBlobFilterPtr &filter = nullptr, bool triggerSsdPreFree = false);
+    void PushRemoveList(const std::string &key, const MmcMemObjMetaPtr &meta, const MmcBlobFilterPtr &filter = nullptr,
+                        bool triggerSsdPreFree = false);
 
     EvictResult EvictCallBackFunction(const std::string &key, const MmcMemObjMetaPtr &objMeta, MediaType srcMediaType);
 
     EvictResult EvictRemoveSrc(const std::string &key, const MmcMemObjMetaPtr &objMeta,
-                               const MmcBlobFilterPtr &srcFilter, uint32_t evictRank,
-                               MediaType srcMediaType, MediaType dstMedium, bool isSsdDelete);
+                               const MmcBlobFilterPtr &srcFilter, uint32_t evictRank, MediaType srcMediaType,
+                               MediaType dstMedium, bool isSsdDelete);
 
     bool HandleEvictSsdBranch(const std::string &key, const MmcMemObjMetaPtr &objMeta,
-                              const MmcBlobFilterPtr &srcFilter, uint32_t evictRank,
-                              MediaType srcMediaType, EvictResult &outResult);
+                              const MmcBlobFilterPtr &srcFilter, uint32_t evictRank, MediaType srcMediaType,
+                              EvictResult &outResult);
 
     EvictResult DispatchMoveBlob(const std::string &key, const MmcMemObjMetaPtr &objMeta,
-                                 const MmcBlobFilterPtr &srcFilter, uint32_t evictRank,
-                                 const MmcLocation &src, const MmcLocation &dst,
-                                 MediaType srcMediaType, MediaType dstMedium);
+                                 const MmcBlobFilterPtr &srcFilter, uint32_t evictRank, const MmcLocation &src,
+                                 const MmcLocation &dst, MediaType srcMediaType, MediaType dstMedium);
 
     Result BlobDeleteRpc(const std::string &key, const MmcMemBlobDesc &blob);
 
 private:
-
     struct RewarmEntry {
         size_t index;
         MmcMemObjMetaPtr memObj;
@@ -435,34 +421,25 @@ private:
                               std::map<uint32_t, std::vector<RewarmEntry>> &rankGroups,
                               std::vector<PendingRewarmWait> &pendingWaitList);
 
-    void RewarmRankGroup(uint32_t rank, std::vector<RewarmEntry> &group,
-                         const std::vector<std::string> &keys, uint32_t opRankId, uint32_t opSeq,
-                         std::vector<MmcMemMetaDesc> &objMetas);
+    void RewarmRankGroup(uint32_t rank, std::vector<RewarmEntry> &group, const std::vector<std::string> &keys,
+                         uint32_t opRankId, uint32_t opSeq, std::vector<MmcMemMetaDesc> &objMetas);
 
     void PendingWaitAndFill(const std::vector<std::string> &keys, uint32_t opRankId, uint32_t opSeq,
                             std::vector<MmcMemMetaDesc> &objMetas, PendingRewarmWait &w);
 
-    size_t BatchAllocForRewarm(const std::vector<std::string> &keys,
-                               const std::vector<RewarmEntry> &group,
+    size_t BatchAllocForRewarm(const std::vector<std::string> &keys, const std::vector<RewarmEntry> &group,
                                AllocResults &results);
 
-    size_t AttachAndCollectBatch(const std::vector<std::string> &keys,
-                                const std::vector<RewarmEntry> &group,
-                                AllocResults &results,
-                                BatchRpcData &batch);
+    size_t AttachAndCollectBatch(const std::vector<std::string> &keys, const std::vector<RewarmEntry> &group,
+                                 AllocResults &results, BatchRpcData &batch);
 
-    Result SendBatchRpc(uint32_t rank,
-                        const std::vector<std::string> &keys,
-                        const std::vector<RewarmEntry> &group,
-                        BatchRpcData &batch,
-                        AllocResults &results);
+    Result SendBatchRpc(uint32_t rank, const std::vector<std::string> &keys, const std::vector<RewarmEntry> &group,
+                        BatchRpcData &batch, AllocResults &results);
 
-    void RollbackEntry(const std::string &key, const RewarmEntry &entry,
-                       MmcMemBlobPtr &dstBlob, const MmcMemBlobDesc &dstDesc,
-                       MediaType dstMedia);
+    void RollbackEntry(const std::string &key, const RewarmEntry &entry, MmcMemBlobPtr &dstBlob,
+                       const MmcMemBlobDesc &dstDesc, MediaType dstMedia);
 
-    Result ApplyRewarm(const std::string &key, RewarmEntry &entry,
-                       MmcMemBlobPtr &dstBlob, const RewarmCtx &ctx,
+    Result ApplyRewarm(const std::string &key, RewarmEntry &entry, MmcMemBlobPtr &dstBlob, const RewarmCtx &ctx,
                        MmcMemMetaDesc &objMeta);
 
     Result RegisterGvaPendingWriteBlob(const std::string &key, uint64_t operateId, const MmcMemObjMetaPtr &objMeta,

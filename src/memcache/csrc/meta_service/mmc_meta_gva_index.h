@@ -113,8 +113,8 @@ private:
     }
 
     template<typename T>
-    T *QueryBlobInNamespace(SegmentNamespaceIndex<T> &nameSpace, SegmentReverseIndex &segment,
-                            uint64_t gva, uint64_t size)
+    T *QueryBlobInNamespace(SegmentNamespaceIndex<T> &nameSpace, SegmentReverseIndex &segment, uint64_t gva,
+                            uint64_t size)
     {
         if (size == 0 || !segment.Contains(gva)) {
             return nullptr;

@@ -9,4 +9,3 @@ spec:
   leaseDurationSeconds: 10  # 租约有效期（10秒）
   acquireTime: null
   renewTime: null
-

@@ -39,8 +39,8 @@ static bool HasSsdBlob(const MmcMemMetaDesc &objMeta, const std::string &key, co
 {
     for (const auto &blob : objMeta.blobs_) {
         if (static_cast<MediaType>(blob.mediaType_) == MEDIA_SSD) {
-            MMC_LOG_ERROR(caller << " returned SSD blob for key " << key
-                                << ", rank=" << blob.rank_ << ", gva=" << blob.gva_);
+            MMC_LOG_ERROR(caller << " returned SSD blob for key " << key << ", rank=" << blob.rank_
+                                 << ", gva=" << blob.gva_);
             return true;
         }
     }
@@ -150,10 +150,8 @@ Result MmcMetaMgrProxy::BatchUpdateState(const BatchUpdateRequest &req, BatchUpd
         Result ret = metaMangerPtr_->UpdateState(req.keys_[i], loc, action, req.operateId_);
         IncrementResultCounter(metricManager, RestMetricType::UPDATE_STATE, ret, req.ranks_[i]);
         if (ret != MMC_OK) {
-            MMC_LOG_ERROR("BatchUpdateState key[" << i << "]=" << req.keys_[i]
-                                                  << " failed, loc=" << loc << ", action="
-                                                  << static_cast<uint32_t>(action)
-                                                  << ", ret=" << ret);
+            MMC_LOG_ERROR("BatchUpdateState key[" << i << "]=" << req.keys_[i] << " failed, loc=" << loc
+                                                  << ", action=" << static_cast<uint32_t>(action) << ", ret=" << ret);
         }
         resp.results_.push_back(ret);
     }
@@ -161,7 +159,8 @@ Result MmcMetaMgrProxy::BatchUpdateState(const BatchUpdateRequest &req, BatchUpd
     // 汇总失败数
     size_t failCnt = 0;
     for (auto r : resp.results_) {
-        if (r != MMC_OK) failCnt++;
+        if (r != MMC_OK)
+            failCnt++;
     }
     MMC_LOG_DEBUG("BatchUpdateState exit, keysCnt=" << keyCount << ", failCnt=" << failCnt
                                                     << ", operateId=" << req.operateId_);
@@ -207,8 +206,7 @@ Result MmcMetaMgrProxy::BatchUpdateLease(const BatchUpdateLeaseRequest &req, Bat
         return MMC_OK;
     }
     if (req.operateIds_.size() != req.keys_.size()) {
-        MMC_LOG_ERROR("BatchUpdateLease invalid operateId count, key count:" << req.keys_.size()
-                                                                             << ", operateId count:"
+        MMC_LOG_ERROR("BatchUpdateLease invalid operateId count, key count:" << req.keys_.size() << ", operateId count:"
                                                                              << req.operateIds_.size());
         resp.ret_ = MMC_INVALID_PARAM;
         return MMC_OK;
@@ -361,10 +359,9 @@ Result MmcMetaMgrProxy::BatchGet(const BatchGetRequest &req, BatchAllocResponse 
     for (size_t i = 0; i < keyCount; ++i) {
         metricManager.IncrementRequestCounter(RestMetricType::GET, rank);
         auto &objMeta = objMetas[i];
-        if (objMeta.numBlobs_ == 0 || objMeta.blobs_.empty() ||
-            HasSsdBlob(objMeta, req.keys_[i], "BatchGet")) {
-            MMC_LOG_WARN("BatchGet key: " << req.keys_[i] << " no blob found, numBlobs: "
-                         << objMeta.numBlobs_ << ", blobs.size: " << objMeta.blobs_.size());
+        if (objMeta.numBlobs_ == 0 || objMeta.blobs_.empty() || HasSsdBlob(objMeta, req.keys_[i], "BatchGet")) {
+            MMC_LOG_WARN("BatchGet key: " << req.keys_[i] << " no blob found, numBlobs: " << objMeta.numBlobs_
+                                          << ", blobs.size: " << objMeta.blobs_.size());
             resp.numBlobs_[i] = 0;
             resp.blobs_[i] = {};
             resp.prots_[i] = 0;

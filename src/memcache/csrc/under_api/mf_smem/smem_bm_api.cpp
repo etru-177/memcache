@@ -93,8 +93,8 @@ Result MFSmemApi::LoadSymbol(const char *symbolName, void **target)
     void *sym = dlsym(gSmemHandle, symbolName);
     const char *err = dlerror();
     if (sym == nullptr) {
-        MMC_LOG_ERROR("MFSmemApi dlsym failed, symbol: " << symbolName << ", lib: " << gSmemLibName <<
-                        ", error: " << (err != nullptr ? err : "unknown"));
+        MMC_LOG_ERROR("MFSmemApi dlsym failed, symbol: " << symbolName << ", lib: " << gSmemLibName
+                                                         << ", error: " << (err != nullptr ? err : "unknown"));
         return MMC_ERROR;
     }
     *target = sym;

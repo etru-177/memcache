@@ -88,8 +88,7 @@ struct RankedOpMetrics {
         c.notFound.fetch_add(1, std::memory_order_relaxed);
     }
 
-    void AppendPerRankToStream(std::ostringstream &oss,
-                               const std::string &reqName, const std::string &succName,
+    void AppendPerRankToStream(std::ostringstream &oss, const std::string &reqName, const std::string &succName,
                                const std::string &failName, const std::string &nfName) const
     {
         std::shared_lock lock(mutex);
@@ -98,14 +97,18 @@ struct RankedOpMetrics {
                 continue;
             }
             auto rv = c.request.load(std::memory_order_relaxed);
-            if (rv > 0) oss << reqName << "{rank=\"" << rank << "\"} " << rv << '\n';
+            if (rv > 0)
+                oss << reqName << "{rank=\"" << rank << "\"} " << rv << '\n';
             auto sv = c.success.load(std::memory_order_relaxed);
-            if (sv > 0) oss << succName << "{rank=\"" << rank << "\"} " << sv << '\n';
+            if (sv > 0)
+                oss << succName << "{rank=\"" << rank << "\"} " << sv << '\n';
             auto fv = c.failure.load(std::memory_order_relaxed);
-            if (fv > 0) oss << failName << "{rank=\"" << rank << "\"} " << fv << '\n';
+            if (fv > 0)
+                oss << failName << "{rank=\"" << rank << "\"} " << fv << '\n';
             if (!nfName.empty()) {
                 auto nv = c.notFound.load(std::memory_order_relaxed);
-                if (nv > 0) oss << nfName << "{rank=\"" << rank << "\"} " << nv << '\n';
+                if (nv > 0)
+                    oss << nfName << "{rank=\"" << rank << "\"} " << nv << '\n';
             }
         }
     }
@@ -116,12 +119,14 @@ private:
         {
             std::shared_lock lock(mutex);
             auto it = ranks.find(rank);
-            if (it != ranks.end()) return it->second;
+            if (it != ranks.end())
+                return it->second;
         }
         {
             std::unique_lock lock(mutex);
             auto it = ranks.find(rank);
-            if (it != ranks.end()) return it->second;
+            if (it != ranks.end())
+                return it->second;
             return ranks[rank]; // default-constructs PerRankCounters{0,0,0,0}
         }
     }
@@ -164,12 +169,14 @@ private:
         {
             std::shared_lock lock(mutex);
             auto it = ranks.find(rank);
-            if (it != ranks.end()) return it->second;
+            if (it != ranks.end())
+                return it->second;
         }
         {
             std::unique_lock lock(mutex);
             auto it = ranks.find(rank);
-            if (it != ranks.end()) return it->second;
+            if (it != ranks.end())
+                return it->second;
             return ranks[rank]; // default-constructs std::atomic<uint64_t>(0)
         }
     }
@@ -235,31 +242,31 @@ struct MmcMetaMetricSnapshot {
     uint64_t unmountSuccessCount{0};
     uint64_t unmountFailureCount{0};
     // internal global counters
-    uint64_t evictCount{0};              // total eviction operations
-    uint64_t evictToSsdCount{0};         // evictions that moved data to SSD
-    uint64_t evictSsdDeleteCount{0};     // SSD blob deletions during eviction
-    uint64_t evictMemDeleteCount{0};     // DRAM/HBM blob deletions during eviction
-    uint64_t rewarmCount{0};             // total rewarm operations (SSD->DRAM)
-    uint64_t rewarmFailCount{0};         // failed rewarm operations
-    uint64_t getHitDramCount{0};         // Get requests served from DRAM
-    uint64_t getHitSsdCount{0};          // Get requests served from SSD (triggered rewarm)
-    uint64_t rewarmBytesCount{0};        // total bytes rewarmed from SSD to DRAM
-    uint64_t rewarmBytesCurrent{0};      // current inflight rewarm bytes
-    uint64_t keyCount{0};                // current number of stored keys
+    uint64_t evictCount{0};          // total eviction operations
+    uint64_t evictToSsdCount{0};     // evictions that moved data to SSD
+    uint64_t evictSsdDeleteCount{0}; // SSD blob deletions during eviction
+    uint64_t evictMemDeleteCount{0}; // DRAM/HBM blob deletions during eviction
+    uint64_t rewarmCount{0};         // total rewarm operations (SSD->DRAM)
+    uint64_t rewarmFailCount{0};     // failed rewarm operations
+    uint64_t getHitDramCount{0};     // Get requests served from DRAM
+    uint64_t getHitSsdCount{0};      // Get requests served from SSD (triggered rewarm)
+    uint64_t rewarmBytesCount{0};    // total bytes rewarmed from SSD to DRAM
+    uint64_t rewarmBytesCurrent{0};  // current inflight rewarm bytes
+    uint64_t keyCount{0};            // current number of stored keys
 
     // per-rank internal counters: key = rank ID, value = counter value
     // Only populated when MMC_ENABLE_PER_RANK_METRICS is enabled.
-    std::unordered_map<uint32_t, uint64_t> evictCountByRank;            // eviction operations per rank
-    std::unordered_map<uint32_t, uint64_t> evictToSsdCountByRank;       // evictions to SSD per rank
-    std::unordered_map<uint32_t, uint64_t> evictSsdDeleteCountByRank;   // SSD blob deletions on eviction per rank
-    std::unordered_map<uint32_t, uint64_t> evictMemDeleteCountByRank;   // DRAM/HBM blob deletions on eviction per rank
-    std::unordered_map<uint32_t, uint64_t> getHitDramCountByRank;       // Get requests that hit DRAM per rank
+    std::unordered_map<uint32_t, uint64_t> evictCountByRank;          // eviction operations per rank
+    std::unordered_map<uint32_t, uint64_t> evictToSsdCountByRank;     // evictions to SSD per rank
+    std::unordered_map<uint32_t, uint64_t> evictSsdDeleteCountByRank; // SSD blob deletions on eviction per rank
+    std::unordered_map<uint32_t, uint64_t> evictMemDeleteCountByRank; // DRAM/HBM blob deletions on eviction per rank
+    std::unordered_map<uint32_t, uint64_t> getHitDramCountByRank;     // Get requests that hit DRAM per rank
     // Get requests that hit SSD (triggered rewarm) per rank
     std::unordered_map<uint32_t, uint64_t> getHitSsdCountByRank;
-    std::unordered_map<uint32_t, uint64_t> rewarmCountByRank;           // rewarm operations per rank
-    std::unordered_map<uint32_t, uint64_t> rewarmFailCountByRank;       // failed rewarm operations per rank
-    std::unordered_map<uint32_t, uint64_t> rewarmBytesByRank;           // total bytes rewarmed per rank
-    std::unordered_map<uint32_t, uint64_t> rewarmBytesCurrentByRank;    // current inflight rewarm bytes per rank
+    std::unordered_map<uint32_t, uint64_t> rewarmCountByRank;        // rewarm operations per rank
+    std::unordered_map<uint32_t, uint64_t> rewarmFailCountByRank;    // failed rewarm operations per rank
+    std::unordered_map<uint32_t, uint64_t> rewarmBytesByRank;        // total bytes rewarmed per rank
+    std::unordered_map<uint32_t, uint64_t> rewarmBytesCurrentByRank; // current inflight rewarm bytes per rank
 };
 
 class MmcMetaMetricManager {

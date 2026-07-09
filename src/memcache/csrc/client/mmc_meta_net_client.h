@@ -31,13 +31,12 @@ constexpr int RETRY_LOG_INTERVAL = 10;
 using ClientRetryHandler = std::function<int32_t(void)>;
 using ClientReplicateHandler = std::function<int32_t(
     const std::vector<uint32_t> &ops, const std::vector<std::string> &keys, const std::vector<MmcMemBlobDesc> &blobs)>;
-using ClientBlobCopyHandler = std::function<int32_t(const std::string& key, const MmcMemBlobDesc &src,
-                                                    const MmcMemBlobDesc &dst)>;
-using ClientBlobDeleteHandler = std::function<int32_t(const std::string& key,
-                                                    const MmcMemBlobDesc &blob)>;
-using ClientBatchBlobCopyHandler = std::function<std::vector<Result>(
-    const std::vector<std::string>& keys, const std::vector<MmcMemBlobDesc>& srcBlobs,
-    const std::vector<MmcMemBlobDesc>& dstBlobs)>;
+using ClientBlobCopyHandler =
+    std::function<int32_t(const std::string &key, const MmcMemBlobDesc &src, const MmcMemBlobDesc &dst)>;
+using ClientBlobDeleteHandler = std::function<int32_t(const std::string &key, const MmcMemBlobDesc &blob)>;
+using ClientBatchBlobCopyHandler =
+    std::function<std::vector<Result>(const std::vector<std::string> &keys, const std::vector<MmcMemBlobDesc> &srcBlobs,
+                                      const std::vector<MmcMemBlobDesc> &dstBlobs)>;
 class MetaNetClient : public MmcReferable {
 public:
     explicit MetaNetClient(const std::string &serverUrl, const std::string &inputName = "");

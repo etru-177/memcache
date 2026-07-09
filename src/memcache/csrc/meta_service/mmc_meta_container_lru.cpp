@@ -276,8 +276,7 @@ public:
             lruLock_.UnLock();
 
             const size_t numEvictObjs =
-                std::max(std::min(oriNum * (nowThreshold - low) / high, oriNum),
-                         static_cast<size_t>(1));
+                std::max(std::min(oriNum * (nowThreshold - low) / high, oriNum), static_cast<size_t>(1));
 
             for (size_t j = 0; j < numEvictObjs; ++j) {
                 EvictOneLeastRecentlyUsed(moveFunc, mediaType);

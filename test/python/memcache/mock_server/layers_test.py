@@ -21,18 +21,10 @@ if __name__ == "__main__":
     size = size1 + size2
     layer_keys = ['test_layers_' + str(i) for i in range(number)]
     for key in layer_keys:
-        res = client.put_from_layers(
-            key,
-            size,
-            1
-        )
+        res = client.put_from_layers(key, size, 1)
 
     for key in layer_keys:
-        res = client.get_into_layers(
-            key,
-            size,
-            1
-        )
+        res = client.get_into_layers(key, size, 1)
 
     # 批量接口
     # count = 1

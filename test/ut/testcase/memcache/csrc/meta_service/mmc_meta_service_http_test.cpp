@@ -61,8 +61,7 @@ constexpr int kHttpEvictThresholdLow = 60U;
 constexpr size_t kBytesPerKilobyte = 1024;
 constexpr size_t kKilobytesPerMegabyte = 1024;
 constexpr size_t kHttpLogRotationFileSizeMb = 2;
-constexpr size_t kHttpLogRotationFileSize =
-    kHttpLogRotationFileSizeMb * kKilobytesPerMegabyte * kBytesPerKilobyte;
+constexpr size_t kHttpLogRotationFileSize = kHttpLogRotationFileSizeMb * kKilobytesPerMegabyte * kBytesPerKilobyte;
 constexpr pid_t kHttpPidModuloBase = 1000;
 constexpr int kHttpCandidatePortAttemptStride = 3;
 constexpr int kHttpDefaultSocketProtocol = 0;
@@ -224,10 +223,9 @@ void MmcMetaServiceHttpTest::MountSegments()
 
 void MmcMetaServiceHttpTest::PrepareAllocatedKey()
 {
-    AllocRequest allocRequest(kHttpAllocKey,
-                              AllocOptions(SIZE_32K, kHttpExpectedBlobCount, MEDIA_HBM, {kHttpRankId},
-                                           kHttpAllocOffset),
-                              GenerateOperateId(kHttpRankId));
+    AllocRequest allocRequest(
+        kHttpAllocKey, AllocOptions(SIZE_32K, kHttpExpectedBlobCount, MEDIA_HBM, {kHttpRankId}, kHttpAllocOffset),
+        GenerateOperateId(kHttpRankId));
     AllocResponse allocResponse;
     ASSERT_EQ(metaMgrProxy_->Alloc(allocRequest, allocResponse), MMC_OK);
     ASSERT_EQ(allocResponse.numBlobs_, kHttpExpectedBlobCount);
@@ -386,8 +384,7 @@ TEST_F(MmcMetaServiceHttpTest, RoutesContract)
     EXPECT_FALSE(segmentRemainingJson.at("degraded").get<bool>());
     ASSERT_EQ(segmentRemainingJson.at("segments").size(), kHttpExpectedSegmentCount);
     EXPECT_EQ(segmentRemainingJson.at("segments").at(kHttpFirstItemIndex).at("segment_name"), kHttpHbmSegmentName);
-    EXPECT_EQ(segmentRemainingJson.at("segments").at(kHttpSecondItemIndex).at("segment_name"),
-              kHttpDramSegmentName);
+    EXPECT_EQ(segmentRemainingJson.at("segments").at(kHttpSecondItemIndex).at("segment_name"), kHttpDramSegmentName);
 
     auto removeAllKeysResponse = client.Delete("/all_keys");
     ASSERT_NE(removeAllKeysResponse, nullptr);
@@ -473,18 +470,15 @@ TEST_F(MmcMetaServiceHttpTest, MetricsContract)
     std::ostringstream expectedSummary;
     expectedSummary
         << "keys=" << kHttpExpectedBlobCount << " evict=" << snapshot.evictCount
-        << " evict_to_ssd=" << snapshot.evictToSsdCount
-        << " evict_ssd_delete=" << snapshot.evictSsdDeleteCount
-        << " evict_mem_delete=" << snapshot.evictMemDeleteCount
-        << " rewarm=" << snapshot.rewarmCount << " rewarm_fail=" << snapshot.rewarmFailCount
-        << " rewarm_bytes_total=" << snapshot.rewarmBytesCount
-        << " rewarm_bytes_current=" << snapshot.rewarmBytesCurrent
-        << " get_hit_dram=" << snapshot.getHitDramCount << " get_hit_ssd=" << snapshot.getHitSsdCount
-        << " hbm_used=" << SIZE_32K << "/" << kHttpSegmentCapacityBytes
-        << " dram_used=" << kHttpZeroUsedBytes << "/" << kHttpSegmentCapacityBytes
-        << " ssd_used=" << kHttpZeroUsedBytes << "/" << kHttpZeroUsedBytes
-        << " alloc_req=" << snapshot.allocRequestCount << " alloc_success=" << snapshot.allocSuccessCount
-        << " alloc_fail=" << snapshot.allocFailureCount << " batch_alloc_req=" << snapshot.batchAllocRequestCount
+        << " evict_to_ssd=" << snapshot.evictToSsdCount << " evict_ssd_delete=" << snapshot.evictSsdDeleteCount
+        << " evict_mem_delete=" << snapshot.evictMemDeleteCount << " rewarm=" << snapshot.rewarmCount
+        << " rewarm_fail=" << snapshot.rewarmFailCount << " rewarm_bytes_total=" << snapshot.rewarmBytesCount
+        << " rewarm_bytes_current=" << snapshot.rewarmBytesCurrent << " get_hit_dram=" << snapshot.getHitDramCount
+        << " get_hit_ssd=" << snapshot.getHitSsdCount << " hbm_used=" << SIZE_32K << "/" << kHttpSegmentCapacityBytes
+        << " dram_used=" << kHttpZeroUsedBytes << "/" << kHttpSegmentCapacityBytes << " ssd_used=" << kHttpZeroUsedBytes
+        << "/" << kHttpZeroUsedBytes << " alloc_req=" << snapshot.allocRequestCount
+        << " alloc_success=" << snapshot.allocSuccessCount << " alloc_fail=" << snapshot.allocFailureCount
+        << " batch_alloc_req=" << snapshot.batchAllocRequestCount
         << " batch_alloc_success=" << snapshot.batchAllocSuccessCount
         << " batch_alloc_fail=" << snapshot.batchAllocFailureCount << " get_req=" << snapshot.getRequestCount
         << " get_success=" << snapshot.getSuccessCount << " get_fail=" << snapshot.getFailureCount

@@ -40,7 +40,8 @@ protected:
     static uint64_t GetSegmentUsed(MmcRef<MmcMetaManager> &mgr, const std::string &medium)
     {
         for (const auto &s : mgr->GetAllSegmentInfo()) {
-            if (s["medium"] == medium) return s["allocatedSize"].get<uint64_t>();
+            if (s["medium"] == medium)
+                return s["allocatedSize"].get<uint64_t>();
         }
         return 0;
     }
@@ -48,7 +49,8 @@ protected:
     static bool HasMediumSegment(MmcRef<MmcMetaManager> &mgr, const std::string &medium)
     {
         for (const auto &s : mgr->GetAllSegmentInfo()) {
-            if (s["medium"] == medium) return true;
+            if (s["medium"] == medium)
+                return true;
         }
         return false;
     }
@@ -122,7 +124,8 @@ TEST_F(TestThreeTierCache, EvictDram_CascadingEviction)
     EXPECT_EQ(mgr->ExistKey(keys[4U]), MMC_OK);
     EXPECT_EQ(mgr->ExistKey(keys[5U]), MMC_OK);
 
-    for (const auto &k : keys) mgr->Remove(k);
+    for (const auto &k : keys)
+        mgr->Remove(k);
     mgr->Stop();
 }
 
@@ -164,11 +167,13 @@ TEST_F(TestThreeTierCache, MassivePut_MultiLevelEviction)
     // System should be consistent: at least some keys survive
     size_t existCount = 0;
     for (const auto &k : keys) {
-        if (mgr->ExistKey(k) == MMC_OK) existCount++;
+        if (mgr->ExistKey(k) == MMC_OK)
+            existCount++;
     }
     EXPECT_GE(existCount, 1u) << "At least some keys should survive cascading eviction";
 
-    for (const auto &k : keys) mgr->Remove(k);
+    for (const auto &k : keys)
+        mgr->Remove(k);
     mgr->Stop();
 }
 
@@ -224,7 +229,8 @@ TEST_F(TestThreeTierCache, RepeatedPut_OverwritesOldData)
 
     bool found32k = false;
     for (uint32_t i = 0; i < result.NumBlobs(); i++) {
-        if (result.blobs_[i].size_ == SIZE_32K) found32k = true;
+        if (result.blobs_[i].size_ == SIZE_32K)
+            found32k = true;
     }
     EXPECT_TRUE(found32k);
 
@@ -273,7 +279,8 @@ TEST_F(TestThreeTierCache, SsdWriteFailure_EvictionFallsBackToRemove)
     // System remains consistent — no crash
     EXPECT_EQ(mgr->ExistKey(keys.back()), MMC_OK);
 
-    for (const auto &k : keys) mgr->Remove(k);
+    for (const auto &k : keys)
+        mgr->Remove(k);
     mgr->Stop();
 }
 
@@ -340,7 +347,8 @@ TEST_F(TestThreeTierCache, SsdFull_DramEviction_HandlesGracefully)
     // System consistent
     EXPECT_EQ(mgr->ExistKey(keys.back()), MMC_OK);
 
-    for (const auto &k : keys) mgr->Remove(k);
+    for (const auto &k : keys)
+        mgr->Remove(k);
     mgr->Stop();
 }
 
@@ -448,8 +456,7 @@ TEST_F(TestThreeTierCache, GetLatency_Benchmark)
     MmcBlobFilterPtr filter = MmcMakeRef<MmcBlobFilter>(UINT32_MAX, MEDIA_NONE, READABLE);
     Result ret = mgr->Get(key, 1, filter, result);
 
-    auto elapsed = chrono::duration_cast<chrono::microseconds>(
-        chrono::steady_clock::now() - start).count();
+    auto elapsed = chrono::duration_cast<chrono::microseconds>(chrono::steady_clock::now() - start).count();
 
     EXPECT_EQ(ret, MMC_OK);
     EXPECT_LT(elapsed, 10000U) << "Get latency " << elapsed << "us exceeds 10ms target";
@@ -495,15 +502,15 @@ TEST_F(TestThreeTierCache, Eviction_Throughput)
         mgr->CheckAndEvict(MEDIA_DRAM, SIZE_32K);
     }
     usleep(500000UL);
-    auto evictUs = chrono::duration_cast<chrono::microseconds>(
-        chrono::steady_clock::now() - start).count();
+    auto evictUs = chrono::duration_cast<chrono::microseconds>(chrono::steady_clock::now() - start).count();
 
     double throughput = (numEvictions * 1e6) / std::max(evictUs, 1L);
-    printf("[PERF] Eviction throughput: %.1f evictions/sec (%d evictions in %ld us)\n",
-           throughput, numEvictions, evictUs);
+    printf("[PERF] Eviction throughput: %.1f evictions/sec (%d evictions in %ld us)\n", throughput, numEvictions,
+           evictUs);
     EXPECT_GE(numEvictions, 1);
 
-    for (const auto &k : keys) mgr->Remove(k);
+    for (const auto &k : keys)
+        mgr->Remove(k);
     mgr->Stop();
 }
 
@@ -536,15 +543,13 @@ TEST_F(TestThreeTierCache, ThreeTierFullPath_LatencyRegression)
         MmcMemMetaDesc meta;
         ASSERT_EQ(mgr->Alloc(key, allocReq, 1, meta), MMC_OK);
         ASSERT_EQ(mgr->UpdateState(key, dramLoc, MMC_WRITE_OK, 1), MMC_OK);
-        getAllocLat.push_back(chrono::duration_cast<chrono::microseconds>(
-            chrono::steady_clock::now() - t0).count());
+        getAllocLat.push_back(chrono::duration_cast<chrono::microseconds>(chrono::steady_clock::now() - t0).count());
 
         auto t1 = chrono::steady_clock::now();
         MmcMemMetaDesc result;
         MmcBlobFilterPtr filter = MmcMakeRef<MmcBlobFilter>(UINT32_MAX, MEDIA_NONE, READABLE);
         EXPECT_EQ(mgr->Get(key, 1, filter, result), MMC_OK);
-        getDramLat.push_back(chrono::duration_cast<chrono::microseconds>(
-            chrono::steady_clock::now() - t1).count());
+        getDramLat.push_back(chrono::duration_cast<chrono::microseconds>(chrono::steady_clock::now() - t1).count());
     }
 
     std::sort(getAllocLat.begin(), getAllocLat.end());

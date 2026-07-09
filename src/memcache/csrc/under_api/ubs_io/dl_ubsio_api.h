@@ -31,8 +31,8 @@ using ubsio_deleteFunc = int32_t (*)(const char *, uint32_t);
 using ubsio_get_lengthFunc = int32_t (*)(const char *, size_t *, uint32_t);
 using ubsio_batch_putFunc = int32_t (*)(const char **, uint32_t, void **, size_t *, int *, uint32_t);
 using ubsio_batch_getFunc = int32_t (*)(const char **, uint32_t, void **, size_t *, int *, uint32_t);
-using ubsio_batch_get_hbmFunc = int32_t (*)(const char **, uint32_t, void ***, size_t **,
-                                            uint32_t, uint32_t, int *, uint32_t);
+using ubsio_batch_get_hbmFunc = int32_t (*)(const char **, uint32_t, void ***, size_t **, uint32_t, uint32_t, int *,
+                                            uint32_t);
 using ubsio_batch_existFunc = int32_t (*)(const char **, uint32_t, bool *, uint32_t);
 using ubsio_batch_deleteFunc = int32_t (*)(const char **, uint32_t, int32_t *, uint32_t);
 using ubsio_batch_get_lengthFunc = int32_t (*)(const char **, uint32_t, size_t *, int32_t *, uint32_t);
@@ -108,7 +108,7 @@ public:
     }
 
     static inline Result UbsioBatchPut(const char **keys, uint32_t keys_count, void **bufs, size_t *lengths,
-                                     int *results, uint32_t flags)
+                                       int *results, uint32_t flags)
     {
         if (pUbsioBatchPut == nullptr) {
             return MMC_NOT_INITIALIZED;
@@ -117,7 +117,7 @@ public:
     }
 
     static inline Result UbsioBatchGet(const char **keys, uint32_t keys_count, void **bufs, size_t *lengths,
-                                     int *results, uint32_t flags)
+                                       int *results, uint32_t flags)
     {
         if (pUbsioBatchGet == nullptr) {
             return MMC_NOT_INITIALIZED;
@@ -126,7 +126,7 @@ public:
     }
 
     static inline Result UbsioBatchGetWithHBM(const char **keys, uint32_t keys_count, void ***bufs, size_t **lengths,
-                                     uint32_t lengthsRows, uint32_t lengthsCols, int *results, uint32_t flags)
+                                              uint32_t lengthsRows, uint32_t lengthsCols, int *results, uint32_t flags)
     {
         if (pUbsioBatchGetWithHBM == nullptr) {
             return MMC_NOT_INITIALIZED;
@@ -150,8 +150,8 @@ public:
         return pUbsioBatchDelete(keys, keys_count, results, flags);
     }
 
-    static inline Result UbsioBatchGetLength(const char **keys, uint32_t keys_count, size_t *lengths,
-                                           int32_t *results, uint32_t flags)
+    static inline Result UbsioBatchGetLength(const char **keys, uint32_t keys_count, size_t *lengths, int32_t *results,
+                                             uint32_t flags)
     {
         if (pUbsioBatchGetLength == nullptr) {
             return MMC_NOT_INITIALIZED;
@@ -197,7 +197,7 @@ private:
     static ubsio_batch_free_addressFunc pUbsioBatchFreeAddress;
     static ubsio_register_meta_event_callbackFunc pUbsioRegisterMetaEventCallback;
 };
-}  // namespace mmc
-}  // namespace ock
+} // namespace mmc
+} // namespace ock
 
-#endif  // MEM_FABRIC_MMC_DL_UBS_IO_API_H
+#endif // MEM_FABRIC_MMC_DL_UBS_IO_API_H

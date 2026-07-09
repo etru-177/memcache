@@ -24,15 +24,11 @@ class TestClient:
     def __del__(self):
         self._client.close()
 
-    def execute(self, cmd: str, args: list=None):
-        request = {
-            "cmd": cmd,
-            "args": args if args else []
-        }
+    def execute(self, cmd: str, args: list = None):
+        request = {"cmd": cmd, "args": args if args else []}
         self._send_request(json.dumps(request))
         response = self._read_response()
-        print(f"command: {cmd}\n"
-              f"response: {response}\n")
+        print(f"command: {cmd}\nresponse: {response}\n")
         return response
 
     def init_mmc(self):
@@ -43,7 +39,7 @@ class TestClient:
 
     def put(self, key, value):
         return self.execute("put", [key, value.decode('utf-8')])
-    
+
     def put_batch(self, keys, values):
         return self.execute("put_batch", [keys, values])
 

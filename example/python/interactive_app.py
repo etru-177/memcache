@@ -11,8 +11,8 @@
 # See the Mulan PSL v2 for more details.
 
 """Brief description of the module.
-   Interactive calling of memcache_hybrid
-   Available commands: put, get, remove, quit
+Interactive calling of memcache_hybrid
+Available commands: put, get, remove, quit
 """
 
 import faulthandler

@@ -35,8 +35,14 @@ public:
 
 protected:
     // 桥接访问 MmcMetaManager 私有成员（TestMmcMetaManager 是 friend）
-    static auto &MetaContainer(MmcRef<MmcMetaManager> &mgr) { return mgr->metaContainer_; }
-    static auto &GlobalAllocator(MmcRef<MmcMetaManager> &mgr) { return mgr->globalAllocator_; }
+    static auto &MetaContainer(MmcRef<MmcMetaManager> &mgr)
+    {
+        return mgr->metaContainer_;
+    }
+    static auto &GlobalAllocator(MmcRef<MmcMetaManager> &mgr)
+    {
+        return mgr->globalAllocator_;
+    }
 };
 TestMmcMetaManager::TestMmcMetaManager() {}
 
@@ -558,7 +564,8 @@ TEST_F(TestMmcMetaManager, RemoveMixedMedia_FreesAllAllocators)
     // 记录 Remove 前各介质使用量
     auto getUsed = [&](const std::string &medium) -> uint64_t {
         for (const auto &s : metaMng->GetAllSegmentInfo()) {
-            if (s["medium"] == medium) return s["allocatedSize"];
+            if (s["medium"] == medium)
+                return s["allocatedSize"];
         }
         return 0;
     };
@@ -597,7 +604,8 @@ TEST_F(TestMmcMetaManager, DramOnlyRemove_SsdPreFreeNoop)
     auto segs = metaMng->GetAllSegmentInfo();
     uint64_t dramUsed = 0;
     for (const auto &s : segs) {
-        if (s["medium"] == "DRAM") dramUsed = s["allocatedSize"];
+        if (s["medium"] == "DRAM")
+            dramUsed = s["allocatedSize"];
     }
     EXPECT_GT(dramUsed, 0u);
 
@@ -606,7 +614,8 @@ TEST_F(TestMmcMetaManager, DramOnlyRemove_SsdPreFreeNoop)
 
     segs = metaMng->GetAllSegmentInfo();
     for (const auto &s : segs) {
-        if (s["medium"] == "DRAM") EXPECT_EQ(s["allocatedSize"], 0u);
+        if (s["medium"] == "DRAM")
+            EXPECT_EQ(s["allocatedSize"], 0u);
     }
 
     metaMng->Stop();

@@ -96,10 +96,10 @@ public:
     }
 
 private:
-    uint64_t size_{};   // size <= 0， 表示key不存在或无效
+    uint64_t size_{}; // size <= 0， 表示key不存在或无效
     uint32_t blobNum_{};
-    std::vector<int> loc_{};  // blob's location
-    std::vector<int> type_{}; // blob's media type
+    std::vector<int> loc_{};      // blob's location
+    std::vector<int> type_{};     // blob's media type
     std::vector<uint64_t> gva_{}; // blob's gva
 };
 
@@ -210,9 +210,9 @@ public:
      * negative value on error
      */
     virtual std::vector<int> BatchGetIntoLayers(const std::vector<std::string> &keys,
-                                                 const std::vector<std::vector<void *>> &buffers,
-                                                 const std::vector<std::vector<size_t>> &sizes,
-                                                 const int32_t direct = 2) = 0;
+                                                const std::vector<std::vector<void *>> &buffers,
+                                                const std::vector<std::vector<size_t>> &sizes,
+                                                const int32_t direct = 2) = 0;
 
     /**
      * @brief Put object data directly from a pre-allocated buffer

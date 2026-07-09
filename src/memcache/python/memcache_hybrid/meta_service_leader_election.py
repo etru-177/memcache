@@ -65,11 +65,11 @@ logger = MmcLogger()
 
 class MetaServiceLeaderElection:
     """
-        提供基本的选主功能，利用以下4个功能，可以实现选主
-        1. 更新Lease的renew time，进行尝试选主: update_lease
-        2. 检查Leader状态：check_leader_status
-        3. 更新Pod为Master：update_pod_to_master
-        4. 更新Pod为Backup：update_pod_to_backup
+    提供基本的选主功能，利用以下4个功能，可以实现选主
+    1. 更新Lease的renew time，进行尝试选主: update_lease
+    2. 检查Leader状态：check_leader_status
+    3. 更新Pod为Master：update_pod_to_master
+    4. 更新Pod为Backup：update_pod_to_backup
     """
 
     def __init__(self, lease_name, namespace, pod_name, retry_period=3, log_level=1, log_path="/home/memcache"):
@@ -162,10 +162,7 @@ class MetaServiceLeaderElection:
     def check_leader_status(self):
         """检查当前主节点状态"""
         try:
-            lease = self.coordination_v1.read_namespaced_lease(
-                name=self.lease_name,
-                namespace=self.namespace
-            )
+            lease = self.coordination_v1.read_namespaced_lease(name=self.lease_name, namespace=self.namespace)
 
             holder = lease.spec.holder_identity
             if not holder:
@@ -207,10 +204,7 @@ class MetaServiceLeaderElection:
 
     def _update_lease(self, is_renew):
         # 尝试获取现有Lease
-        lease = self.coordination_v1.read_namespaced_lease(
-            name=self.lease_name,
-            namespace=self.namespace
-        )
+        lease = self.coordination_v1.read_namespaced_lease(name=self.lease_name, namespace=self.namespace)
 
         # 检查是否需要更新
         renew_time = _to_utc_datetime(lease.spec.renew_time)
@@ -230,9 +224,11 @@ class MetaServiceLeaderElection:
             self._inner_update_lease(is_renew, lease, current_time)
             return True
 
-        logger.debug(f"Lease={self.lease_name} is not expired: curHolder={holder}, "
-                     f"leaseDuration={self.lease_duration}, renewTime={renew_time}, currentTime={current_time}, "
-                     f"retry_period={self.retry_period}, my_pod_name={self.pod_name}")
+        logger.debug(
+            f"Lease={self.lease_name} is not expired: curHolder={holder}, "
+            f"leaseDuration={self.lease_duration}, renewTime={renew_time}, currentTime={current_time}, "
+            f"retry_period={self.retry_period}, my_pod_name={self.pod_name}"
+        )
         return False
 
     def _inner_update_lease(self, is_renew, lease, current_time):
@@ -244,34 +240,25 @@ class MetaServiceLeaderElection:
             lease.spec.acquire_time = current_time
 
         try:
-            self.coordination_v1.replace_namespaced_lease(
-                name=self.lease_name,
-                namespace=self.namespace,
-                body=lease
+            self.coordination_v1.replace_namespaced_lease(name=self.lease_name, namespace=self.namespace, body=lease)
+            logger.debug(
+                f"Succeed in updating lease={self.lease_name}: curHolder={self.pod_name}, "
+                f"leaseDuration={self.lease_duration}, renewTime={current_time}, currentTime={current_time}, "
+                f"retry_period={self.retry_period}, my_pod_name={self.pod_name}"
             )
-            logger.debug(f"Succeed in updating lease={self.lease_name}: curHolder={self.pod_name}, "
-                         f"leaseDuration={self.lease_duration}, renewTime={current_time}, currentTime={current_time}, "
-                         f"retry_period={self.retry_period}, my_pod_name={self.pod_name}")
         except Exception as e:
             logger.error(f'Failed in updating lease {self.pod_name=}, Exception: {e}')
 
     def _update_pod_label(self, labels):
         """更新当前Pod的标签"""
         try:
-            pod = self.core_v1.read_namespaced_pod(
-                name=self.pod_name,
-                namespace=self.namespace
-            )
+            pod = self.core_v1.read_namespaced_pod(name=self.pod_name, namespace=self.namespace)
 
             if pod.metadata.labels is None:
                 pod.metadata.labels = {}
             pod.metadata.labels.update(labels)
 
-            self.core_v1.patch_namespaced_pod(
-                name=self.pod_name,
-                namespace=self.namespace,
-                body=pod
-            )
+            self.core_v1.patch_namespaced_pod(name=self.pod_name, namespace=self.namespace, body=pod)
             logger.warning(f'Updated label of {self.pod_name=} to {labels=}')
         except ApiException as e:
             logger.error(f'Failed in updating label of {self.pod_name=} {labels=}, ApiException: {e}')
@@ -325,7 +312,7 @@ if __name__ == "__main__":
         pod_name=POD_NAME,
         retry_period=5,
         log_level=0,
-        log_path="/home/memcache"
+        log_path="/home/memcache",
     )
 
     try:

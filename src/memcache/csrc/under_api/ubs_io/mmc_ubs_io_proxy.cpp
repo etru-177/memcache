@@ -169,14 +169,15 @@ Result MmcUbsIoProxy::GetLength(const std::string &key, size_t &length)
 }
 
 Result MmcUbsIoProxy::BatchPut(const std::vector<std::string> &keys, const std::vector<void *> &bufs,
-    const std::vector<size_t> &lengths, std::vector<int> &results)
+                               const std::vector<size_t> &lengths, std::vector<int> &results)
 {
     MMC_ASSERT_LOG_AND_RETURN(started_, "started_ = " << started_, MMC_NOT_INITIALIZED);
     MMC_ASSERT_LOG_AND_RETURN(!keys.empty(), "keys are empty", MMC_INVALID_PARAM);
     MMC_ASSERT_LOG_AND_RETURN(keys.size() == bufs.size(),
-        "keys.size() = " << keys.size() << ", bufs.size() = " << bufs.size(), MMC_INVALID_PARAM);
+                              "keys.size() = " << keys.size() << ", bufs.size() = " << bufs.size(), MMC_INVALID_PARAM);
     MMC_ASSERT_LOG_AND_RETURN(keys.size() == lengths.size(),
-        "keys.size() = " << keys.size() << ", lengths.size() = " << lengths.size(), MMC_INVALID_PARAM);
+                              "keys.size() = " << keys.size() << ", lengths.size() = " << lengths.size(),
+                              MMC_INVALID_PARAM);
 
     const uint32_t keysCount = static_cast<uint32_t>(keys.size());
     std::vector<const char *> keyPtrs;
@@ -191,18 +192,19 @@ Result MmcUbsIoProxy::BatchPut(const std::vector<std::string> &keys, const std::
 
     TP_TRACE_BEGIN(TP_MMC_UBS_IO_BATCH_PUT);
     int32_t ret = DlUbsioApi::UbsioBatchPut(keyPtrs.data(), keysCount, bufferPtrs.data(), lengthCopy.data(),
-        results.data(), flags);
+                                            results.data(), flags);
     TP_TRACE_END(TP_MMC_UBS_IO_BATCH_PUT, ret);
     return ret;
 }
 
-Result MmcUbsIoProxy::BatchGet(const std::vector<std::string> &keys, void **bufs,
-    std::vector<size_t> &lengths, std::vector<int> &results)
+Result MmcUbsIoProxy::BatchGet(const std::vector<std::string> &keys, void **bufs, std::vector<size_t> &lengths,
+                               std::vector<int> &results)
 {
     MMC_ASSERT_LOG_AND_RETURN(started_, "started_ = " << started_, MMC_NOT_INITIALIZED);
     MMC_ASSERT_LOG_AND_RETURN(!keys.empty(), "keys are empty", MMC_INVALID_PARAM);
     MMC_ASSERT_LOG_AND_RETURN(keys.size() == lengths.size(),
-        "keys.size() = " << keys.size() << ", lengths.size() = " << lengths.size(), MMC_INVALID_PARAM);
+                              "keys.size() = " << keys.size() << ", lengths.size() = " << lengths.size(),
+                              MMC_INVALID_PARAM);
 
     const uint32_t keysCount = static_cast<uint32_t>(keys.size());
     std::vector<const char *> keyPtrs;
@@ -220,21 +222,22 @@ Result MmcUbsIoProxy::BatchGet(const std::vector<std::string> &keys, void **bufs
 }
 
 Result MmcUbsIoProxy::BatchGetWithHBM(const std::vector<std::string> &keys,
-                                      std::vector<std::vector<void*>>& npuBufAddrs,
-                                      std::vector<std::vector<size_t>>& npuBufLengths,
-                                      std::vector<int> &results)
+                                      std::vector<std::vector<void *>> &npuBufAddrs,
+                                      std::vector<std::vector<size_t>> &npuBufLengths, std::vector<int> &results)
 {
     MMC_ASSERT_LOG_AND_RETURN(started_, "started_ = " << started_, MMC_NOT_INITIALIZED);
     MMC_ASSERT_LOG_AND_RETURN(!keys.empty(), "keys are empty", MMC_INVALID_PARAM);
     MMC_ASSERT_LOG_AND_RETURN(keys.size() == npuBufAddrs.size() && keys.size() == npuBufLengths.size(),
-        "keys.size() = " << keys.size() << ", npuBufAddrs.size() = " << npuBufAddrs.size()
-        << ", npuBufLengths.size() = " << npuBufLengths.size(), MMC_INVALID_PARAM);
+                              "keys.size() = " << keys.size() << ", npuBufAddrs.size() = " << npuBufAddrs.size()
+                                               << ", npuBufLengths.size() = " << npuBufLengths.size(),
+                              MMC_INVALID_PARAM);
     uint32_t lengthsRows = keys.size();
     uint32_t lengthsCols = npuBufAddrs[0].size();
     for (uint32_t i = 1; i < lengthsRows; i++) {
         MMC_ASSERT_LOG_AND_RETURN(lengthsCols == npuBufAddrs[i].size(),
-            "lengthsCols = " << lengthsCols << ", npuBufAddrs[" << i << "].size() = " << npuBufAddrs[i].size(),
-            MMC_INVALID_PARAM);
+                                  "lengthsCols = " << lengthsCols << ", npuBufAddrs[" << i
+                                                   << "].size() = " << npuBufAddrs[i].size(),
+                                  MMC_INVALID_PARAM);
     }
     const uint32_t keysCount = static_cast<uint32_t>(keys.size());
     std::vector<const char *> keyPtrs;
@@ -242,12 +245,12 @@ Result MmcUbsIoProxy::BatchGetWithHBM(const std::vector<std::string> &keys,
     for (const auto &key : keys) {
         keyPtrs.emplace_back(key.c_str());
     }
-    void*** bufs = new (std::nothrow) void** [lengthsRows];
+    void ***bufs = new (std::nothrow) void **[lengthsRows];
     if (bufs == nullptr) {
         MMC_LOG_ERROR("alloc buf failed");
         return MMC_ERROR;
     }
-    size_t** lengths = new (std::nothrow) size_t* [lengthsRows];
+    size_t **lengths = new (std::nothrow) size_t *[lengthsRows];
     if (lengths == nullptr) {
         MMC_LOG_ERROR("alloc length failed");
         delete[] bufs;
@@ -260,8 +263,8 @@ Result MmcUbsIoProxy::BatchGetWithHBM(const std::vector<std::string> &keys,
 
     uint32_t flags = 0;
     TP_TRACE_BEGIN(TP_MMC_UBS_IO_BATCH_GET);
-    int32_t ret = DlUbsioApi::UbsioBatchGetWithHBM(keyPtrs.data(), keysCount, bufs, lengths, lengthsRows,
-                                                   lengthsCols, results.data(), flags);
+    int32_t ret = DlUbsioApi::UbsioBatchGetWithHBM(keyPtrs.data(), keysCount, bufs, lengths, lengthsRows, lengthsCols,
+                                                   results.data(), flags);
     TP_TRACE_END(TP_MMC_UBS_IO_BATCH_GET, ret);
     delete[] bufs;
     delete[] lengths;
@@ -319,7 +322,7 @@ Result MmcUbsIoProxy::BatchDelete(const std::vector<std::string> &keys, std::vec
 }
 
 Result MmcUbsIoProxy::BatchGetLength(const std::vector<std::string> &keys, std::vector<size_t> &lengths,
-    std::vector<int32_t> &results)
+                                     std::vector<int32_t> &results)
 {
     MMC_ASSERT_LOG_AND_RETURN(started_, "started_ = " << started_, MMC_NOT_INITIALIZED);
     MMC_ASSERT_LOG_AND_RETURN(!keys.empty(), "keys are empty", MMC_INVALID_PARAM);
@@ -339,5 +342,5 @@ Result MmcUbsIoProxy::BatchGetLength(const std::vector<std::string> &keys, std::
     TP_TRACE_END(TP_MMC_UBS_IO_BATCH_LENGTH, ret);
     return ret;
 }
-}
-}
+} // namespace mmc
+} // namespace ock

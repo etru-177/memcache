@@ -459,8 +459,9 @@ Result NetEngineAcc::HandleNeqRequest(const TcpReqContext &context)
     MMC_LOG_DEBUG("HandleNeqRequest Header " << context.Header().ToString());
     int16_t opCode = context.Header().result;
     MMC_ASSERT_LOG_AND_RETURN(opCode >= gHandlerMin && opCode < gHandlerMax,
-        "opCode = " << opCode << ", gHandlerMin = " << gHandlerMin << ", gHandlerMax = " << gHandlerMax,
-        MMC_NET_REQ_HANDLE_NO_FOUND);
+                              "opCode = " << opCode << ", gHandlerMin = " << gHandlerMin
+                                          << ", gHandlerMax = " << gHandlerMax,
+                              MMC_NET_REQ_HANDLE_NO_FOUND);
     if (reqReceivedHandlers_[opCode] == nullptr) {
         /*  client do reply response */
         auto res = HandleAllRequests4Response(context);

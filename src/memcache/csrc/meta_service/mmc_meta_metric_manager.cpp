@@ -118,7 +118,7 @@ MmcMetaMetricManager::MmcMetaMetricManager()
       rewarmBytesCounter_("memcache_rewarm_bytes_total", "Total bytes rewarmed from SSD to DRAM"),
       rewarmBytesCurrentGauge_("memcache_rewarm_bytes_current", "Current bytes occupied by rewarmed data"),
       keyCountGauge_("memcache_stored_keys", "Current number of stored keys")
-      // per-rank counters (pure data, metric names passed at serialization time)
+// per-rank counters (pure data, metric names passed at serialization time)
 {}
 
 MmcMetaMetricSnapshot MmcMetaMetricManager::GetSnapshot() const
@@ -213,54 +213,48 @@ MmcMetaMetricSnapshot MmcMetaMetricManager::GetSnapshot() const
 
 void MmcMetaMetricManager::AppendRestApiPerRankMetrics(std::ostringstream &oss) const
 {
-    rankedAlloc_.AppendPerRankToStream(oss,
-        "memcache_alloc_requests_total", "memcache_alloc_successes_total",
-        "memcache_alloc_failures_total", "");
-    rankedBatchAlloc_.AppendPerRankToStream(oss,
-        "memcache_batch_alloc_requests_total", "memcache_batch_alloc_successes_total",
-        "memcache_batch_alloc_failures_total", "");
-    rankedGet_.AppendPerRankToStream(oss,
-        "memcache_get_requests_total", "memcache_get_successes_total",
-        "memcache_get_failures_total", "memcache_get_not_found_total");
-    rankedBatchGet_.AppendPerRankToStream(oss,
-        "memcache_batch_get_requests_total", "memcache_batch_get_successes_total",
-        "memcache_batch_get_failures_total", "memcache_batch_get_not_found_total");
-    rankedRemove_.AppendPerRankToStream(oss,
-        "memcache_remove_requests_total", "memcache_remove_successes_total",
-        "memcache_remove_failures_total", "memcache_remove_not_found_total");
-    rankedBatchRemove_.AppendPerRankToStream(oss,
-        "memcache_batch_remove_requests_total", "memcache_batch_remove_successes_total",
+    rankedAlloc_.AppendPerRankToStream(oss, "memcache_alloc_requests_total", "memcache_alloc_successes_total",
+                                       "memcache_alloc_failures_total", "");
+    rankedBatchAlloc_.AppendPerRankToStream(oss, "memcache_batch_alloc_requests_total",
+                                            "memcache_batch_alloc_successes_total",
+                                            "memcache_batch_alloc_failures_total", "");
+    rankedGet_.AppendPerRankToStream(oss, "memcache_get_requests_total", "memcache_get_successes_total",
+                                     "memcache_get_failures_total", "memcache_get_not_found_total");
+    rankedBatchGet_.AppendPerRankToStream(oss, "memcache_batch_get_requests_total",
+                                          "memcache_batch_get_successes_total", "memcache_batch_get_failures_total",
+                                          "memcache_batch_get_not_found_total");
+    rankedRemove_.AppendPerRankToStream(oss, "memcache_remove_requests_total", "memcache_remove_successes_total",
+                                        "memcache_remove_failures_total", "memcache_remove_not_found_total");
+    rankedBatchRemove_.AppendPerRankToStream(
+        oss, "memcache_batch_remove_requests_total", "memcache_batch_remove_successes_total",
         "memcache_batch_remove_failures_total", "memcache_batch_remove_not_found_total");
-    rankedRemoveAll_.AppendPerRankToStream(oss,
-        "memcache_remove_all_requests_total", "memcache_remove_all_successes_total",
-        "memcache_remove_all_failures_total", "");
-    rankedUpdateState_.AppendPerRankToStream(oss,
-        "memcache_update_state_requests_total", "memcache_update_state_successes_total",
+    rankedRemoveAll_.AppendPerRankToStream(oss, "memcache_remove_all_requests_total",
+                                           "memcache_remove_all_successes_total", "memcache_remove_all_failures_total",
+                                           "");
+    rankedUpdateState_.AppendPerRankToStream(
+        oss, "memcache_update_state_requests_total", "memcache_update_state_successes_total",
         "memcache_update_state_failures_total", "memcache_update_state_not_found_total");
-    rankedBatchUpdateState_.AppendPerRankToStream(oss,
-        "memcache_batch_update_state_requests_total", "memcache_batch_update_state_successes_total",
+    rankedBatchUpdateState_.AppendPerRankToStream(
+        oss, "memcache_batch_update_state_requests_total", "memcache_batch_update_state_successes_total",
         "memcache_batch_update_state_failures_total", "memcache_batch_update_state_not_found_total");
-    rankedQuery_.AppendPerRankToStream(oss,
-        "memcache_query_requests_total", "memcache_query_successes_total",
-        "memcache_query_failures_total", "memcache_query_not_found_total");
-    rankedBatchQuery_.AppendPerRankToStream(oss,
-        "memcache_batch_query_requests_total", "memcache_batch_query_successes_total",
+    rankedQuery_.AppendPerRankToStream(oss, "memcache_query_requests_total", "memcache_query_successes_total",
+                                       "memcache_query_failures_total", "memcache_query_not_found_total");
+    rankedBatchQuery_.AppendPerRankToStream(
+        oss, "memcache_batch_query_requests_total", "memcache_batch_query_successes_total",
         "memcache_batch_query_failures_total", "memcache_batch_query_not_found_total");
-    rankedGetAllKeys_.AppendPerRankToStream(oss,
-        "memcache_get_all_keys_requests_total", "memcache_get_all_keys_successes_total",
-        "memcache_get_all_keys_failures_total", "");
-    rankedExistKey_.AppendPerRankToStream(oss,
-        "memcache_exist_key_requests_total", "memcache_exist_key_successes_total",
-        "memcache_exist_key_failures_total", "memcache_exist_key_not_found_total");
-    rankedBatchExistKey_.AppendPerRankToStream(oss,
-        "memcache_batch_exist_key_requests_total", "memcache_batch_exist_key_successes_total",
+    rankedGetAllKeys_.AppendPerRankToStream(oss, "memcache_get_all_keys_requests_total",
+                                            "memcache_get_all_keys_successes_total",
+                                            "memcache_get_all_keys_failures_total", "");
+    rankedExistKey_.AppendPerRankToStream(oss, "memcache_exist_key_requests_total",
+                                          "memcache_exist_key_successes_total", "memcache_exist_key_failures_total",
+                                          "memcache_exist_key_not_found_total");
+    rankedBatchExistKey_.AppendPerRankToStream(
+        oss, "memcache_batch_exist_key_requests_total", "memcache_batch_exist_key_successes_total",
         "memcache_batch_exist_key_failures_total", "memcache_batch_exist_key_not_found_total");
-    rankedMount_.AppendPerRankToStream(oss,
-        "memcache_mount_requests_total", "memcache_mount_successes_total",
-        "memcache_mount_failures_total", "");
-    rankedUnmount_.AppendPerRankToStream(oss,
-        "memcache_unmount_requests_total", "memcache_unmount_successes_total",
-        "memcache_unmount_failures_total", "");
+    rankedMount_.AppendPerRankToStream(oss, "memcache_mount_requests_total", "memcache_mount_successes_total",
+                                       "memcache_mount_failures_total", "");
+    rankedUnmount_.AppendPerRankToStream(oss, "memcache_unmount_requests_total", "memcache_unmount_successes_total",
+                                         "memcache_unmount_failures_total", "");
 }
 
 // global dispatching (unchanged)

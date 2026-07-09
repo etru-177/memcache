@@ -22,28 +22,28 @@ using namespace ock::mmc;
 
 // 测试用常量定义
 namespace {
-    const char VALID_IPV4_URL[] = "tcp://192.168.1.1:8080";
-    const char VALID_IPV6_URL[] = "tcp://[::1]:9090";
-    const char VALID_HTTP_URL[] = "http://10.0.0.1:7070";
-    const char VALID_HTTPS_URL[] = "https://172.16.0.1:6060";
-    const char URL_WITHOUT_PROTOCOL[] = "192.168.1.100:5050";
-    const char INVALID_URL_EMPTY[] = "";
-    const char INVALID_URL_NO_PORT[] = "tcp://192.168.1.1";
-    const char INVALID_URL_INVALID_PORT[] = "tcp://192.168.1.1:99999";
-    const char INVALID_URL_ZERO_PORT[] = "tcp://192.168.1.1:0";
-    const char INVALID_URL_NEGATIVE_PORT[] = "tcp://192.168.1.1:-1";
-    const char INVALID_URL_INVALID_IPV4[] = "tcp://999.999.999.999:8080";
-    const char INVALID_URL_INVALID_IPV6[] = "tcp://[invalid]:8080";
-    const uint16_t VALID_PORT_8080 = 8080;
-    const uint16_t VALID_PORT_9090 = 9090;
-    const uint16_t VALID_PORT_7070 = 7070;
-    const uint16_t VALID_PORT_6060 = 6060;
-    const uint16_t VALID_PORT_5050 = 5050;
-    const uint16_t MIN_VALID_PORT = 1;
-    const uint16_t MAX_VALID_PORT = 65535;
-    const int AF_INET_VALUE = AF_INET;
-    const int AF_INET6_VALUE = AF_INET6;
-}
+const char VALID_IPV4_URL[] = "tcp://192.168.1.1:8080";
+const char VALID_IPV6_URL[] = "tcp://[::1]:9090";
+const char VALID_HTTP_URL[] = "http://10.0.0.1:7070";
+const char VALID_HTTPS_URL[] = "https://172.16.0.1:6060";
+const char URL_WITHOUT_PROTOCOL[] = "192.168.1.100:5050";
+const char INVALID_URL_EMPTY[] = "";
+const char INVALID_URL_NO_PORT[] = "tcp://192.168.1.1";
+const char INVALID_URL_INVALID_PORT[] = "tcp://192.168.1.1:99999";
+const char INVALID_URL_ZERO_PORT[] = "tcp://192.168.1.1:0";
+const char INVALID_URL_NEGATIVE_PORT[] = "tcp://192.168.1.1:-1";
+const char INVALID_URL_INVALID_IPV4[] = "tcp://999.999.999.999:8080";
+const char INVALID_URL_INVALID_IPV6[] = "tcp://[invalid]:8080";
+const uint16_t VALID_PORT_8080 = 8080;
+const uint16_t VALID_PORT_9090 = 9090;
+const uint16_t VALID_PORT_7070 = 7070;
+const uint16_t VALID_PORT_6060 = 6060;
+const uint16_t VALID_PORT_5050 = 5050;
+const uint16_t MIN_VALID_PORT = 1;
+const uint16_t MAX_VALID_PORT = 65535;
+const int AF_INET_VALUE = AF_INET;
+const int AF_INET6_VALUE = AF_INET6;
+} // namespace
 
 class TestUrlParser : public testing::Test {
 public:
@@ -67,7 +67,7 @@ TEST_F(TestUrlParser, ParseValidIpv4Url_Success)
     bool ret = parser_.Initialize(VALID_IPV4_URL);
     ASSERT_TRUE(ret);
     ASSERT_TRUE(parser_.IsInitialized());
-    
+
     EXPECT_EQ(parser_.GetIp(), "192.168.1.1");
     EXPECT_EQ(parser_.GetPort(), VALID_PORT_8080);
     EXPECT_FALSE(parser_.IsIpv6());
@@ -81,7 +81,7 @@ TEST_F(TestUrlParser, ParseValidIpv6UrlWithBrackets_Success)
     bool ret = parser_.Initialize(VALID_IPV6_URL);
     ASSERT_TRUE(ret);
     ASSERT_TRUE(parser_.IsInitialized());
-    
+
     EXPECT_EQ(parser_.GetIp(), "::1");
     EXPECT_EQ(parser_.GetPort(), VALID_PORT_9090);
     EXPECT_TRUE(parser_.IsIpv6());
@@ -95,7 +95,7 @@ TEST_F(TestUrlParser, ParseHttpUrl_Success)
     bool ret = parser_.Initialize(VALID_HTTP_URL);
     ASSERT_TRUE(ret);
     ASSERT_TRUE(parser_.IsInitialized());
-    
+
     EXPECT_EQ(parser_.GetIp(), "10.0.0.1");
     EXPECT_EQ(parser_.GetPort(), VALID_PORT_7070);
     EXPECT_FALSE(parser_.IsIpv6());
@@ -108,7 +108,7 @@ TEST_F(TestUrlParser, ParseHttpsUrl_Success)
     bool ret = parser_.Initialize(VALID_HTTPS_URL);
     ASSERT_TRUE(ret);
     ASSERT_TRUE(parser_.IsInitialized());
-    
+
     EXPECT_EQ(parser_.GetIp(), "172.16.0.1");
     EXPECT_EQ(parser_.GetPort(), VALID_PORT_6060);
     EXPECT_FALSE(parser_.IsIpv6());
@@ -121,7 +121,7 @@ TEST_F(TestUrlParser, ParseUrlWithoutProtocol_Success)
     bool ret = parser_.Initialize(URL_WITHOUT_PROTOCOL);
     ASSERT_TRUE(ret);
     ASSERT_TRUE(parser_.IsInitialized());
-    
+
     EXPECT_EQ(parser_.GetIp(), "192.168.1.100");
     EXPECT_EQ(parser_.GetPort(), VALID_PORT_5050);
     EXPECT_FALSE(parser_.IsIpv6());
@@ -134,7 +134,7 @@ TEST_F(TestUrlParser, ParseEmptyUrl_Fail)
     bool ret = parser_.Initialize(INVALID_URL_EMPTY);
     ASSERT_FALSE(ret);
     ASSERT_FALSE(parser_.IsInitialized());
-    
+
     EXPECT_EQ(parser_.GetIp(), "");
     EXPECT_EQ(parser_.GetPort(), 0);
 }
@@ -192,10 +192,10 @@ TEST_F(TestUrlParser, InitializeMultipleTimes_Success)
 {
     bool ret1 = parser_.Initialize(VALID_IPV4_URL);
     ASSERT_TRUE(ret1);
-    
+
     bool ret2 = parser_.Initialize(VALID_IPV6_URL);
     ASSERT_TRUE(ret2);
-    
+
     // 应该保留第一次初始化的值
     EXPECT_EQ(parser_.GetIp(), "192.168.1.1");
     EXPECT_EQ(parser_.GetPort(), VALID_PORT_8080);
@@ -206,10 +206,10 @@ TEST_F(TestUrlParser, GetSockAddr_ValidAfterInit)
 {
     bool ret = parser_.Initialize(VALID_IPV4_URL);
     ASSERT_TRUE(ret);
-    
+
     const struct sockaddr *addr = parser_.GetSockAddr();
     EXPECT_NE(addr, nullptr);
-    
+
     socklen_t addrLen = parser_.GetAddrLen();
     EXPECT_EQ(addrLen, sizeof(struct sockaddr_in));
 }
@@ -219,7 +219,7 @@ TEST_F(TestUrlParser, GetSockAddr_BeforeInit_ReturnNull)
 {
     const struct sockaddr *addr = parser_.GetSockAddr();
     EXPECT_EQ(addr, nullptr);
-    
+
     socklen_t addrLen = parser_.GetAddrLen();
     EXPECT_EQ(addrLen, 0);
 }
@@ -229,14 +229,14 @@ TEST_F(TestUrlParser, GetPeerAddressIpv4_Success)
 {
     bool ret = parser_.Initialize(VALID_IPV4_URL);
     ASSERT_TRUE(ret);
-    
+
     const string peerIp = "192.168.1.2";
     const uint16_t peerPort = 8081;
-    
+
     auto [addr, size] = parser_.GetPeerAddress(peerIp, peerPort);
     EXPECT_NE(addr, nullptr);
     EXPECT_EQ(size, sizeof(struct sockaddr_in));
-    
+
     // 验证地址内容
     const auto *addrIn = reinterpret_cast<const struct sockaddr_in *>(addr);
     EXPECT_EQ(addrIn->sin_family, AF_INET_VALUE);
@@ -248,14 +248,14 @@ TEST_F(TestUrlParser, GetPeerAddressIpv6_Success)
 {
     bool ret = parser_.Initialize(VALID_IPV6_URL);
     ASSERT_TRUE(ret);
-    
+
     const string peerIp = "::2";
     const uint16_t peerPort = 9091;
-    
+
     auto [addr, size] = parser_.GetPeerAddress(peerIp, peerPort);
     EXPECT_NE(addr, nullptr);
     EXPECT_EQ(size, sizeof(struct sockaddr_in6));
-    
+
     // 验证地址内容
     const auto *addrIn6 = reinterpret_cast<const struct sockaddr_in6 *>(addr);
     EXPECT_EQ(addrIn6->sin6_family, AF_INET6_VALUE);
@@ -267,10 +267,10 @@ TEST_F(TestUrlParser, GetPeerAddressWithInvalidIp_Fail)
 {
     bool ret = parser_.Initialize(VALID_IPV4_URL);
     ASSERT_TRUE(ret);
-    
+
     const string invalidIp = "999.999.999.999";
     const uint16_t peerPort = 8081;
-    
+
     auto [addr, size] = parser_.GetPeerAddress(invalidIp, peerPort);
     EXPECT_EQ(addr, nullptr);
     EXPECT_EQ(size, 0U);
@@ -281,7 +281,7 @@ TEST_F(TestUrlParser, GetPeerAddressBeforeInit_Fail)
 {
     const string peerIp = "192.168.1.2";
     const uint16_t peerPort = 8081;
-    
+
     auto [addr, size] = parser_.GetPeerAddress(peerIp, peerPort);
     EXPECT_EQ(addr, nullptr);
     EXPECT_EQ(size, 0U);
@@ -343,10 +343,10 @@ TEST_F(TestIpAddressParserMgr, CreateParser_SameUrl_ReturnSameParser)
 {
     auto parser1 = mgr_.CreateParser(VALID_IPV4_URL);
     ASSERT_NE(parser1, nullptr);
-    
+
     auto parser2 = mgr_.CreateParser(VALID_IPV4_URL);
     ASSERT_NE(parser2, nullptr);
-    
+
     EXPECT_EQ(parser1, parser2);
 }
 
@@ -355,7 +355,7 @@ TEST_F(TestIpAddressParserMgr, GetParser_ByPort_Success)
 {
     auto parser = mgr_.CreateParser(VALID_IPV4_URL);
     ASSERT_NE(parser, nullptr);
-    
+
     auto retrievedParser = mgr_.GetParser(VALID_PORT_8080);
     ASSERT_NE(retrievedParser, nullptr);
     EXPECT_EQ(retrievedParser, parser);
@@ -374,18 +374,18 @@ TEST_F(TestIpAddressParserMgr, CreateParser_MultipleUrls_Success)
 {
     auto parser1 = mgr_.CreateParser(VALID_IPV4_URL);
     ASSERT_NE(parser1, nullptr);
-    
+
     auto parser2 = mgr_.CreateParser(VALID_IPV6_URL);
     ASSERT_NE(parser2, nullptr);
-    
+
     auto parser3 = mgr_.CreateParser(VALID_HTTP_URL);
     ASSERT_NE(parser3, nullptr);
-    
+
     // 验证不同的解析器
     EXPECT_NE(parser1, parser2);
     EXPECT_NE(parser1, parser3);
     EXPECT_NE(parser2, parser3);
-    
+
     // 验证可以通过端口获取
     EXPECT_NE(mgr_.GetParser(VALID_PORT_8080), nullptr);
     EXPECT_NE(mgr_.GetParser(VALID_PORT_9090), nullptr);

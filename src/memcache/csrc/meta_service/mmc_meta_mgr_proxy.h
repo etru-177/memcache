@@ -34,15 +34,15 @@ public:
     ~MmcMetaMgrProxy() override = default;
 
     Result Start(uint64_t leaseTtl, uint16_t evictThresholdHigh, uint16_t evictThresholdLow,
-                uint16_t rewarmDramWatermark, const MmcMetaExtConfig &extConfig = {})
+                 uint16_t rewarmDramWatermark, const MmcMetaExtConfig &extConfig = {})
     {
         std::lock_guard<std::mutex> guard(mutex_);
         if (started_) {
             MMC_LOG_INFO("MmcMetaMgrProxyDefault already started");
             return MMC_OK;
         }
-        metaMangerPtr_ = MmcMakeRef<MmcMetaManager>(leaseTtl, evictThresholdHigh, evictThresholdLow,
-                                                    rewarmDramWatermark, extConfig);
+        metaMangerPtr_ =
+            MmcMakeRef<MmcMetaManager>(leaseTtl, evictThresholdHigh, evictThresholdLow, rewarmDramWatermark, extConfig);
         if (metaMangerPtr_ == nullptr) {
             MMC_LOG_ERROR("new object failed, probably out of memory");
             return MMC_NEW_OBJECT_FAILED;
@@ -189,7 +189,7 @@ private:
     // Increments exactly one terminal result counter for a single operation: MMC_OK -> success, MMC_UNMATCHED_KEY ->
     // not_found, other errors including MMC_DUPLICATED_OBJECT -> failure.
     static void IncrementResultCounter(MmcMetaMetricManager &metricManager, RestMetricType type, Result ret,
-                                         uint32_t rank = UINT32_MAX)
+                                       uint32_t rank = UINT32_MAX)
     {
         if (ret == MMC_OK) {
             metricManager.IncrementSuccessCounter(type, rank);

@@ -57,7 +57,7 @@ TEST_F(TestUbsIoProxy, PutAndGet)
     std::string value = "test_value";
 
     // Put操作
-    result_ = proxy_->Put(key, const_cast<char*>(value.c_str()), value.size());
+    result_ = proxy_->Put(key, const_cast<char *>(value.c_str()), value.size());
     ASSERT_EQ(result_, MMC_OK);
 
     // Get操作
@@ -87,7 +87,7 @@ TEST_F(TestUbsIoProxy, Exist)
     ASSERT_NE(result_, true);
 
     // Put操作
-    result_ = proxy_->Put(key, const_cast<char*>(value.c_str()), value.size());
+    result_ = proxy_->Put(key, const_cast<char *>(value.c_str()), value.size());
     ASSERT_EQ(result_, MMC_OK);
 
     // 检查存在
@@ -102,7 +102,7 @@ TEST_F(TestUbsIoProxy, Delete)
     std::string value = "delete_test_value";
 
     // Put操作
-    result_ = proxy_->Put(key, const_cast<char*>(value.c_str()), value.size());
+    result_ = proxy_->Put(key, const_cast<char *>(value.c_str()), value.size());
     ASSERT_EQ(result_, MMC_OK);
 
     // 检查存在
@@ -126,7 +126,7 @@ TEST_F(TestUbsIoProxy, GetLength)
     size_t length = 0;
 
     // Put操作
-    result_ = proxy_->Put(key, const_cast<char*>(value.c_str()), value.size());
+    result_ = proxy_->Put(key, const_cast<char *>(value.c_str()), value.size());
     ASSERT_EQ(result_, MMC_OK);
 
     // GetLength操作
@@ -140,13 +140,13 @@ TEST_F(TestUbsIoProxy, BatchPutAndGet)
     // 测试批量Put和Get操作
     std::vector<std::string> keys = {"batch_key1", "batch_key2", "batch_key3"};
     std::vector<std::string> values = {"batch_value1", "batch_value2", "batch_value3"};
-    std::vector<void*> bufs;
+    std::vector<void *> bufs;
     std::vector<size_t> lengths;
     std::vector<int> results(keys.size());
 
     // 准备数据
-    for (const auto& value : values) {
-        bufs.push_back(const_cast<char*>(value.c_str()));
+    for (const auto &value : values) {
+        bufs.push_back(const_cast<char *>(value.c_str()));
         lengths.push_back(value.size());
     }
 
@@ -158,7 +158,7 @@ TEST_F(TestUbsIoProxy, BatchPutAndGet)
     }
 
     // 批量Get操作
-    std::vector<void*> get_bufs(keys.size(), nullptr);
+    std::vector<void *> get_bufs(keys.size(), nullptr);
     std::vector<size_t> get_lengths(keys.size(), 0);
     std::vector<int> get_results(keys.size());
 
@@ -166,7 +166,7 @@ TEST_F(TestUbsIoProxy, BatchPutAndGet)
     ASSERT_EQ(result_, MMC_OK);
     for (int i = 0; i < get_results.size(); ++i) {
         ASSERT_EQ(get_results[i], 0);
-        ASSERT_STREQ(static_cast<char*>(get_bufs[i]), values[i].c_str());
+        ASSERT_STREQ(static_cast<char *>(get_bufs[i]), values[i].c_str());
     }
 
     // 测试BatchGetFree操作（释放UBSIO分配的内存）
@@ -182,7 +182,7 @@ TEST_F(TestUbsIoProxy, BatchExist)
 
     // 只Put前两个键
     for (int i = 0; i < 2; ++i) {
-        result_ = proxy_->Put(keys[i], const_cast<char*>(values[i].c_str()), values[i].size());
+        result_ = proxy_->Put(keys[i], const_cast<char *>(values[i].c_str()), values[i].size());
         ASSERT_EQ(result_, MMC_OK);
     }
 
@@ -203,7 +203,7 @@ TEST_F(TestUbsIoProxy, BatchDelete)
 
     // Put所有键
     for (int i = 0; i < keys.size(); ++i) {
-        result_ = proxy_->Put(keys[i], const_cast<char*>(values[i].c_str()), values[i].size());
+        result_ = proxy_->Put(keys[i], const_cast<char *>(values[i].c_str()), values[i].size());
         ASSERT_EQ(result_, MMC_OK);
     }
 
@@ -216,7 +216,7 @@ TEST_F(TestUbsIoProxy, BatchDelete)
     }
 
     // 检查所有键都不存在
-    for (const auto& key : keys) {
+    for (const auto &key : keys) {
         result_ = proxy_->Exist(key);
         ASSERT_NE(result_, true);
     }
@@ -230,7 +230,7 @@ TEST_F(TestUbsIoProxy, BatchGetLength)
 
     // Put所有键
     for (int i = 0; i < keys.size(); ++i) {
-        result_ = proxy_->Put(keys[i], const_cast<char*>(values[i].c_str()), values[i].size());
+        result_ = proxy_->Put(keys[i], const_cast<char *>(values[i].c_str()), values[i].size());
         ASSERT_EQ(result_, MMC_OK);
     }
 

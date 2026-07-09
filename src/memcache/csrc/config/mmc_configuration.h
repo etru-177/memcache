@@ -205,8 +205,7 @@ public:
                    0);
         AddIntConf(OCK_MMC_REWARM_DRAM_WATERMARK,
                    VIntRange::Create(OCK_MMC_REWARM_DRAM_WATERMARK.first, MIN_PERCENT, MAX_PERCENT), 0);
-        AddBoolConf(OCK_MMC_PREFETCH_ENABLED,
-                    VStrEnum::Create(OCK_MMC_PREFETCH_ENABLED.first, BOOL_ENUM_STR), 0);
+        AddBoolConf(OCK_MMC_PREFETCH_ENABLED, VStrEnum::Create(OCK_MMC_PREFETCH_ENABLED.first, BOOL_ENUM_STR), 0);
         AddIntConf(OCK_MMC_META_LEASE_TTL_MS,
                    VIntRange::Create(OCK_MMC_META_LEASE_TTL_MS.first, MIN_LEASE_TTL_MS, MAX_LEASE_TTL_MS), 0);
 
@@ -231,7 +230,6 @@ public:
                    0);
         AddStrConf(OCK_MMC_CS_TLS_DECRYPTER_PATH,
                    VStrLength::Create(OCK_MMC_CS_TLS_DECRYPTER_PATH.first, TLS_PATH_MAX_LEN), 0);
-
     }
 
     void GetMetaServiceConfig(mmc_meta_service_config_t &config)
@@ -389,8 +387,8 @@ public:
         uint64_t alignment = DRAM_SIZE_ALIGNMENT;          // 默认 2MB 对齐
         std::string protocol(config.dataOpType);
 
-        if (protocol == "device_rdma" || protocol == "device_urma" || protocol == "device_uboe"
-            || protocol == "device_sdma") {
+        if (protocol == "device_rdma" || protocol == "device_urma" || protocol == "device_uboe" ||
+            protocol == "device_sdma") {
             alignment = GB_SIZE_ALIGNMENT;
         }
 

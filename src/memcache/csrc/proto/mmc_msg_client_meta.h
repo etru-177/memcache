@@ -276,7 +276,8 @@ struct BatchAllocRequest : MsgBase {
         packer.Serialize(destRankId);
         packer.Serialize(keys_);
         MMC_ASSERT_LOG_AND_RETURN(keys_.size() == options_.size(),
-            "keys_.size() = " << keys_.size() << ", options_.size() = " << options_.size(), MMC_ERROR);
+                                  "keys_.size() = " << keys_.size() << ", options_.size() = " << options_.size(),
+                                  MMC_ERROR);
         for (const auto &option : options_) {
             option.Serialize(packer);
         }
@@ -691,7 +692,7 @@ struct BlobCopyRequest : public MsgBase {
     MmcMemBlobDesc dstBlob_;
 
     BlobCopyRequest() : MsgBase{0, LM_BLOB_COPY_REQ, 0} {}
-    BlobCopyRequest(const std::string& key, const MmcMemBlobDesc &src, const MmcMemBlobDesc &dst)
+    BlobCopyRequest(const std::string &key, const MmcMemBlobDesc &src, const MmcMemBlobDesc &dst)
         : MsgBase{0, LM_BLOB_COPY_REQ, 0}, key_(key), srcBlob_(src), dstBlob_(dst)
     {}
 
@@ -725,12 +726,9 @@ struct BatchBlobCopyRequest : public MsgBase {
 
     BatchBlobCopyRequest() : MsgBase{0, LM_BATCH_BLOB_COPY_REQ, 0} {}
 
-    BatchBlobCopyRequest(std::vector<std::string> keys,
-                         std::vector<MmcMemBlobDesc> srcBlobs,
+    BatchBlobCopyRequest(std::vector<std::string> keys, std::vector<MmcMemBlobDesc> srcBlobs,
                          std::vector<MmcMemBlobDesc> dstBlobs)
-        : MsgBase{0, LM_BATCH_BLOB_COPY_REQ, 0},
-          keys_(std::move(keys)),
-          srcBlobs_(std::move(srcBlobs)),
+        : MsgBase{0, LM_BATCH_BLOB_COPY_REQ, 0}, keys_(std::move(keys)), srcBlobs_(std::move(srcBlobs)),
           dstBlobs_(std::move(dstBlobs))
     {}
 
@@ -1042,9 +1040,8 @@ struct BatchUpdateLeaseRequest : MsgBase {
     std::vector<std::string> keys_;
 
     BatchUpdateLeaseRequest() : MsgBase{0, ML_BATCH_UPDATE_LEASE_REQ, 0} {}
-    explicit BatchUpdateLeaseRequest(const std::vector<std::string> &keys,
-                                     const std::vector<uint64_t> &operateIds = {}, uint64_t leaseTtlMs = 0,
-                                     uint32_t flag = 0)
+    explicit BatchUpdateLeaseRequest(const std::vector<std::string> &keys, const std::vector<uint64_t> &operateIds = {},
+                                     uint64_t leaseTtlMs = 0, uint32_t flag = 0)
         : MsgBase{0, ML_BATCH_UPDATE_LEASE_REQ, 0}, operateIds_(operateIds), leaseTtlMs_(leaseTtlMs), flag_(flag),
           keys_(keys)
     {}
@@ -1151,7 +1148,8 @@ struct BlobDeleteRequest : MsgBase {
 
     BlobDeleteRequest() : MsgBase{0, LM_BLOB_DELETE_REQ, 0}, rank_{0} {}
     BlobDeleteRequest(const std::string &key, uint32_t rank, const MmcMemBlobDesc &blob)
-        : MsgBase{0, LM_BLOB_DELETE_REQ, 0}, key_(key), rank_(rank), blob_(blob) {}
+        : MsgBase{0, LM_BLOB_DELETE_REQ, 0}, key_(key), rank_(rank), blob_(blob)
+    {}
 
     Result Serialize(NetMsgPacker &packer) const override
     {

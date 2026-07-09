@@ -384,9 +384,9 @@ void DefineMmcStructModule(py::module_ &m)
              Enable or disable high availability deployment.
                 )pbdoc")
             .def_property(
-            "backup_enable", [](const mmc_meta_service_config_t &config) { return config.backupEnable; },
-            [](mmc_meta_service_config_t &config, bool value) { config.backupEnable = value; },
-            R"pbdoc(
+                "backup_enable", [](const mmc_meta_service_config_t &config) { return config.backupEnable; },
+                [](mmc_meta_service_config_t &config, bool value) { config.backupEnable = value; },
+                R"pbdoc(
              Enable or disable meta service backup.
             )pbdoc")
             .def_property(
@@ -634,8 +634,8 @@ PYBIND11_MODULE(_pymmc, m)
              py::arg("flag") = 0)
         .def("batch_get_key_info", &MmcacheStore::BatchGetKeyInfo, py::call_guard<py::gil_scoped_release>(),
              py::arg("keys"), py::arg("flag") = 0)
-        .def("batch_add_lease", &MmcacheStore::BatchAddLease, py::call_guard<py::gil_scoped_release>(),
-             py::arg("keys"), py::arg("leaseTtlMs") = 0)
+        .def("batch_add_lease", &MmcacheStore::BatchAddLease, py::call_guard<py::gil_scoped_release>(), py::arg("keys"),
+             py::arg("leaseTtlMs") = 0)
         .def("batch_remove_lease", &MmcacheStore::BatchRemoveLease, py::call_guard<py::gil_scoped_release>(),
              py::arg("keys"))
         .def("close", &MmcacheStore::TearDown)

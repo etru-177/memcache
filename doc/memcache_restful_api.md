@@ -12,7 +12,7 @@
 
 ### 1 `GET /metadata?key=...`
 
-#### 作用  
+#### 作用
 按原样读取指定 metadata value；成功时直接返回原始内容，不额外包装 JSON。
 
 #### curl
@@ -64,7 +64,7 @@ demo metadata value
 
 ### 2 `PUT /metadata?key=...`
 
-#### 作用  
+#### 作用
 按原始文本写入指定 metadata value。
 
 #### curl
@@ -123,7 +123,7 @@ metadata updated
 
 ### 3 `DELETE /metadata?key=...`
 
-#### 作用  
+#### 作用
 删除指定 metadata key。
 
 #### curl
@@ -174,7 +174,7 @@ metadata deleted
 
 ### 4 `GET /health`
 
-#### 作用  
+#### 作用
 返回 HTTP 服务健康状态、HA 状态和服务就绪状态。
 
 #### curl
@@ -235,7 +235,7 @@ curl "http://127.0.0.1:8000/health"
 
 ### 5 `GET /metrics`
 
-#### 作用  
+#### 作用
 以 Prometheus 文本格式导出 MemCache 监控指标。当前无法提供的字段允许以 `0` 或 `false` 等占位值导出。
 
 #### curl
@@ -484,7 +484,7 @@ memcache_allocated_bytes{medium="dram"} 0
 
 ### 6 `GET /metrics/summary`
 
-#### 作用  
+#### 作用
 返回固定字段顺序的单行文本摘要。属于统计汇总接口，当前无法提供的字段允许按降级策略返回占位值。
 
 返回格式为单行文本，使用空格分隔的 `key=value` 片段组成；字段顺序固定，不换行，不做 JSON 包装。
@@ -540,7 +540,7 @@ keys=2 evict=0 hbm_used=368640/5368709120 dram_used=0/5368709120 alloc_req=68 al
 
 ### 7 `GET /metrics/ptracer`
 
-#### 作用  
+#### 作用
 导出当前 ptracer 原始文本输出。
 
 #### curl
@@ -592,7 +592,7 @@ TIME                   NAME                                    BEGIN          GO
 
 ### 8 `GET /role`
 
-#### 作用  
+#### 作用
 返回当前角色文本。
 
 #### curl
@@ -641,7 +641,7 @@ leader
 
 ### 9 `GET /ha_status`
 
-#### 作用  
+#### 作用
 返回当前 HA 状态文本。无法稳定映射时返回 `unknown`。
 
 #### curl
@@ -690,7 +690,7 @@ serving
 
 ### 10 `GET /leader`
 
-#### 作用  
+#### 作用
 返回 leader 是否存在及其地址和视图版本。响应中不包含 `role` 字段；当前无法提供稳定值的字段允许返回默认值。
 
 #### curl
@@ -745,7 +745,7 @@ curl "http://127.0.0.1:8000/leader"
 
 ### 11 `GET /query_key?key=...`
 
-#### 作用  
+#### 作用
 查询单个 key 的元数据信息，包括对象大小、访问属性和 blob 分布信息。
 
 #### curl
@@ -819,7 +819,7 @@ curl "http://127.0.0.1:8000/query_key?key=key_a"
 
 ### 12 `GET /batch_query_keys?keys=...`
 
-#### 作用  
+#### 作用
 批量查询多个 key 的元数据信息；单个 key 的字段定义与 `/query_key` 保持一致。
 
 #### curl
@@ -1012,7 +1012,7 @@ curl -X DELETE "http://127.0.0.1:8000/all_keys"
 
 ### 15 `GET /get_all_keys`
 
-#### 作用  
+#### 作用
 列出全部对象 key 列表。
 
 #### curl
@@ -1062,7 +1062,7 @@ key_2
 
 ### 16 `GET /get_all_segments`
 
-#### 作用  
+#### 作用
 列出全部 `segment_id`。当前版本逐行返回文本，不返回 JSON 数组。
 
 #### curl
@@ -1115,7 +1115,7 @@ rank-1-dram
 
 ### 17 `GET /query_segment?segment=...`
 
-#### 作用  
+#### 作用
 查询指定 segment 的容量占用信息。
 
 #### curl
@@ -1178,7 +1178,7 @@ curl "http://127.0.0.1:8000/query_segment?segment=rank-0-hbm"
 
 ### 18 `POST /api/v1/drain_jobs`
 
-#### 作用  
+#### 作用
 目标契约为返回固定字段顺序的单行文本摘要；当前源码尚未按该契约实现。
 
 #### curl
@@ -1217,7 +1217,7 @@ curl -X POST "http://127.0.0.1:8000/api/v1/drain_jobs"
 
 ### 19 `GET /api/v1/drain_jobs/query?job_id=...`
 
-#### 作用  
+#### 作用
 目标契约为返回固定字段顺序的单行文本摘要；当前源码尚未按该契约实现。
 
 
@@ -1259,7 +1259,7 @@ curl "http://127.0.0.1:8000/api/v1/drain_jobs/query?job_id=job_1"
 
 ### 20 `POST /api/v1/drain_jobs/cancel?job_id=...`
 
-#### 作用  
+#### 作用
 当前版本不实现该接口；返回统一错误格式，实际 `error_message` 为 `Not supported`。
 
 #### curl
@@ -1300,7 +1300,7 @@ curl -X POST "http://127.0.0.1:8000/api/v1/drain_jobs/cancel?job_id=job_1"
 
 ### 21 `GET /api/v1/segments/status?segment=...`
 
-#### 作用  
+#### 作用
 查询指定 segment 的状态。当前版本仅返回 `OK`。
 
 #### curl
@@ -1359,7 +1359,7 @@ curl "http://127.0.0.1:8000/api/v1/segments/status?segment=rank-0-hbm"
 
 ### 22 `GET /api/v1/capacity/usage`
 
-#### 作用  
+#### 作用
 返回整体容量使用情况。介质映射关系为 `HBM -> npu`、`DRAM -> cpu`；无对应介质时返回 `0`，不视为错误。
 
 #### curl
@@ -1430,7 +1430,7 @@ curl "http://127.0.0.1:8000/api/v1/capacity/usage"
 
 ### 23 `GET /api/v1/capacity/segment_remaining`
 
-#### 作用  
+#### 作用
 返回各 segment 的剩余容量情况。
 
 #### curl
@@ -1499,7 +1499,7 @@ curl "http://127.0.0.1:8000/api/v1/capacity/segment_remaining"
 
 ### 24 `GET /api/v1/analysis/alloc_free_latency`
 
-#### 作用  
+#### 作用
 返回 alloc/free 延迟相关的 ptracer 文本结果。该接口展示 alloc/free 相关统计行，数据来源与 `/metrics/ptracer` 保持一致。
 
 #### curl

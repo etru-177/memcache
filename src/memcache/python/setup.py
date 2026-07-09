@@ -81,9 +81,7 @@ setup(
         "memfabric_hybrid>=1.1.0",
     ],
     zip_safe=False,
-    package_data={
-        "memcache_hybrid": ["_pymmc.cpython*.so", "lib/**", "config/**", "VERSION"]
-    },
+    package_data={"memcache_hybrid": ["_pymmc.cpython*.so", "lib/**", "config/**", "VERSION"]},
     cmdclass={
         "bdist_wheel": BuildWheel,
     },

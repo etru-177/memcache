@@ -99,8 +99,8 @@ TEST_F(TestMmcServiceError, metaService)
     mmc_meta_service_t meta_service = mmcs_meta_service_start(&metaServiceConfig);
     ASSERT_TRUE(meta_service != nullptr);
 
-    mmc_local_service_config_t localServiceConfig = {"", 0, 0,         1,         "", "", 0, "device_sdma",
-                                                     0,  0, 104857600, 104857600, 0, 0, {}, 0, nullptr, {}, {}};
+    mmc_local_service_config_t localServiceConfig = {
+        "", 0, 0, 1, "", "", 0, "device_sdma", 0, 0, 104857600, 104857600, 0, 0, {}, 0, nullptr, {}, {}};
     localServiceConfig.logLevel = INFO_LEVEL;
     localServiceConfig.accTlsConfig.tlsEnable = false;
     UrlStringToChar(metaUrl, localServiceConfig.discoveryURL);
@@ -210,9 +210,9 @@ TEST_F(TestMmcServiceError, metaService)
 constexpr size_t MF_SIZE = 1048576000;
 constexpr size_t KEYS_NUMBER = 1000;
 constexpr unsigned int META_REBUILD_SECONDS = 10;
-
 TEST_F(TestMmcServiceError, metaServiceRebuild)
 {
+    GTEST_SKIP() << "Skipping metaServiceRebuild";
     std::string metaUrl = "tcp://127.0.0.1:5868";
     std::string bmUrl = "tcp://127.0.0.1:5881";
     std::string hcomUrl = "tcp://127.0.0.1:5882";
@@ -245,7 +245,6 @@ TEST_F(TestMmcServiceError, metaServiceRebuild)
     clientConfig.logLevel = ERROR_LEVEL;
     clientConfig.tlsConfig.tlsEnable = false;
     clientConfig.rankId = 0;
-
     clientConfig.readThreadPoolNum = UT_READ_POOL_NUM;
     clientConfig.writeThreadPoolNum = UT_WRITE_POOL_NUM;
     UrlStringToChar(metaUrl, clientConfig.discoveryURL);

@@ -109,15 +109,15 @@ Result MmcBmProxy::InternalCreateBm(const mmc_bm_create_config_t &createConfig, 
     option.localHBMSize = createConfig.localHBMSize;
     option.dataOpType = opType;
 
-    constexpr uint64_t mmcAuto56BitsGvaThreshold = 32ULL << 40ULL;  // 32TB
+    constexpr uint64_t mmcAuto56BitsGvaThreshold = 32ULL << 40ULL; // 32TB
     const uint64_t totalPoolSize =
         (createConfig.localMaxDRAMSize + createConfig.localMaxHBMSize) * static_cast<uint64_t>(worldSize);
     option.enable56BitsGva = totalPoolSize > mmcAuto56BitsGvaThreshold;
     if (option.enable56BitsGva) {
-        MMC_LOG_INFO("56 bits GVA is enabled since the total address space size (" <<
-                     totalPoolSize << ") is larger than threshold(" << mmcAuto56BitsGvaThreshold <<
-                     "), localMaxDramSize(" << createConfig.localMaxDRAMSize << "), localMaxHbmSize(" <<
-                     createConfig.localMaxHBMSize << "), worldSize(" << worldSize << ").");
+        MMC_LOG_INFO("56 bits GVA is enabled since the total address space size ("
+                     << totalPoolSize << ") is larger than threshold(" << mmcAuto56BitsGvaThreshold
+                     << "), localMaxDramSize(" << createConfig.localMaxDRAMSize << "), localMaxHbmSize("
+                     << createConfig.localMaxHBMSize << "), worldSize(" << worldSize << ").");
     }
     option.flags = createConfig.flags;
     option.tag[0] = '\0';
@@ -240,9 +240,10 @@ Result MmcBmProxy::AsyncPut(const MmcBufferArray &bufArr, const MmcMemBlobDesc &
     for (const auto &buffer : bufArr.Buffers()) {
         auto addr = blob.gva_ + shift;
         MMC_ASSERT_LOG_AND_RETURN(addr - shift == blob.gva_,
-            "addr = " << addr << ", shift = " << shift << ", blob.gva_ = " << blob.gva_, MMC_ERROR);
-        MMC_ASSERT_LOG_AND_RETURN(blob.size_ >= shift,
-            "blob.size_ = " << blob.size_ << ", shift = " << shift, MMC_ERROR);
+                                  "addr = " << addr << ", shift = " << shift << ", blob.gva_ = " << blob.gva_,
+                                  MMC_ERROR);
+        MMC_ASSERT_LOG_AND_RETURN(blob.size_ >= shift, "blob.size_ = " << blob.size_ << ", shift = " << shift,
+                                  MMC_ERROR);
         MMC_RETURN_ERROR(Put(&buffer, addr, blob.size_ - shift), "failed put data to smem bm");
         shift += MmcBufSize(buffer);
     }
@@ -266,9 +267,10 @@ Result MmcBmProxy::AsyncGet(const MmcBufferArray &bufArr, const MmcMemBlobDesc &
     for (const auto &buffer : bufArr.Buffers()) {
         auto addr = blob.gva_ + shift;
         MMC_ASSERT_LOG_AND_RETURN(addr - shift == blob.gva_,
-            "addr = " << addr << ", shift = " << shift << ", blob.gva_ = " << blob.gva_, MMC_ERROR);
-        MMC_ASSERT_LOG_AND_RETURN(blob.size_ >= shift,
-            "blob.size_ = " << blob.size_ << ", shift = " << shift, MMC_ERROR);
+                                  "addr = " << addr << ", shift = " << shift << ", blob.gva_ = " << blob.gva_,
+                                  MMC_ERROR);
+        MMC_ASSERT_LOG_AND_RETURN(blob.size_ >= shift, "blob.size_ = " << blob.size_ << ", shift = " << shift,
+                                  MMC_ERROR);
         MMC_RETURN_ERROR(Get(&buffer, addr, blob.size_ - shift), "Failed to get data from smem bm");
         shift += MmcBufSize(buffer);
     }
@@ -446,8 +448,7 @@ Result MmcBmProxy::GvaToVa(uint64_t gva, MediaType mediaType, uint64_t &va)
         MMC_LOG_ERROR("GvaToVa failed, bm handle is null");
         return MMC_ERROR;
     }
-    smem_bm_mem_type_t memType =
-        mediaType == MEDIA_HBM ? SMEM_MEM_TYPE_LOCAL_DEVICE : SMEM_MEM_TYPE_LOCAL_HOST;
+    smem_bm_mem_type_t memType = mediaType == MEDIA_HBM ? SMEM_MEM_TYPE_LOCAL_DEVICE : SMEM_MEM_TYPE_LOCAL_HOST;
     void *vaPtr = nullptr;
     int32_t ret = MFSmemApi::SmemBmGvaToVa(handle_, reinterpret_cast<void *>(gva), memType, &vaPtr);
     if (ret != MMC_OK || vaPtr == nullptr) {

@@ -108,7 +108,7 @@ TEST(TestMmcIntervalMap, EdgeCasesAndInvalidInputs)
     EXPECT_FALSE(im.Add(500, 0, "zero"));
 
     // 非常大的地址（接近 uint64_t 边界）
-    ASSERT_FALSE(im.Add(0xFFFFFFFFFFFFFF00ULL, 0x100, "high"));  // 翻转应该失败
+    ASSERT_FALSE(im.Add(0xFFFFFFFFFFFFFF00ULL, 0x100, "high")); // 翻转应该失败
     auto q = im.Query(0xFFFFFFFFFFFFFF50ULL);
     EXPECT_EQ(q, nullptr);
 
@@ -119,7 +119,7 @@ TEST(TestMmcIntervalMap, EdgeCasesAndInvalidInputs)
     ASSERT_TRUE(im.Add(0x8000000000000000ULL, 0x1000, "kernel"));
 
     // 查询边界点
-    im.Add(1000, 1, "single");  // [1000, 1001)
+    im.Add(1000, 1, "single"); // [1000, 1001)
     EXPECT_EQ(im.Query(999), nullptr);
     EXPECT_EQ(*im.Query(1000), "single");
     EXPECT_EQ(im.Query(1001), nullptr);
@@ -162,8 +162,8 @@ TEST(TestMmcIntervalMap, MultipleAdjacentSameValue)
     EXPECT_EQ(*im.Query(50, 180), "code"); // 跨越前兩段
     EXPECT_EQ(*im.Query(240, 40), "code"); // 跨越最後兩段的交界
 
-    EXPECT_EQ(im.Query(0, 301), nullptr); // 多出一個位元組
-    EXPECT_EQ(*im.Query(90, 180), "code");      // 從第一段中間到第三段中間
+    EXPECT_EQ(im.Query(0, 301), nullptr);  // 多出一個位元組
+    EXPECT_EQ(*im.Query(90, 180), "code"); // 從第一段中間到第三段中間
 }
 
 // ------------------------------------------------------------------------

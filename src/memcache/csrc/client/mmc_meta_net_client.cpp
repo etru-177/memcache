@@ -205,7 +205,7 @@ Result MetaNetClient::HandleBatchBlobCopy(const NetContextPtr &context)
         for (size_t i = 0; i < n; ++i) {
             if (resp.results_[i] != MMC_OK) {
                 MMC_LOG_ERROR("batchBlobCopy failed for [" << i << "] key=" << req.keys_[i]
-                              << ", ret=" << resp.results_[i]);
+                                                           << ", ret=" << resp.results_[i]);
             }
         }
     } else {

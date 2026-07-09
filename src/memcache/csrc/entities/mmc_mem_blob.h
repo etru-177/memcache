@@ -28,7 +28,7 @@
 namespace ock {
 namespace mmc {
 
-using SsdPreFreeHandler = std::function<void(const std::string& key, const MmcMemBlobDesc& desc)>;
+using SsdPreFreeHandler = std::function<void(const std::string &key, const MmcMemBlobDesc &desc)>;
 struct MemObjQueryInfo {
     uint64_t size_;
     uint16_t prot_;
@@ -85,8 +85,7 @@ public:
     MmcMemBlob() = delete;
     MmcMemBlob(const uint32_t &rank, const uint64_t &gva, const uint64_t &size, const MediaType &mediaType,
                const BlobState &state, uint64_t defaultTtlMs = MMC_DATA_TTL_MS)
-        : rank_(rank), gva_(gva), size_(size), mediaType_(mediaType), state_(state),
-          metaLeaseManager_(defaultTtlMs)
+        : rank_(rank), gva_(gva), size_(size), mediaType_(mediaType), state_(state), metaLeaseManager_(defaultTtlMs)
     {}
     ~MmcMemBlob() override = default;
 
@@ -175,8 +174,8 @@ public:
     {
         os << "Blob{rank=" << blob.rank_ << ",gva=" << blob.gva_ << ",size=" << blob.size_
            << ",media=" << static_cast<int>(blob.mediaType_) << ",state=" << static_cast<int>(blob.state_)
-           << ",rewarm_flag=" << ((blob.flags_ & MmcMemBlob::kRewarmFlag) != 0 ? 1 : 0)
-           << ",prot=" << blob.prot_ << "," << blob.metaLeaseManager_ << "}";
+           << ",rewarm_flag=" << ((blob.flags_ & MmcMemBlob::kRewarmFlag) != 0 ? 1 : 0) << ",prot=" << blob.prot_ << ","
+           << blob.metaLeaseManager_ << "}";
         return os;
     }
 
@@ -189,7 +188,7 @@ public:
 
     Result BackupRemove(const std::string &key);
 
-    static void SsdPreFree(const std::string& key, const MmcMemBlobDesc& desc);
+    static void SsdPreFree(const std::string &key, const MmcMemBlobDesc &desc);
 
     static SsdPreFreeHandler ssdPreFreeHandler_;
     mutable std::condition_variable cv_; /* P7: 回温完成时唤醒等待中的并发 Get() */
@@ -202,7 +201,10 @@ public:
     }
 
     // P7: 通知等待者 blob 已变为 READABLE
-    void NotifyReadable() { cv_.notify_all(); }
+    void NotifyReadable()
+    {
+        cv_.notify_all();
+    }
 
 private:
     /**

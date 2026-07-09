@@ -38,8 +38,8 @@ Result MmcLocalServiceDefault::Start(const mmc_local_service_config_t &config)
     MMC_RETURN_ERROR(InitBm(), "Failed to init bm of local service " << name_);
 
     metaNetClient_ = MetaNetClientFactory::GetInstance(this->options_.discoveryURL, "MetaClientCommon").Get();
-    MMC_ASSERT_LOG_AND_RETURN(metaNetClient_.Get() != nullptr,
-        "metaNetClient_.Get() is nullptr", MMC_NEW_OBJECT_FAILED);
+    MMC_ASSERT_LOG_AND_RETURN(metaNetClient_.Get() != nullptr, "metaNetClient_.Get() is nullptr",
+                              MMC_NEW_OBJECT_FAILED);
     if (!metaNetClient_->Status()) {
         NetEngineOptions options;
         options.name = name_;
@@ -264,14 +264,12 @@ Result MmcLocalServiceDefault::InitUbsIo(int32_t deviceId)
     MmcUbsIoProxyPtr ubsIoProxy = MmcUbsIoProxyFactory::GetInstance("ubsIoProxyDefault");
     MMC_ASSERT_LOG_AND_RETURN(ubsIoProxy != nullptr, "ubsIoProxy is nullptr", MMC_ERROR);
     MMC_ASSERT_LOG_AND_RETURN(metaNetClient_ != nullptr && metaNetClient_->Status(),
-        "metaNetClient_ not ready when registering UBS IO callback", MMC_NOT_INITIALIZED);
+                              "metaNetClient_ not ready when registering UBS IO callback", MMC_NOT_INITIALIZED);
     ubsIoProxyPtr_ = ubsIoProxy;
 
     // Register UBS IO metadata event callback (before InitUbsIo to avoid missing recovery events)
     ubsIoProxy->SetMetaEventCallback([this](int type, const std::vector<std::string> &keys) {
-        ubsioEventPool_->Enqueue([this, type, keys]() {
-            HandleUbsIoMetaEvents(type, keys);
-        });
+        ubsioEventPool_->Enqueue([this, type, keys]() { HandleUbsIoMetaEvents(type, keys); });
     });
 
     return ubsIoProxy->InitUbsIo(deviceId);
@@ -335,7 +333,7 @@ Result MmcLocalServiceDefault::UpdateMetaBackup(const std::vector<uint32_t> &ops
     return MMC_OK;
 }
 
-Result MmcLocalServiceDefault::CopyBlob(const std::string& key, const MmcMemBlobDesc& src, const MmcMemBlobDesc& dst)
+Result MmcLocalServiceDefault::CopyBlob(const std::string &key, const MmcMemBlobDesc &src, const MmcMemBlobDesc &dst)
 {
     if (bmProxyPtr_ == nullptr) {
         MMC_LOG_ERROR("bm proxy is null, src=" << src << ", dst=" << dst);
@@ -348,8 +346,7 @@ Result MmcLocalServiceDefault::CopyBlob(const std::string& key, const MmcMemBlob
             return MMC_SSD_NOT_AVAILABLE;
         }
         if (src.size_ > dst.size_) {
-            MMC_LOG_ERROR("src size " << src.size_ << " exceeds dst size " << dst.size_
-                          << ", key=" << key);
+            MMC_LOG_ERROR("src size " << src.size_ << " exceeds dst size " << dst.size_ << ", key=" << key);
             return MMC_ERROR;
         }
         TP_TRACE_BEGIN(TP_MMC_LOCAL_UBS_IO_GET);
@@ -359,7 +356,7 @@ Result MmcLocalServiceDefault::CopyBlob(const std::string& key, const MmcMemBlob
             MMC_LOG_ERROR("gva_to_va failed for dst gva=" << dst.gva_ << ", ret=" << gvaRet);
             return gvaRet;
         }
-        Result ret = ubsIoProxyPtr_->Get(key, reinterpret_cast<void*>(dstVa), src.size_);
+        Result ret = ubsIoProxyPtr_->Get(key, reinterpret_cast<void *>(dstVa), src.size_);
         TP_TRACE_END(TP_MMC_LOCAL_UBS_IO_GET, ret);
         if (ret != MMC_OK) {
             MMC_LOG_ERROR("ubsIo get failed:" << ret << ", src=" << src << ", dst=" << dst);
@@ -382,7 +379,7 @@ Result MmcLocalServiceDefault::CopyBlob(const std::string& key, const MmcMemBlob
             MMC_LOG_ERROR("gva_to_va failed for src gva=" << src.gva_ << ", ret=" << gvaRet);
             return gvaRet;
         }
-        Result ret = ubsIoProxyPtr_->Put(key, reinterpret_cast<void*>(srcVa), src.size_);
+        Result ret = ubsIoProxyPtr_->Put(key, reinterpret_cast<void *>(srcVa), src.size_);
         TP_TRACE_END(TP_MMC_LOCAL_UBS_IO_PUT, ret);
         if (ret != MMC_OK) {
             MMC_LOG_ERROR("ubsIo put failed:" << ret << ", src=" << src << ", dst=" << dst);
@@ -400,7 +397,7 @@ Result MmcLocalServiceDefault::CopyBlob(const std::string& key, const MmcMemBlob
     return MMC_OK;
 }
 
-Result MmcLocalServiceDefault::BlobDelete(const std::string& key, const MmcMemBlobDesc &blob)
+Result MmcLocalServiceDefault::BlobDelete(const std::string &key, const MmcMemBlobDesc &blob)
 {
     MMC_LOG_DEBUG("delete blob, key=" << key << ", rank=" << blob.rank_);
 
@@ -410,8 +407,8 @@ Result MmcLocalServiceDefault::BlobDelete(const std::string& key, const MmcMemBl
     }
 
     if (blob.mediaType_ != MEDIA_SSD) {
-        MMC_LOG_ERROR("blob type is mismatch, expected SSD(" << MEDIA_SSD << "), got "
-                                                             << blob.mediaType_ << ", key=" << key);
+        MMC_LOG_ERROR("blob type is mismatch, expected SSD(" << MEDIA_SSD << "), got " << blob.mediaType_
+                                                             << ", key=" << key);
         return MMC_ERROR;
     }
 
@@ -424,8 +421,9 @@ Result MmcLocalServiceDefault::BlobDelete(const std::string& key, const MmcMemBl
     return MMC_OK;
 }
 
-std::vector<Result> MmcLocalServiceDefault::BatchCopyBlob(const std::vector<std::string>& keys,
-    const std::vector<MmcMemBlobDesc>& srcBlobs, const std::vector<MmcMemBlobDesc>& dstBlobs)
+std::vector<Result> MmcLocalServiceDefault::BatchCopyBlob(const std::vector<std::string> &keys,
+                                                          const std::vector<MmcMemBlobDesc> &srcBlobs,
+                                                          const std::vector<MmcMemBlobDesc> &dstBlobs)
 {
     size_t count = keys.size();
     if (count == 0) {
@@ -435,7 +433,7 @@ std::vector<Result> MmcLocalServiceDefault::BatchCopyBlob(const std::vector<std:
     std::vector<Result> results(count, MMC_ERROR);
     if (count != srcBlobs.size() || count != dstBlobs.size()) {
         MMC_LOG_ERROR("size mismatch in batch copy, keys=" << count << ", srcBlobs=" << srcBlobs.size()
-                      << ", dstBlobs=" << dstBlobs.size());
+                                                           << ", dstBlobs=" << dstBlobs.size());
         return std::vector<Result>(count, MMC_INVALID_PARAM);
     }
 
@@ -471,72 +469,64 @@ std::vector<Result> MmcLocalServiceDefault::BatchCopyBlob(const std::vector<std:
     return results;
 }
 
-void MmcLocalServiceDefault::CollectBatchIoParams(
-    const std::vector<std::string>& keys,
-    const std::vector<MmcMemBlobDesc>& srcBlobs,
-    const std::vector<MmcMemBlobDesc>& dstBlobs,
-    bool srcIsSsd, std::vector<Result>& results, BatchIoParams& out)
+void MmcLocalServiceDefault::CollectBatchIoParams(const std::vector<std::string> &keys,
+                                                  const std::vector<MmcMemBlobDesc> &srcBlobs,
+                                                  const std::vector<MmcMemBlobDesc> &dstBlobs, bool srcIsSsd,
+                                                  std::vector<Result> &results, BatchIoParams &out)
 {
     size_t count = keys.size();
     if (srcBlobs.size() < count || dstBlobs.size() < count || results.size() < count) {
-        MMC_LOG_ERROR("size mismatch in batch copy, keys=" << count << ", srcBlobs=" << srcBlobs.size()
-                      << ", dstBlobs=" << dstBlobs.size() << ", results=" << results.size());
+        MMC_LOG_ERROR("size mismatch in batch copy, keys=" << count << ", srcBlobs=" << srcBlobs.size() << ", dstBlobs="
+                                                           << dstBlobs.size() << ", results=" << results.size());
         return;
     }
     if (srcIsSsd) {
         for (size_t i = 0; i < count; ++i) {
             if (srcBlobs[i].size_ > dstBlobs[i].size_) {
-                MMC_LOG_ERROR("src size " << srcBlobs[i].size_
-                              << " exceeds dst size " << dstBlobs[i].size_
-                              << " in batch copy, key=" << keys[i]);
+                MMC_LOG_ERROR("src size " << srcBlobs[i].size_ << " exceeds dst size " << dstBlobs[i].size_
+                                          << " in batch copy, key=" << keys[i]);
                 continue;
             }
             uint64_t dstVa = 0;
-            Result gvaRet = bmProxyPtr_->GvaToVa(dstBlobs[i].gva_,
-                                                 static_cast<MediaType>(dstBlobs[i].mediaType_),
-                                                 dstVa);
+            Result gvaRet =
+                bmProxyPtr_->GvaToVa(dstBlobs[i].gva_, static_cast<MediaType>(dstBlobs[i].mediaType_), dstVa);
             if (gvaRet != MMC_OK) {
-                MMC_LOG_ERROR("gva_to_va failed for dst gva="
-                              << dstBlobs[i].gva_ << ", key=" << keys[i]
-                              << ", ret=" << gvaRet);
+                MMC_LOG_ERROR("gva_to_va failed for dst gva=" << dstBlobs[i].gva_ << ", key=" << keys[i]
+                                                              << ", ret=" << gvaRet);
                 results[i] = gvaRet;
                 continue;
             }
             out.keys.push_back(keys[i]);
-            out.vas.push_back(reinterpret_cast<void*>(dstVa));
+            out.vas.push_back(reinterpret_cast<void *>(dstVa));
             out.sizes.push_back(srcBlobs[i].size_);
             out.validIdx.push_back(i);
         }
     } else {
         for (size_t i = 0; i < count; ++i) {
             if (srcBlobs[i].gva_ == 0 || srcBlobs[i].size_ == 0) {
-                MMC_LOG_ERROR("invalid src gva=" << srcBlobs[i].gva_
-                              << " or size=" << srcBlobs[i].size_
-                              << " in batch copy, key=" << keys[i]);
+                MMC_LOG_ERROR("invalid src gva=" << srcBlobs[i].gva_ << " or size=" << srcBlobs[i].size_
+                                                 << " in batch copy, key=" << keys[i]);
                 results[i] = MMC_INVALID_PARAM;
                 continue;
             }
             uint64_t srcVa = 0;
-            Result gvaRet = bmProxyPtr_->GvaToVa(srcBlobs[i].gva_,
-                static_cast<MediaType>(srcBlobs[i].mediaType_), srcVa);
+            Result gvaRet =
+                bmProxyPtr_->GvaToVa(srcBlobs[i].gva_, static_cast<MediaType>(srcBlobs[i].mediaType_), srcVa);
             if (gvaRet != MMC_OK) {
-                MMC_LOG_ERROR("gva_to_va failed for src gva="
-                              << srcBlobs[i].gva_ << ", key=" << keys[i]
-                              << ", ret=" << gvaRet);
+                MMC_LOG_ERROR("gva_to_va failed for src gva=" << srcBlobs[i].gva_ << ", key=" << keys[i]
+                                                              << ", ret=" << gvaRet);
                 results[i] = gvaRet;
                 continue;
             }
             out.keys.push_back(keys[i]);
-            out.vas.push_back(reinterpret_cast<void*>(srcVa));
+            out.vas.push_back(reinterpret_cast<void *>(srcVa));
             out.sizes.push_back(srcBlobs[i].size_);
             out.validIdx.push_back(i);
         }
     }
 }
 
-void MmcLocalServiceDefault::ExecuteBatchIo(
-    BatchIoParams& params, bool srcIsSsd,
-    std::vector<Result>& results)
+void MmcLocalServiceDefault::ExecuteBatchIo(BatchIoParams &params, bool srcIsSsd, std::vector<Result> &results)
 {
     if (params.keys.empty()) {
         return;
@@ -554,8 +544,7 @@ void MmcLocalServiceDefault::ExecuteBatchIo(
     }
     for (size_t j = 0; j < params.keys.size(); ++j) {
         if (params.validIdx[j] >= results.size()) {
-            MMC_LOG_ERROR("validIdx out of range, idx=" << params.validIdx[j]
-                          << ", results.size=" << results.size());
+            MMC_LOG_ERROR("validIdx out of range, idx=" << params.validIdx[j] << ", results.size=" << results.size());
             continue;
         }
         if (batchRet == MMC_OK && batchResults[j] == 0) {
@@ -563,7 +552,7 @@ void MmcLocalServiceDefault::ExecuteBatchIo(
             MMC_LOG_DEBUG("batch copy ok, key=" << params.keys[j] << ", size=" << params.sizes[j]);
         } else {
             MMC_LOG_ERROR("batch copy failed, key=" << params.keys[j] << " batchRet: " << batchRet
-                << " indexRet: " << batchResults[j]);
+                                                    << " indexRet: " << batchResults[j]);
         }
     }
 }
@@ -585,7 +574,7 @@ void MmcLocalServiceDefault::HandleUbsIoMetaEvents(int type, const std::vector<s
         Result ret = SyncCallMeta(request, response, TIMEOUT_THIRTY);
         if (ret != MMC_OK || response.ret_ != MMC_OK) {
             MMC_LOG_WARN("UBS IO meta DELETE RPC failed, ret=" << ret << ", resp=" << response.ret_
-                                                                          << ", keyCount=" << keys.size());
+                                                               << ", keyCount=" << keys.size());
         }
     } else {
         MMC_LOG_ERROR("unknown UBS IO meta event type=" << type << ", keyCount=" << keys.size());

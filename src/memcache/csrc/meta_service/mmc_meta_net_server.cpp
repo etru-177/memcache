@@ -113,8 +113,7 @@ Result MetaNetServer::HandleBmRegister(const NetContextPtr &context)
                                            req.storageEnabled_);
     TP_TRACE_END(TP_MMC_META_BM_REGISTER, result);
     MMC_LOG_INFO("HandleBmRegister rank: " << req.rank_ << ", storageEnabled: " << req.storageEnabled_
-                                           << ", rebuild blob size: " << req.blobList_.size()
-                                           << ", ret: " << result);
+                                           << ", rebuild blob size: " << req.blobList_.size() << ", ret: " << result);
     Response resp;
     resp.ret_ = result;
     return context->Reply(req.msgId, resp);
@@ -263,11 +262,12 @@ Result MetaNetServer::HandleBatchUpdate(const NetContextPtr &context)
     // 统计响应中的失败数量
     size_t failCnt = 0;
     for (auto r : resp.results_) {
-        if (r != MMC_OK) failCnt++;
+        if (r != MMC_OK)
+            failCnt++;
     }
     if (failCnt > 0) {
-        MMC_LOG_WARN("HandleBatchUpdate done, keysCnt=" << req.keys_.size() << ", failCnt=" << failCnt
-                                                        << "/" << resp.results_.size() << ", ret=" << ret
+        MMC_LOG_WARN("HandleBatchUpdate done, keysCnt=" << req.keys_.size() << ", failCnt=" << failCnt << "/"
+                                                        << resp.results_.size() << ", ret=" << ret
                                                         << ", keys=" << Join(req.keys_));
     } else {
         MMC_LOG_DEBUG("HandleBatchUpdate done, keysCnt=" << req.keys_.size() << ", all ok"

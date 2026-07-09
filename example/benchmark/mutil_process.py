@@ -34,6 +34,7 @@ MISALIGNED_ACCESS = True
 
 def set_device(device_id):
     import acl
+
     acl.init()
     ret = acl.rt.set_device(device_id)
     if ret != 0:
@@ -48,7 +49,7 @@ def tensor_sum(tensor: List[torch.Tensor], sizes: List[int] = None):
     return sum(layer[:size].sum().item() for layer, size in zip(tensor, sizes))
 
 
-def allocate_aligned_tensor(shape, dtype=torch.float32, alignment=2*1024*1024):
+def allocate_aligned_tensor(shape, dtype=torch.float32, alignment=2 * 1024 * 1024):
     num_elements = torch.prod(torch.tensor(shape)).item()
     element_size = torch.finfo(dtype).bits // 8 if dtype.is_floating_point else torch.iinfo(dtype).bits // 8
     total_bytes = num_elements * element_size
@@ -60,9 +61,11 @@ def allocate_aligned_tensor(shape, dtype=torch.float32, alignment=2*1024*1024):
     aligned_address = (address + alignment - 1) & ~(alignment - 1)
     offset = (aligned_address - address) // element_size
 
-    aligned_tensor = buffer[offset:offset + num_elements].view(*shape)
-    print(f"==== Aligned tensor address: {aligned_tensor.data_ptr():x}, {num_elements=}, "
-          f"{element_size=}, {total_bytes=}, {dtype=}, {shape=}")
+    aligned_tensor = buffer[offset : offset + num_elements].view(*shape)
+    print(
+        f"==== Aligned tensor address: {aligned_tensor.data_ptr():x}, {num_elements=}, "
+        f"{element_size=}, {total_bytes=}, {dtype=}, {shape=}"
+    )
     return aligned_tensor
 
 
@@ -88,15 +91,17 @@ def get_col_tensors_ptr_by_index(tensors, layer_num, block_index):
 
 def init_mooncake(device_id: int):
     from mooncake_store import Mooncakestore, MooncakeConfig
+
     config = MooncakeConfig(
         device=device_id,
         protocol='rdma',
         device_name='',
-        local_hostname='192.168.1.2', # Change to your local IP
+        local_hostname='192.168.1.2',  # Change to your local IP
         metadata_server='P2PHANDSHAKE',
         global_segment_size=1024 * 1024 * 1024 * 64,
         local_buffer_size=128 * 1024 * 1024,
-        master_server_address='192.168.1.1:50051') # Change to your master server
+        master_server_address='192.168.1.1:50051',
+    )  # Change to your master server
     store = Mooncakestore(config)
     return store
 
@@ -120,6 +125,7 @@ def write_worker(*args):
         print(f"==== Start to init mooncake device:{device_id}")
     else:
         from memcache_hybrid import DistributedObjectStore, L2G, G2L, G2H
+
         store = DistributedObjectStore()
         print(f"==== Start to init memcache device:{device_id}")
         res = store.init(device_id)
@@ -154,9 +160,14 @@ def write_worker(*args):
             key = key_prefix + str(device_id) + '_' + str(i) + '_' + str(j)
             keys.append(key)
             if data_dim == 2:
-                block_buffs = [item for pair in zip(get_col_tensors_ptr_by_index(k_tensors, len(k_sizes), j),
-                                                    get_col_tensors_ptr_by_index(v_tensors, len(v_sizes), j))
-                                                    for item in pair]
+                block_buffs = [
+                    item
+                    for pair in zip(
+                        get_col_tensors_ptr_by_index(k_tensors, len(k_sizes), j),
+                        get_col_tensors_ptr_by_index(v_tensors, len(v_sizes), j),
+                    )
+                    for item in pair
+                ]
                 sizes.append(layers_block_size)
             else:
                 block_buffs = get_col_tensors_ptr_by_index(one_dim_tensor, 1, j)
@@ -179,10 +190,12 @@ def write_worker(*args):
     total_size_gb = total_size_bytes / (1024 * 1024 * 1024)
     total_duration_seconds = duration_us / 1_000_000
     bandwidth_gb_per_sec = total_size_gb / total_duration_seconds
-    print(f"\033[91mdevice_id:{device_id} write_total_size:{total_size_bytes} bytes, "
-          f"single_size:{total_size_bytes / call_count:.0f} bytes, call count:{call_count}, "
-          f"total_time:{duration_us:.2f} us, avg_time:{duration_us / call_count:.2f} us, "
-          f"bw:{bandwidth_gb_per_sec:.3f} GB/s\033[0m\n")
+    print(
+        f"\033[91mdevice_id:{device_id} write_total_size:{total_size_bytes} bytes, "
+        f"single_size:{total_size_bytes / call_count:.0f} bytes, call count:{call_count}, "
+        f"total_time:{duration_us:.2f} us, avg_time:{duration_us / call_count:.2f} us, "
+        f"bw:{bandwidth_gb_per_sec:.3f} GB/s\033[0m\n"
+    )
 
     sleep(1)
     if PRINT_DATA_SUM:
@@ -211,6 +224,7 @@ def read_worker(*args):
         print(f"==== Start to init mooncake device:{device_id}")
     else:
         from memcache_hybrid import DistributedObjectStore, L2G, G2L, G2H
+
         store = DistributedObjectStore()
         print(f"==== Start to init memcache device:{device_id}")
         res = store.init(device_id)
@@ -251,9 +265,14 @@ def read_worker(*args):
             key = key_prefix + str(device_id) + '_' + str(i) + '_' + str(j)
             keys.append(key)
             if data_dim == 2:
-                block_buffs = [item for pair in zip(get_col_tensors_ptr_by_index(k_tensors, len(k_sizes), j),
-                                                    get_col_tensors_ptr_by_index(v_tensors, len(v_sizes), j))
-                                                    for item in pair]
+                block_buffs = [
+                    item
+                    for pair in zip(
+                        get_col_tensors_ptr_by_index(k_tensors, len(k_sizes), j),
+                        get_col_tensors_ptr_by_index(v_tensors, len(v_sizes), j),
+                    )
+                    for item in pair
+                ]
                 sizes.append(layers_block_size)
             else:
                 block_buffs = get_col_tensors_ptr_by_index(one_dim_tensor, 1, j)
@@ -272,9 +291,14 @@ def read_worker(*args):
             key = key_prefix + str(device_id) + '_' + str(i) + '_' + str(j)
             keys.append(key)
             if data_dim == 2:
-                block_buffs = [item for pair in zip(get_col_tensors_ptr_by_index(k_tensors, len(k_sizes), j),
-                                                    get_col_tensors_ptr_by_index(v_tensors, len(v_sizes), j))
-                                                    for item in pair]
+                block_buffs = [
+                    item
+                    for pair in zip(
+                        get_col_tensors_ptr_by_index(k_tensors, len(k_sizes), j),
+                        get_col_tensors_ptr_by_index(v_tensors, len(v_sizes), j),
+                    )
+                    for item in pair
+                ]
                 sizes.append(layers_block_size)
             else:
                 block_buffs = get_col_tensors_ptr_by_index(one_dim_tensor, 1, j)
@@ -308,10 +332,12 @@ def read_worker(*args):
     else:
         one_dim_sum = one_dim_tensor.sum().item()
 
-    print(f"\033[91mdevice_id:{device_id} read_total_size:{total_size_bytes} bytes, "
-          f"single_size:{total_size_bytes / call_count:.0f} bytes, call count:{call_count}, "
-          f"total_time:{duration_us:.2f} us, avg_time:{duration_us / call_count:.2f} us, "
-          f"bw:{bandwidth_gb_per_sec:.3f} GB/s\033[0m\n")
+    print(
+        f"\033[91mdevice_id:{device_id} read_total_size:{total_size_bytes} bytes, "
+        f"single_size:{total_size_bytes / call_count:.0f} bytes, call count:{call_count}, "
+        f"total_time:{duration_us:.2f} us, avg_time:{duration_us / call_count:.2f} us, "
+        f"bw:{bandwidth_gb_per_sec:.3f} GB/s\033[0m\n"
+    )
 
     sleep(1)
     if PRINT_DATA_SUM:

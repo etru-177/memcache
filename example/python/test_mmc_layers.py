@@ -46,9 +46,7 @@ class TestExample(unittest.TestCase):
         print(f"object store init res: {res}")
 
         cls.cpu_tensor = torch.empty(
-            size=(cls.layer_number, cls.block_number, cls.block_size),
-            dtype=torch.uint8,
-            device=torch.device('cpu')
+            size=(cls.layer_number, cls.block_number, cls.block_size), dtype=torch.uint8, device=torch.device('cpu')
         )
         cls.cpu_blocks = []
         for block_id in range(cls.block_number):
@@ -56,9 +54,7 @@ class TestExample(unittest.TestCase):
             cls.cpu_blocks.append(block)
 
         cls.npu_tensor = torch.empty(
-            size=(cls.layer_number, cls.block_number, cls.block_size),
-            dtype=torch.uint8,
-            device=torch.device('npu')
+            size=(cls.layer_number, cls.block_number, cls.block_size), dtype=torch.uint8, device=torch.device('npu')
         )
         cls.npu_blocks = []
         for block_id in range(cls.block_number):
@@ -68,16 +64,20 @@ class TestExample(unittest.TestCase):
     def test_equidistant(self):
         self.npu_tensor[0][0] = 123
         print(self.npu_tensor[0][0])
-        res = self.store.put_from_layers("2d",
-                                         [layer.data_ptr() for layer in self.npu_blocks[0]],
-                                         [self.block_size] * self.layer_number,
-                                         MmcDirect.COPY_L2G.value)
+        res = self.store.put_from_layers(
+            "2d",
+            [layer.data_ptr() for layer in self.npu_blocks[0]],
+            [self.block_size] * self.layer_number,
+            MmcDirect.COPY_L2G.value,
+        )
         self.assertEqual(res, 0)
 
-        res = self.store.get_into_layers("2d",
-                                         [layer.data_ptr() for layer in self.npu_blocks[1]],
-                                         [self.block_size] * self.layer_number,
-                                         MmcDirect.COPY_G2L.value)
+        res = self.store.get_into_layers(
+            "2d",
+            [layer.data_ptr() for layer in self.npu_blocks[1]],
+            [self.block_size] * self.layer_number,
+            MmcDirect.COPY_G2L.value,
+        )
         self.assertEqual(res, 0)
 
         self.assertTrue(self.npu_tensor[0][0].eq(self.npu_tensor[0][1]).all())
@@ -95,15 +95,13 @@ class TestExample(unittest.TestCase):
             torch.zeros(size=(5,), dtype=torch.uint8),
         ]
         print(src_layers)
-        res = self.store.put_from_layers("not-2d",
-                                         [layer.data_ptr() for layer in src_layers],
-                                         [3, 4, 5],
-                                         MmcDirect.COPY_AUTO.value)
+        res = self.store.put_from_layers(
+            "not-2d", [layer.data_ptr() for layer in src_layers], [3, 4, 5], MmcDirect.COPY_AUTO.value
+        )
         self.assertEqual(res, 0)
-        res = self.store.get_into_layers("not-2d",
-                                         [layer.data_ptr() for layer in dst_layers],
-                                         [3, 4, 5],
-                                         MmcDirect.COPY_AUTO.value)
+        res = self.store.get_into_layers(
+            "not-2d", [layer.data_ptr() for layer in dst_layers], [3, 4, 5], MmcDirect.COPY_AUTO.value
+        )
         self.assertEqual(res, 0)
         print(dst_layers)
 

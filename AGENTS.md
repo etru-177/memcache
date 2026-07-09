@@ -16,7 +16,7 @@
 ## 预提交与代码风格
 
 - 安装：`pip install pre-commit && pre-commit install --install-hooks`。
-- PR 增量检查：`TARGET_BRANCH=develop bash script/ci-pre-commit-pr.sh`。
+- PR 增量检查：`bash script/ci-pre-commit-pr.sh`。
 - Python 规则以 `pre-commit/pyproject.toml` 为准：Ruff 目标 `py310`，行宽 120，并启用 Pylint、Bandit。
 - C/C++ 格式以 `.clang-format` 和 `.pre-commit-config.yaml` 为准：clang-format v18.1.8、4 空格缩进、行宽 120。
 - C/C++ 命名和魔法数字规则以 `doc/c_cpp_naming.md` 为准。

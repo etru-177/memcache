@@ -25,7 +25,7 @@ def malloc_cpu(layer_num: int = 1, block_num: int = 1, min_block_size: int = 102
     raw_blocks = torch.rand(
         size=(layer_num, block_num, min_block_size // 2),  # torch.float16占两个字节所以除以2
         dtype=torch.float16,
-        device=torch.device('cpu')
+        device=torch.device('cpu'),
     )
     return raw_blocks
 
@@ -175,7 +175,7 @@ def handle_signal(signal_num, frame):
     signal_names = {
         signal.SIGINT: "SIGINT (Ctrl+C)",
         signal.SIGTERM: "SIGTERM (终止信号)",
-        signal.SIGUSR1: "SIGUSR1 (用户自定义信号1)"
+        signal.SIGUSR1: "SIGUSR1 (用户自定义信号1)",
     }
     signal_name = signal_names.get(signal_num, f"未知信号 ({signal_num})")
     print(f"\n收到信号: {signal_name}")

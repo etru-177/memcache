@@ -487,14 +487,13 @@ Result MmcRestApiFacade::BuildMetricsSummary(bool serviceReady, std::string &res
     oss << "keys=" << keys.size() << " evict=" << metricSnapshot.evictCount
         << " evict_to_ssd=" << metricSnapshot.evictToSsdCount
         << " evict_ssd_delete=" << metricSnapshot.evictSsdDeleteCount
-        << " evict_mem_delete=" << metricSnapshot.evictMemDeleteCount
-        << " rewarm=" << metricSnapshot.rewarmCount << " rewarm_fail=" << metricSnapshot.rewarmFailCount
+        << " evict_mem_delete=" << metricSnapshot.evictMemDeleteCount << " rewarm=" << metricSnapshot.rewarmCount
+        << " rewarm_fail=" << metricSnapshot.rewarmFailCount
         << " rewarm_bytes_total=" << metricSnapshot.rewarmBytesCount
         << " rewarm_bytes_current=" << metricSnapshot.rewarmBytesCurrent
         << " get_hit_dram=" << metricSnapshot.getHitDramCount << " get_hit_ssd=" << metricSnapshot.getHitSsdCount
-        << " hbm_used=" << BuildUsedText(hbmUsage)
-        << " dram_used=" << BuildUsedText(dramUsage) << " ssd_used=" << BuildUsedText(ssdUsage)
-        << " alloc_req=" << metricSnapshot.allocRequestCount
+        << " hbm_used=" << BuildUsedText(hbmUsage) << " dram_used=" << BuildUsedText(dramUsage)
+        << " ssd_used=" << BuildUsedText(ssdUsage) << " alloc_req=" << metricSnapshot.allocRequestCount
         << " alloc_success=" << metricSnapshot.allocSuccessCount << " alloc_fail=" << metricSnapshot.allocFailureCount
         << " batch_alloc_req=" << metricSnapshot.batchAllocRequestCount
         << " batch_alloc_success=" << metricSnapshot.batchAllocSuccessCount

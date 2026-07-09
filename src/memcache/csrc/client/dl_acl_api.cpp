@@ -139,5 +139,5 @@ void DlAclApi::CleanupLibrary()
     }
     gLoaded = false;
 }
-}
-}
+} // namespace mmc
+} // namespace ock

@@ -30,17 +30,19 @@ class MooncakeConfig:
     master_server_address: str
 
 
-class Mooncakestore():
+class Mooncakestore:
     def __init__(self, config: MooncakeConfig):
         self.local_hostname_ = config.local_hostname
         self.store = MooncakeDistributedStore()
-        ret = self.store.setup(self.local_hostname_,
-                               config.metadata_server,
-                               config.global_segment_size,
-                               config.local_buffer_size,
-                               config.protocol,
-                               config.device_name,
-                               config.master_server_address)
+        ret = self.store.setup(
+            self.local_hostname_,
+            config.metadata_server,
+            config.global_segment_size,
+            config.local_buffer_size,
+            config.protocol,
+            config.device_name,
+            config.master_server_address,
+        )
         if ret != 0:
             msg = "Initialize mooncake failed."
             raise RuntimeError(msg)

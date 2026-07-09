@@ -28,21 +28,47 @@ if __name__ == "__main__":
     backend = sys.argv[7]
     local_type = sys.argv[8]
 
-    print(f"主进程 PID: {os.getpid()}, {testcase=}, {process_count=}, {batch_size=}, {block_size=}, "
-          f"{call_count=}, {data_dim=}, {backend=}, {local_type=}")
+    print(
+        f"主进程 PID: {os.getpid()}, {testcase=}, {process_count=}, {batch_size=}, {block_size=}, "
+        f"{call_count=}, {data_dim=}, {backend=}, {local_type=}"
+    )
 
     sync = mp.Barrier(process_count)
     process = []
     # 创建两个子进程
     for index in range(process_count):
         if testcase == "read":
-            p = mp.Process(target=read_worker, args=(index, batch_size, block_size, call_count, data_dim,
-                    backend, local_type, process_count, sync, ))
+            p = mp.Process(
+                target=read_worker,
+                args=(
+                    index,
+                    batch_size,
+                    block_size,
+                    call_count,
+                    data_dim,
+                    backend,
+                    local_type,
+                    process_count,
+                    sync,
+                ),
+            )
             p.start()
             process.append(p)
         elif testcase == "write":
-            p = mp.Process(target=write_worker, args=(index, batch_size, block_size, call_count, data_dim,
-                    backend, local_type, process_count, sync, ))
+            p = mp.Process(
+                target=write_worker,
+                args=(
+                    index,
+                    batch_size,
+                    block_size,
+                    call_count,
+                    data_dim,
+                    backend,
+                    local_type,
+                    process_count,
+                    sync,
+                ),
+            )
             p.start()
             process.append(p)
         else:

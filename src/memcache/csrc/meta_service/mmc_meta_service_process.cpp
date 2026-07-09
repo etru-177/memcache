@@ -232,7 +232,7 @@ int MmcMetaServiceProcess::ValidateConfig() const
 
 void MmcMetaServiceProcess::RegisterSignal()
 {
-    struct sigaction action{};
+    struct sigaction action {};
     action.sa_handler = SignalInterruptHandler;
     sigemptyset(&action.sa_mask);
 
@@ -306,12 +306,12 @@ int MmcMetaServiceProcess::ExtractIpPortFromUrl(const std::string &url, std::str
         MMC_LOG_ERROR("Invalid http URL, failed to create socket address parser");
         return MMC_INVALID_PARAM;
     }
-    
+
     if (!parser->IsInitialized()) {
         MMC_LOG_ERROR("Invalid http URL, socket address parser initialization failed");
         return MMC_INVALID_PARAM;
     }
-    
+
     ip = parser->GetIp();
     port = parser->GetPort();
     return MMC_OK;

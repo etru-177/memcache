@@ -80,11 +80,10 @@ constexpr auto OCK_MMC_CLIENT_BATCH_CHUNK_SIZE = std::make_pair("ock.mmc.client.
 constexpr auto OCK_MMC_CLIENT_BATCH_CHUNK_COUNT = std::make_pair("ock.mmc.client.batch_option.chunk.count", 3);
 
 constexpr uint16_t DEFAULT_REWARM_WATERMARK_VAL = 95U;
-constexpr auto OCK_MMC_REWARM_DRAM_WATERMARK = std::make_pair("ock.mmc.rewarm.dram_watermark",
-                                                              DEFAULT_REWARM_WATERMARK_VAL);
+constexpr auto OCK_MMC_REWARM_DRAM_WATERMARK =
+    std::make_pair("ock.mmc.rewarm.dram_watermark", DEFAULT_REWARM_WATERMARK_VAL);
 constexpr auto OCK_MMC_PREFETCH_ENABLED = std::make_pair("ock.mmc.storage.prefetch.enabled", false);
-constexpr auto OCK_MMC_LOCAL_SERVICE_STORAGE_ENABLED =
-    std::make_pair("ock.mmc.local_service.storage.enabled", false);
+constexpr auto OCK_MMC_LOCAL_SERVICE_STORAGE_ENABLED = std::make_pair("ock.mmc.local_service.storage.enabled", false);
 } // namespace ConfConstant
 
 constexpr int MIN_LOG_ROTATION_FILE_SIZE = 1;

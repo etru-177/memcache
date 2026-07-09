@@ -56,8 +56,8 @@ MmcMemBlobPtr MmcBlobAllocator::Alloc(uint64_t blobSize)
     auto sizePos = sizeTree_.lower_bound(anchor);
     if (sizePos == sizeTree_.end()) {
         spinlock_.unlock();
-        MMC_LOG_WARN("Allocator rank: " << rank_ << " mediaType: " << mediaType_ << ", cap:" << allocatedSize_ << "/" <<
-                     capacity_ << " cannot allocate with size: " << blobSize);
+        MMC_LOG_WARN("Allocator rank: " << rank_ << " mediaType: " << mediaType_ << ", cap:" << allocatedSize_ << "/"
+                                        << capacity_ << " cannot allocate with size: " << blobSize);
         return nullptr;
     }
 
@@ -94,7 +94,7 @@ Result MmcBlobAllocator::Release(const MmcMemBlobPtr &blob)
     }
     auto alignedSize = AllocSizeAlignUp(blob->Size());
     MMC_ASSERT_LOG_AND_RETURN(allocatedSize_ >= alignedSize,
-        "allocatedSize_ = " << allocatedSize_ << ", alignedSize = " << alignedSize, MMC_ERROR);
+                              "allocatedSize_ = " << allocatedSize_ << ", alignedSize = " << alignedSize, MMC_ERROR);
     auto blobAddr = blob->Gva();
     if (blobAddr < bmAddr_ || blobAddr + alignedSize > bmAddr_ + capacity_) {
         MMC_LOG_ERROR("blob address not in allocator");
@@ -142,7 +142,7 @@ Result MmcBlobAllocator::Release(const MmcMemBlobPtr &blob)
 
     spinlock_.unlock();
     MMC_LOG_DEBUG("Release rank=" << rank_ << ", type=" << mediaType_ << " released=" << blob->Size()
-                                 << " total=" << allocatedSize_ << "/" << capacity_);
+                                  << " total=" << allocatedSize_ << "/" << capacity_);
     return MMC_OK;
 }
 

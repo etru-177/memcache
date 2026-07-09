@@ -101,12 +101,12 @@ public:
             return;
         }
 
-        struct timeval tv{};
+        struct timeval tv {};
         char strTime[24];
 
         gettimeofday(&tv, nullptr);
         time_t timeStamp = tv.tv_sec;
-        struct tm localTime{};
+        struct tm localTime {};
         if (strftime(strTime, sizeof strTime, "%Y-%m-%d %H:%M:%S.", localtime_r(&timeStamp, &localTime)) != 0) {
             std::cout << strTime << std::setw(MICROSECOND_WIDTH) << std::setfill('0') << tv.tv_usec << " "
                       << LogLevelDesc(level) << PID_TID << oss.str() << std::endl;
@@ -200,27 +200,27 @@ private:
 #define MMC_AUDIT_LOG(MSG) MMC_OUT_AUDIT_LOG(MSG)
 
 // if ARGS is false, print error with variable values
-#define MMC_ASSERT_LOG_AND_RETURN(ARGS, MSG, RET)                  \
-    do {                                                            \
-        if (__builtin_expect(!(ARGS), 0) != 0) {                    \
-            MMC_LOG_ERROR("Assert " << #ARGS << ", " << MSG);       \
-            return RET;                                             \
-        }                                                           \
+#define MMC_ASSERT_LOG_AND_RETURN(ARGS, MSG, RET)             \
+    do {                                                      \
+        if (__builtin_expect(!(ARGS), 0) != 0) {              \
+            MMC_LOG_ERROR("Assert " << #ARGS << ", " << MSG); \
+            return RET;                                       \
+        }                                                     \
     } while (0)
 
-#define MMC_ASSERT_RET_VOID(ARGS, MSG)                          \
-    do {                                                        \
-        if (__builtin_expect(!(ARGS), 0) != 0) {                \
-            MMC_LOG_ERROR("Assert " << #ARGS << ", " << MSG);   \
-            return;                                             \
-        }                                                       \
+#define MMC_ASSERT_RET_VOID(ARGS, MSG)                        \
+    do {                                                      \
+        if (__builtin_expect(!(ARGS), 0) != 0) {              \
+            MMC_LOG_ERROR("Assert " << #ARGS << ", " << MSG); \
+            return;                                           \
+        }                                                     \
     } while (0)
 
-#define MMC_ASSERT(ARGS, MSG)                                     \
-    do {                                                          \
-        if (__builtin_expect(!(ARGS), 0) != 0) {                  \
-            MMC_LOG_ERROR("Assert " << #ARGS << ", " << MSG);     \
-        }                                                         \
+#define MMC_ASSERT(ARGS, MSG)                                 \
+    do {                                                      \
+        if (__builtin_expect(!(ARGS), 0) != 0) {              \
+            MMC_LOG_ERROR("Assert " << #ARGS << ", " << MSG); \
+        }                                                     \
     } while (0)
 
 #define MMC_RETURN_ERROR(result, msg)                     \

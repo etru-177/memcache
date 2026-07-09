@@ -108,7 +108,7 @@ Result MmcClientDefault::Start(const mmc_client_config_t &config)
     MMC_RETURN_ERROR(writeThreadPool_->Start(bindCpu), "write thread pool start failed");
 
     MMC_ASSERT_LOG_AND_RETURN(memchr(config.discoveryURL, '\0', DISCOVERY_URL_SIZE) != nullptr,
-        "config.discoveryURL possibly unterminated", MMC_INVALID_PARAM);
+                              "config.discoveryURL possibly unterminated", MMC_INVALID_PARAM);
     auto tmpNetClient = MetaNetClientFactory::GetInstance(config.discoveryURL, "MetaClientCommon").Get();
     MMC_ASSERT_LOG_AND_RETURN(tmpNetClient != nullptr, "tmpNetClient is nullptr", MMC_NEW_OBJECT_FAILED);
     if (!tmpNetClient->Status()) {
@@ -356,8 +356,8 @@ Result MmcClientDefault::Get(const std::string &key, const MmcBufferArray &bufAr
     MMC_RETURN_ERROR(metaNetClient_->SyncCall(request, response, rpcRetryTimeOut_),
                      "client " << name_ << " get " << key << " failed");
     if (response.numBlobs_ == 0 || response.blobs_.empty()) {
-        MMC_LOG_ERROR("client " << name_ << " get " << key << " failed, numblob is:"
-                    << static_cast<uint64_t>(response.numBlobs_));
+        MMC_LOG_ERROR("client " << name_ << " get " << key
+                                << " failed, numblob is:" << static_cast<uint64_t>(response.numBlobs_));
         return MMC_ERROR;
     }
     auto &blob = response.blobs_[0];
@@ -482,8 +482,7 @@ Result MmcClientDefault::BatchGet(const std::vector<std::string> &keys, const st
     bool hasExpiredLease = false;
     const uint64_t leaseCheckNowMs = NowMs();
     for (size_t i = 0; i < localLeaseDeadlinesMs.size() && i < batchResult.size(); ++i) {
-        if (localLeaseDeadlinesMs[i] != 0 && leaseCheckNowMs > localLeaseDeadlinesMs[i] &&
-            batchResult[i] == MMC_OK) {
+        if (localLeaseDeadlinesMs[i] != 0 && leaseCheckNowMs > localLeaseDeadlinesMs[i] && batchResult[i] == MMC_OK) {
             batchResult[i] = MMC_LEASE_EXPIRED;
             hasExpiredLease = true;
         }
@@ -612,9 +611,9 @@ Result MmcClientDefault::Query(const std::string &key, mmc_data_info &query_info
                      "client " << name_ << " Query " << key << " failed");
     query_info.size = response.queryInfo_.size_;
     query_info.prot = response.queryInfo_.prot_;
-    const size_t queryBlobCount = std::min(
-        std::min(static_cast<size_t>(response.queryInfo_.numBlobs_), response.queryInfo_.blobs_.size()),
-        static_cast<size_t>(MAX_BLOB_COPIES));
+    const size_t queryBlobCount =
+        std::min(std::min(static_cast<size_t>(response.queryInfo_.numBlobs_), response.queryInfo_.blobs_.size()),
+                 static_cast<size_t>(MAX_BLOB_COPIES));
     query_info.numBlobs = static_cast<uint8_t>(queryBlobCount);
     query_info.valid = response.queryInfo_.valid_;
     for (size_t i = 0; i < queryBlobCount; i++) {
@@ -658,9 +657,8 @@ Result MmcClientDefault::BatchQuery(const std::vector<std::string> &keys, std::v
             continue;
         }
 
-        const size_t queryBlobCount =
-            std::min(std::min(static_cast<size_t>(info.numBlobs_), info.blobs_.size()),
-                     static_cast<size_t>(MAX_BLOB_COPIES));
+        const size_t queryBlobCount = std::min(std::min(static_cast<size_t>(info.numBlobs_), info.blobs_.size()),
+                                               static_cast<size_t>(MAX_BLOB_COPIES));
         for (size_t i = 0; i < queryBlobCount; i++) {
             outInfo.ranks[i] = info.blobs_[i].rank_;
             outInfo.types[i] = info.blobs_[i].mediaType_;
@@ -730,8 +728,7 @@ Result MmcClientDefault::BatchAddLease(const std::vector<std::string> &keys, uin
         }
 
         const auto &blob = queryInfo.blobs_[0];
-        Result trackRet = gvaBlobTracker_.UpdateFromQuery(keys[i], blob, operateIds[i],
-                                                          ToLocalLeaseDeadlineMs(blob));
+        Result trackRet = gvaBlobTracker_.UpdateFromQuery(keys[i], blob, operateIds[i], ToLocalLeaseDeadlineMs(blob));
         if (trackRet != MMC_OK) {
             MMC_LOG_ERROR("client " << name_ << " batch add lease track failed for key " << keys[i]
                                     << ", ret:" << trackRet);
@@ -797,7 +794,7 @@ void MmcClientDefault::ProcessUbsIoBatchGetWithHBM(UbsIoBatchGetData &data)
     std::vector<size_t> ubsIoIndices;
     data.ubsIoKeys.reserve(data.keys.size());
     ubsIoIndices.reserve(data.keys.size());
-    std::vector<std::vector<void*>> npuBufAddrs;
+    std::vector<std::vector<void *>> npuBufAddrs;
     std::vector<std::vector<size_t>> npuBufLengths;
     npuBufAddrs.reserve(data.keys.size());
     npuBufLengths.reserve(data.keys.size());
@@ -805,13 +802,13 @@ void MmcClientDefault::ProcessUbsIoBatchGetWithHBM(UbsIoBatchGetData &data)
         if (data.batchResult[i] == MMC_ERROR) {
             data.ubsIoKeys.emplace_back(data.keys[i]);
             ubsIoIndices.emplace_back(i);
-            auto& keyBuffers = data.bufArrs[i].Buffers();
-            std::vector<void*> npuBufAddrsForThisKey;
+            auto &keyBuffers = data.bufArrs[i].Buffers();
+            std::vector<void *> npuBufAddrsForThisKey;
             std::vector<size_t> npuBufLengthsForThisKey;
             npuBufAddrsForThisKey.reserve(keyBuffers.size());
             npuBufLengthsForThisKey.reserve(keyBuffers.size());
-            for (auto& buffer : keyBuffers) {
-                npuBufAddrsForThisKey.emplace_back(reinterpret_cast<void*>(buffer.addr + buffer.offset));
+            for (auto &buffer : keyBuffers) {
+                npuBufAddrsForThisKey.emplace_back(reinterpret_cast<void *>(buffer.addr + buffer.offset));
                 npuBufLengthsForThisKey.emplace_back(buffer.len);
             }
             npuBufAddrs.emplace_back(std::move(npuBufAddrsForThisKey));
@@ -833,7 +830,7 @@ void MmcClientDefault::ProcessUbsIoBatchGetWithHBM(UbsIoBatchGetData &data)
             size_t originIndex = ubsIoIndices[i];
             if (ubsIoResults[i] != 0) {
                 MMC_LOG_ERROR("ubsIo batch get failed for key " << data.ubsIoKeys[i]
-                              << ", result: " << ubsIoResults[i]);
+                                                                << ", result: " << ubsIoResults[i]);
                 data.batchResult[originIndex] = MMC_ERROR;
             } else {
                 data.batchResult[originIndex] = MMC_OK;
@@ -935,8 +932,8 @@ Result MmcClientDefault::RegisterPeriodicTask(const std::string &taskName, uint3
                                               MmcPeriodicTask::Task task)
 {
     if (intervalSeconds == 0 || !task) {
-        MMC_LOG_ERROR("Failed to start periodic task in client, invalid param: taskName=" << taskName
-                      << ", intervalSeconds=" << intervalSeconds);
+        MMC_LOG_ERROR("Failed to start periodic task in client, invalid param: taskName="
+                      << taskName << ", intervalSeconds=" << intervalSeconds);
         return MMC_INVALID_PARAM;
     }
 
@@ -1184,8 +1181,8 @@ Result MmcClientDefault::BatchMalloc(const std::vector<std::string> &keys, const
     return MMC_OK;
 }
 
-void MmcClientDefault::BuildReadFinishRequestsByOperateId(
-    const std::vector<LocalGvaBlobInfoPtr> &claimedInfos, std::vector<BatchUpdateRequest> &requests)
+void MmcClientDefault::BuildReadFinishRequestsByOperateId(const std::vector<LocalGvaBlobInfoPtr> &claimedInfos,
+                                                          std::vector<BatchUpdateRequest> &requests)
 {
     requests.clear();
     requests.reserve(claimedInfos.size());

@@ -96,15 +96,13 @@ if __name__ == "__main__":
     get_offset = args.get_offset  # get item after put <get_offset> more items
     keys = []
     put_value = []
-    hasher = (
-        hashlib.sha256()
-    )  # calculate hash over all tests, useful in dual-host testing
+    hasher = hashlib.sha256()  # calculate hash over all tests, useful in dual-host testing
     failures = 0
     mismatch = 0
     for put_idx in range(count + get_offset):
         if perform_puts and put_idx < count:
             key = "test_evict_" + str(put_idx)
-            print(f"[{put_idx+1}/{count}] put data: {key}")
+            print(f"[{put_idx + 1}/{count}] put data: {key}")
             res = client.put_from(key, size, media)
             ret, value = json.loads(res)
             keys.append(key)
@@ -114,7 +112,7 @@ if __name__ == "__main__":
         if perform_gets and put_idx >= get_offset:
             get_idx = put_idx - get_offset
             key = "test_evict_" + str(get_idx)
-            print(f"[{get_idx+1}/{count}] get data: {key}")
+            print(f"[{get_idx + 1}/{count}] get data: {key}")
             res = client.get_into(key, size, media)
             ret, value = json.loads(res)
             if ret != 0:
@@ -123,9 +121,7 @@ if __name__ == "__main__":
                 equals = put_value[get_idx] == value
                 if ret == 0 and not equals:
                     mismatch += 1
-                print(
-                    f"[{get_idx+1}/{count}] {equals=} {key=} put_value={put_value[get_idx]} get_value={value}"
-                )
+                print(f"[{get_idx + 1}/{count}] {equals=} {key=} put_value={put_value[get_idx]} get_value={value}")
                 print()
             else:
                 keys.append(key)

@@ -151,7 +151,9 @@ def _wait_for_lease_read(coordination_api, namespace: str, lease_name: str):
     )
 
 
-def _set_lease_state(coordination_api, namespace: str, lease_name: str, holder_identity, renew_time, acquire_time, lease_duration_seconds):
+def _set_lease_state(
+    coordination_api, namespace: str, lease_name: str, holder_identity, renew_time, acquire_time, lease_duration_seconds
+):
     lease = coordination_api.read_namespaced_lease(name=lease_name, namespace=namespace)
     lease.spec.holder_identity = holder_identity
     lease.spec.renew_time = renew_time
@@ -173,7 +175,9 @@ def _assert_datetime_greater(new_value, old_value, message: str) -> None:
     assert new_value > old_value, message
 
 
-def _make_election(module, namespace: str, lease_name: str, pod_name: str, retry_period: int = DEFAULT_RETRY_PERIOD_SECONDS):
+def _make_election(
+    module, namespace: str, lease_name: str, pod_name: str, retry_period: int = DEFAULT_RETRY_PERIOD_SECONDS
+):
     return module.MetaServiceLeaderElection(
         lease_name=lease_name,
         namespace=namespace,
@@ -211,11 +215,21 @@ def _test_check_leader_status(module, election, coordination_api, namespace: str
     assert election.check_leader_status() == "None"
 
     current_time = _utc_now()
-    _set_lease_state(coordination_api, namespace, lease_name, "other-pod", current_time, current_time, DEFAULT_LEASE_DURATION_SECONDS)
+    _set_lease_state(
+        coordination_api, namespace, lease_name, "other-pod", current_time, current_time, DEFAULT_LEASE_DURATION_SECONDS
+    )
     assert election.check_leader_status() == "other-pod"
 
     expired_time = _utc_now() - timedelta(seconds=DEFAULT_LEASE_DURATION_SECONDS + 5)
-    _set_lease_state(coordination_api, namespace, lease_name, "expired-pod", expired_time, expired_time, DEFAULT_LEASE_DURATION_SECONDS)
+    _set_lease_state(
+        coordination_api,
+        namespace,
+        lease_name,
+        "expired-pod",
+        expired_time,
+        expired_time,
+        DEFAULT_LEASE_DURATION_SECONDS,
+    )
     assert election.check_leader_status() == "None"
 
 
@@ -235,12 +249,22 @@ def _test_update_lease(module, election, coordination_api, namespace: str, lease
     _assert_datetime_greater(after_renew, before_renew, "renew_time did not advance after renewal")
 
     other_renew = _utc_now()
-    _set_lease_state(coordination_api, namespace, lease_name, "other-pod", other_renew, other_renew, DEFAULT_LEASE_DURATION_SECONDS)
+    _set_lease_state(
+        coordination_api, namespace, lease_name, "other-pod", other_renew, other_renew, DEFAULT_LEASE_DURATION_SECONDS
+    )
     assert election.update_lease(False) is False
     assert election._retry_update_lease(False) == 0
 
     expired_renew = _utc_now() - timedelta(seconds=DEFAULT_LEASE_DURATION_SECONDS + 5)
-    _set_lease_state(coordination_api, namespace, lease_name, "other-pod", expired_renew, expired_renew, DEFAULT_LEASE_DURATION_SECONDS)
+    _set_lease_state(
+        coordination_api,
+        namespace,
+        lease_name,
+        "other-pod",
+        expired_renew,
+        expired_renew,
+        DEFAULT_LEASE_DURATION_SECONDS,
+    )
     assert election.update_lease(False) is True
 
 
@@ -249,7 +273,9 @@ def _test_retry_update_lease(module, election, coordination_api, namespace: str,
     assert election._retry_update_lease(False) == 1
 
     other_renew = _utc_now()
-    _set_lease_state(coordination_api, namespace, lease_name, "other-pod", other_renew, other_renew, DEFAULT_LEASE_DURATION_SECONDS)
+    _set_lease_state(
+        coordination_api, namespace, lease_name, "other-pod", other_renew, other_renew, DEFAULT_LEASE_DURATION_SECONDS
+    )
     assert election._retry_update_lease(False) == 0
 
 
@@ -264,7 +290,9 @@ def _test_pod_label_updates(module, election, core_api, namespace: str, pod_name
     _assert_label_role(core_api, namespace, pod_name, "master")
 
 
-def _test_check_and_update_leadership(module, election, coordination_api, core_api, namespace: str, lease_name: str, pod_name: str):
+def _test_check_and_update_leadership(
+    module, election, coordination_api, core_api, namespace: str, lease_name: str, pod_name: str
+):
     _set_lease_state(coordination_api, namespace, lease_name, None, None, None, DEFAULT_LEASE_DURATION_SECONDS)
     election.is_leader = False
     election._check_and_update_leadership()
@@ -272,7 +300,9 @@ def _test_check_and_update_leadership(module, election, coordination_api, core_a
     _assert_label_role(core_api, namespace, pod_name, "master")
 
     other_renew = _utc_now()
-    _set_lease_state(coordination_api, namespace, lease_name, "other-pod", other_renew, other_renew, DEFAULT_LEASE_DURATION_SECONDS)
+    _set_lease_state(
+        coordination_api, namespace, lease_name, "other-pod", other_renew, other_renew, DEFAULT_LEASE_DURATION_SECONDS
+    )
     election.is_leader = True
     election._check_and_update_leadership()
     assert election.is_leader is False
@@ -280,7 +310,9 @@ def _test_check_and_update_leadership(module, election, coordination_api, core_a
 
 
 def _test_renew_loop(module, election, coordination_api, namespace: str, lease_name: str, pod_name: str):
-    _set_lease_state(coordination_api, namespace, lease_name, pod_name, _utc_now(), _utc_now(), DEFAULT_LEASE_DURATION_SECONDS)
+    _set_lease_state(
+        coordination_api, namespace, lease_name, pod_name, _utc_now(), _utc_now(), DEFAULT_LEASE_DURATION_SECONDS
+    )
     initial_lease = _wait_for_lease_read(coordination_api, namespace, lease_name)
     initial_renew = _to_utc_datetime(module, initial_lease.spec.renew_time)
     election.is_leader = True
@@ -290,6 +322,7 @@ def _test_renew_loop(module, election, coordination_api, namespace: str, lease_n
     thread = threading.Thread(target=election._renew_lease, daemon=True)
     thread.start()
     try:
+
         def _read_renewed_lease():
             current_lease = _wait_for_lease_read(coordination_api, namespace, lease_name)
             if _to_utc_datetime(module, current_lease.spec.renew_time) > initial_renew:
@@ -301,7 +334,9 @@ def _test_renew_loop(module, election, coordination_api, namespace: str, lease_n
             _read_renewed_lease,
         )
         after_renew = _to_utc_datetime(module, lease.spec.renew_time)
-        _assert_datetime_greater(after_renew, initial_renew, "renew_time did not advance while the renew loop was running")
+        _assert_datetime_greater(
+            after_renew, initial_renew, "renew_time did not advance while the renew loop was running"
+        )
     finally:
         election.stop_election()
         thread.join(THREAD_WAIT_SECONDS)
@@ -350,11 +385,15 @@ def _cleanup(
 
 def _parse_args():
     parser = argparse.ArgumentParser(description="Real k3s functional checks for meta_service_leader_election")
-    parser.add_argument("--namespace", default=None, help="Existing namespace to use; otherwise create a unique test namespace")
+    parser.add_argument(
+        "--namespace", default=None, help="Existing namespace to use; otherwise create a unique test namespace"
+    )
     parser.add_argument("--lease-name", default=None, help="Lease name to use")
     parser.add_argument("--pod-name", default=None, help="Pod name to use")
     parser.add_argument("--pod-image", default=DEFAULT_POD_IMAGE, help="Pod image used for object creation")
-    parser.add_argument("--keep-resources", action="store_true", help="Keep created Kubernetes resources after the script exits")
+    parser.add_argument(
+        "--keep-resources", action="store_true", help="Keep created Kubernetes resources after the script exits"
+    )
     return parser.parse_args()
 
 

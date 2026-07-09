@@ -47,17 +47,16 @@ public:
     bool RegisterTask(std::string name, uint32_t intervalSeconds, Task task)
     {
         if (intervalSeconds == 0 || !task) {
-            MMC_LOG_ERROR("Failed to register periodic task, invalid param: name=" << name
-                           << ", intervalSeconds=" << intervalSeconds << ", task=" << (task ? "set" : "null"));
+            MMC_LOG_ERROR("Failed to register periodic task, invalid param: name="
+                          << name << ", intervalSeconds=" << intervalSeconds << ", task=" << (task ? "set" : "null"));
             return false;
         }
 
         const auto now = std::chrono::steady_clock::now();
         {
             std::lock_guard<std::mutex> lock(mutex_);
-            const auto iter = std::find_if(tasks_.begin(), tasks_.end(), [&name](const TaskEntry &entry) {
-                return entry.name == name;
-            });
+            const auto iter = std::find_if(tasks_.begin(), tasks_.end(),
+                                           [&name](const TaskEntry &entry) { return entry.name == name; });
             if (iter != tasks_.end()) {
                 MMC_LOG_WARN("Periodic task already exists, update config: " << name);
                 iter->interval = std::chrono::seconds(intervalSeconds);
@@ -186,8 +185,7 @@ public:
         std::lock_guard<std::mutex> lock(instanceMutex_);
         const auto it = instances_.find(realKey);
         if (it == instances_.end()) {
-            std::shared_ptr<MmcPeriodicTask> instance(
-                new (std::nothrow) MmcPeriodicTask(realKey));
+            std::shared_ptr<MmcPeriodicTask> instance(new (std::nothrow) MmcPeriodicTask(realKey));
             if (instance == nullptr) {
                 MMC_LOG_ERROR("new object failed, probably out of memory");
                 return nullptr;

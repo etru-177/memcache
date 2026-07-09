@@ -145,7 +145,7 @@ public:
 
     [[nodiscard]] std::string ResolveDomainToIp(const std::string &url)
     {
-        addrinfo hints {};
+        addrinfo hints{};
         hints.ai_family = AF_UNSPEC;
         hints.ai_socktype = SOCK_STREAM;
 
@@ -163,7 +163,7 @@ public:
         for (addrinfo *cur = result; cur != nullptr; cur = cur->ai_next) {
             if (cur->ai_family == AF_INET) {
                 auto *addr4 = reinterpret_cast<sockaddr_in *>(cur->ai_addr);
-                char ip_str[INET_ADDRSTRLEN] {};
+                char ip_str[INET_ADDRSTRLEN]{};
                 if (inet_ntop(AF_INET, &addr4->sin_addr, ip_str, sizeof(ip_str)) != nullptr) {
                     resolved_ip = ip_str;
                     is_ipv6_ = false;
@@ -172,7 +172,7 @@ public:
             }
             if (cur->ai_family == AF_INET6) {
                 auto *addr6 = reinterpret_cast<sockaddr_in6 *>(cur->ai_addr);
-                char ip_str[INET6_ADDRSTRLEN] {};
+                char ip_str[INET6_ADDRSTRLEN]{};
                 if (inet_ntop(AF_INET6, &addr6->sin6_addr, ip_str, sizeof(ip_str)) != nullptr) {
                     resolved_ip = ip_str;
                     is_ipv6_ = true;
@@ -242,8 +242,8 @@ private:
 
         // 处理IPv6地址（包含在方括号中）
         if (host.front() == '[' && host.back() == ']') {
-            constexpr size_t kLeftBracketLen = 1;   // 左括号 '[' 长度
-            constexpr size_t kRightBracketLen = 1;  // 右括号 ']' 长度
+            constexpr size_t kLeftBracketLen = 1;  // 左括号 '[' 长度
+            constexpr size_t kRightBracketLen = 1; // 右括号 ']' 长度
             host_ = host.substr(kLeftBracketLen, host.length() - kLeftBracketLen - kRightBracketLen);
             is_ipv6_ = true;
         } else {

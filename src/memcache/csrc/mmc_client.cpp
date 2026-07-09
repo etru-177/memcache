@@ -220,8 +220,8 @@ MMC_API int32_t mmcc_batch_remove_lease(const char **keys, uint32_t keys_count)
     return MmcClientDefault::GetInstance()->BatchRemoveLease(keysVector);
 }
 
-MMC_API int32_t mmcc_batch_malloc(const char **keys, uint32_t keys_count, const size_t *sizes,
-                                  mmc_put_options options, uint64_t *gvas)
+MMC_API int32_t mmcc_batch_malloc(const char **keys, uint32_t keys_count, const size_t *sizes, mmc_put_options options,
+                                  uint64_t *gvas)
 {
     MMC_VALIDATE_RETURN(MmcClientDefault::GetInstance() != nullptr, "client is not initialize", MMC_CLIENT_NOT_INIT);
     MMC_VALIDATE_RETURN(keys != nullptr, "invalid param, keys is null", MMC_INVALID_PARAM);

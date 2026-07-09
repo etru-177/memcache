@@ -19,14 +19,14 @@ namespace ock {
 namespace mmc {
 
 enum class aclrtMemLocationType {
-    ACL_MEM_LOCATION_TYPE_HOST = 0,   // Host内存
-    ACL_MEM_LOCATION_TYPE_DEVICE,     // Device内存
+    ACL_MEM_LOCATION_TYPE_HOST = 0, // Host内存
+    ACL_MEM_LOCATION_TYPE_DEVICE,   // Device内存
 };
 
 using aclrtMemLocation = struct aclrtMemLocation;
 struct aclrtMemLocation {
     uint32_t id;
-    aclrtMemLocationType type;    // 内存所在位置
+    aclrtMemLocationType type; // 内存所在位置
 };
 
 using aclrtMemcpyBatchAttr = struct aclrtMemcpyBatchAttr;
@@ -63,8 +63,8 @@ using rtGetLogicDevIdByUserDevIdFunc = int32_t (*)(const int32_t, int32_t *const
 using rtIpcOpenMemoryFunc = int32_t (*)(void **, const char *);
 using rtIpcCloseMemoryFunc = int32_t (*)(const void *);
 using aclrtGetSocNameFunc = const char *(*)();
-using aclrtMemcpyBatchFunc = int32_t (*)(void **, size_t *, void **, size_t *, size_t,
-                                         aclrtMemcpyBatchAttr *, size_t *, size_t, size_t *);
+using aclrtMemcpyBatchFunc = int32_t (*)(void **, size_t *, void **, size_t *, size_t, aclrtMemcpyBatchAttr *, size_t *,
+                                         size_t, size_t *);
 
 class DlAclApi {
 public:
@@ -184,10 +184,9 @@ public:
         return pAclrtMemcpyAsync(dst, destMax, src, count, kind, stream);
     }
 
-    static inline Result AclrtMemcpyBatch(void **dsts, size_t *destMax,
-                                          void **srcs, size_t *sizes, size_t numBatches,
-                                          aclrtMemcpyBatchAttr *attrs, size_t *attrsIndexes,
-                                          size_t numAttrs, size_t *failIndex)
+    static inline Result AclrtMemcpyBatch(void **dsts, size_t *destMax, void **srcs, size_t *sizes, size_t numBatches,
+                                          aclrtMemcpyBatchAttr *attrs, size_t *attrsIndexes, size_t numAttrs,
+                                          size_t *failIndex)
     {
         if (pAclrtMemcpyBatch == nullptr) {
             return MMC_ERROR;
@@ -195,8 +194,8 @@ public:
         return pAclrtMemcpyBatch(dsts, destMax, srcs, sizes, numBatches, attrs, attrsIndexes, numAttrs, failIndex);
     }
 
-    static inline Result AclrtMemcpy2d(void *dst, size_t dpitch, const void *src, size_t spitch,
-                                       size_t width, size_t height, uint32_t kind)
+    static inline Result AclrtMemcpy2d(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width,
+                                       size_t height, uint32_t kind)
     {
         if (pAclrtMemcpy2d == nullptr) {
             return MMC_ERROR;
@@ -204,8 +203,8 @@ public:
         return pAclrtMemcpy2d(dst, dpitch, src, spitch, width, height, kind);
     }
 
-    static inline Result AclrtMemcpy2dAsync(void *dst, size_t dpitch, const void *src, size_t spitch,
-                                            size_t width, size_t height, uint32_t kind, void *stream)
+    static inline Result AclrtMemcpy2dAsync(void *dst, size_t dpitch, const void *src, size_t spitch, size_t width,
+                                            size_t height, uint32_t kind, void *stream)
     {
         if (pAclrtMemcpy2dAsync == nullptr) {
             return MMC_ERROR;
@@ -298,7 +297,7 @@ public:
         return pRtDisableP2P(devIdDes, phyIdSrc);
     }
 
-    static inline Result RtGetLogicDevIdByUserDevId(const int32_t userDevId, int32_t * const logicDevId)
+    static inline Result RtGetLogicDevIdByUserDevId(const int32_t userDevId, int32_t *const logicDevId)
     {
         if (pRtGetLogicDevIdByUserDevId == nullptr) {
             return MMC_ERROR;
@@ -341,7 +340,7 @@ private:
     static rtDisableP2PFunc pRtDisableP2P;
     static rtGetLogicDevIdByUserDevIdFunc pRtGetLogicDevIdByUserDevId;
 };
-}
-}
+} // namespace mmc
+} // namespace ock
 
-#endif  // MMC_CORE_DL_ACL_API_H
+#endif // MMC_CORE_DL_ACL_API_H

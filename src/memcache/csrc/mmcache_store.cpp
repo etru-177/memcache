@@ -26,7 +26,7 @@
 namespace ock {
 namespace mmc {
 
-constexpr int MAX_LAYER_NUM = 255;  // 分层场景：传统神经网络模型
+constexpr int MAX_LAYER_NUM = 255;   // 分层场景：传统神经网络模型
 constexpr int MAX_BUFFER_NUM = 8192; // 多 buffer 场景：支持稀疏数据、分段存储等
 constexpr int MAX_KEY_LEN = 256;
 constexpr uint64_t MMC_DEVICE_VA_START = 0x100000000000UL; // NPU上的地址空间起始: 16T
@@ -536,8 +536,8 @@ int MmcacheStore::PutFromLayers(const std::string &key, const std::vector<void *
                                 const std::vector<size_t> &sizes, const int32_t direct,
                                 const ReplicateConfig &replicateConfig)
 {
-    MMC_ASSERT_LOG_AND_RETURN(MmcClientDefault::GetInstance() != nullptr,
-        "MmcClientDefault::GetInstance() is nullptr", MMC_INVALID_PARAM);
+    MMC_ASSERT_LOG_AND_RETURN(MmcClientDefault::GetInstance() != nullptr, "MmcClientDefault::GetInstance() is nullptr",
+                              MMC_INVALID_PARAM);
     if (direct != SMEMB_COPY_L2G && direct != SMEMB_COPY_H2G && direct != SMEMB_COPY_AUTO) {
         MMC_LOG_ERROR(
             "Invalid direct(" << direct
@@ -596,8 +596,8 @@ std::vector<int> MmcacheStore::BatchPutFromLayers(const std::vector<std::string>
                                                   const std::vector<std::vector<size_t>> &sizes, const int32_t direct,
                                                   const ReplicateConfig &replicateConfig)
 {
-    MMC_ASSERT_LOG_AND_RETURN(MmcClientDefault::GetInstance() != nullptr,
-        "MmcClientDefault::GetInstance() is nullptr", {});
+    MMC_ASSERT_LOG_AND_RETURN(MmcClientDefault::GetInstance() != nullptr, "MmcClientDefault::GetInstance() is nullptr",
+                              {});
     const size_t batchSize = keys.size();
     MMC_VALIDATE_RETURN(batchSize > 0, "key vector is empty", {});
 
@@ -668,8 +668,8 @@ int MmcacheStore::GetIntoLayers(const std::string &key, const std::vector<void *
                                  "1 (SMEMB_COPY_G2L) , 2 (SMEMB_COPY_G2H) and 9 (SMEMB_COPY_AUTO) is supported");
         return MMC_INVALID_PARAM;
     }
-    MMC_ASSERT_LOG_AND_RETURN(MmcClientDefault::GetInstance() != nullptr,
-        "MmcClientDefault::GetInstance() is nullptr", MMC_INVALID_PARAM);
+    MMC_ASSERT_LOG_AND_RETURN(MmcClientDefault::GetInstance() != nullptr, "MmcClientDefault::GetInstance() is nullptr",
+                              MMC_INVALID_PARAM);
 
     uint32_t type = MEDIA_DRAM;
     if (direct == SMEMB_COPY_G2L) {
@@ -716,8 +716,8 @@ std::vector<int> MmcacheStore::BatchGetIntoLayers(const std::vector<std::string>
                                                   const std::vector<std::vector<void *>> &buffers,
                                                   const std::vector<std::vector<size_t>> &sizes, const int32_t direct)
 {
-    MMC_ASSERT_LOG_AND_RETURN(MmcClientDefault::GetInstance() != nullptr,
-        "MmcClientDefault::GetInstance() is nullptr", {});
+    MMC_ASSERT_LOG_AND_RETURN(MmcClientDefault::GetInstance() != nullptr, "MmcClientDefault::GetInstance() is nullptr",
+                              {});
     const size_t batchSize = keys.size();
     MMC_VALIDATE_RETURN(batchSize > 0, "key vector is empty", {});
 

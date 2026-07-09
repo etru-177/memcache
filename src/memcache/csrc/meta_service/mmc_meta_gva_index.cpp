@@ -65,8 +65,8 @@ std::shared_ptr<MmcMetaGvaIndex::SegmentReverseIndex> MmcMetaGvaIndex::FindSegme
     return {};
 }
 
-std::shared_ptr<MmcMetaGvaIndex::SegmentReverseIndex> MmcMetaGvaIndex::FindSegmentByLocationLocked(
-    const MmcLocation &loc)
+std::shared_ptr<MmcMetaGvaIndex::SegmentReverseIndex>
+MmcMetaGvaIndex::FindSegmentByLocationLocked(const MmcLocation &loc)
 {
     for (const auto &segment : segmentIndexes_) {
         if (segment->loc_ == loc) {
@@ -85,10 +85,9 @@ Result MmcMetaGvaIndex::RegisterSegment(const MmcLocation &loc, const MmcLocalMe
         if (existing->startGva_ == localMemInitInfo.bmAddr_ && existing->endGva_ == expectedEnd) {
             return MMC_OK;
         }
-        MMC_LOG_ERROR("register gva segment conflict, loc:" << loc << ", existingStart:" << existing->startGva_
-                                                            << ", existingEnd:" << existing->endGva_
-                                                            << ", requestStart:" << localMemInitInfo.bmAddr_
-                                                            << ", requestEnd:" << expectedEnd);
+        MMC_LOG_ERROR("register gva segment conflict, loc:"
+                      << loc << ", existingStart:" << existing->startGva_ << ", existingEnd:" << existing->endGva_
+                      << ", requestStart:" << localMemInitInfo.bmAddr_ << ", requestEnd:" << expectedEnd);
         return MMC_ERROR;
     }
 
@@ -101,10 +100,9 @@ Result MmcMetaGvaIndex::RegisterSegment(const MmcLocation &loc, const MmcLocalMe
     segment->loc_ = loc;
     segment->startGva_ = localMemInitInfo.bmAddr_;
     segment->endGva_ = localMemInitInfo.bmAddr_ + localMemInitInfo.capacity_;
-    auto insertPos = std::upper_bound(segmentIndexes_.begin(), segmentIndexes_.end(), segment->startGva_,
-                                      [](uint64_t value, const std::shared_ptr<SegmentReverseIndex> &item) {
-                                          return value < item->startGva_;
-                                      });
+    auto insertPos = std::upper_bound(
+        segmentIndexes_.begin(), segmentIndexes_.end(), segment->startGva_,
+        [](uint64_t value, const std::shared_ptr<SegmentReverseIndex> &item) { return value < item->startGva_; });
     segmentIndexes_.insert(insertPos, segment);
     return MMC_OK;
 }
@@ -125,9 +123,8 @@ Result MmcMetaGvaIndex::RegisterPendingWrite(const std::string &key, uint64_t op
                                              const MmcMemObjMetaPtr &objMeta, const MmcMemBlobPtr &blob)
 {
     if (objMeta == nullptr || blob == nullptr) {
-        MMC_LOG_ERROR("register pending write invalid param, key:" << key << ", operateId:" << operateId
-                                                                   << ", objMeta:" << objMeta.Get()
-                                                                   << ", blob:" << blob.Get());
+        MMC_LOG_ERROR("register pending write invalid param, key:" << key << ", operateId:" << operateId << ", objMeta:"
+                                                                   << objMeta.Get() << ", blob:" << blob.Get());
         return MMC_INVALID_PARAM;
     }
 
@@ -137,9 +134,8 @@ Result MmcMetaGvaIndex::RegisterPendingWrite(const std::string &key, uint64_t op
         segment = FindSegmentByGvaLocked(blob->Gva());
     }
     if (segment == nullptr) {
-        MMC_LOG_ERROR("register pending write segment not found, key:" << key << ", operateId:" << operateId
-                                                                       << ", gva:" << blob->Gva()
-                                                                       << ", size:" << blob->Size());
+        MMC_LOG_ERROR("register pending write segment not found, key:" << key << ", operateId:" << operateId << ", gva:"
+                                                                       << blob->Gva() << ", size:" << blob->Size());
         return MMC_UNMATCHED_KEY;
     }
 
@@ -193,9 +189,8 @@ bool MmcMetaGvaIndex::UpdatePendingWrite(uint64_t gva, uint64_t size, bool remov
     std::lock_guard<std::mutex> guard(segment->mutex_);
     auto *query = QueryBlobInNamespace(segment->pendingWrite_, *segment, gva, size);
     if (query == nullptr) {
-        MMC_LOG_ERROR("update pending write interval not found, gva:" << gva << ", size:" << size
-                                                                      << ", removeDirectly:" << removeDirectly
-                                                                      << ", loc:" << segment->loc_);
+        MMC_LOG_ERROR("update pending write interval not found, gva:" << gva << ", size:" << size << ", removeDirectly:"
+                                                                      << removeDirectly << ", loc:" << segment->loc_);
         return false;
     }
 

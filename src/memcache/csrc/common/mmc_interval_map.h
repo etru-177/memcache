@@ -44,7 +44,7 @@ public:
         return true;
     }
 
-    V* Query(uint64_t addr)
+    V *Query(uint64_t addr)
     {
         // 找到第一个 start > addr 的区间 → 前一个可能是包含 addr 的
         auto it = intervals_.upper_bound(addr);
@@ -61,7 +61,7 @@ public:
     }
 
     // 范围查询：整个 [addr, addr+size) 是否被同一个值完全覆盖
-    V* Query(uint64_t addr, uint64_t size)
+    V *Query(uint64_t addr, uint64_t size)
     {
         if (size == 0) {
             return nullptr;
@@ -85,7 +85,7 @@ public:
         }
 
         // 记录第一个区间的 value，作为基准
-        V* common_value = &(it->second.second);
+        V *common_value = &(it->second.second);
 
         // 从 addr 开始检查，直到覆盖到 end
         uint64_t covered_up_to = addr;

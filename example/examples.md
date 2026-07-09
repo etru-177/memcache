@@ -5,8 +5,8 @@
 ## 目录说明
 
 ```
-├── examples        
-│   ├── benchmark        # memcache性能测试bench mark     
+├── examples
+│   ├── benchmark        # memcache性能测试bench mark
 │   ├── cpp              # c++样例
 │   ├── python           # python样例
 │   ├── metrics          # grafana metrics样例

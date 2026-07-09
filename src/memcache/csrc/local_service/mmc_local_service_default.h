@@ -47,13 +47,12 @@ public:
     Result UpdateMetaBackup(const std::vector<uint32_t> &ops, const std::vector<std::string> &keys,
                             const std::vector<MmcMemBlobDesc> &blobs);
 
-    Result CopyBlob(const std::string& key, const MmcMemBlobDesc &src, const MmcMemBlobDesc &dst);
+    Result CopyBlob(const std::string &key, const MmcMemBlobDesc &src, const MmcMemBlobDesc &dst);
 
-    std::vector<Result> BatchCopyBlob(const std::vector<std::string>& keys,
-                                      const std::vector<MmcMemBlobDesc>& srcBlobs,
-                                      const std::vector<MmcMemBlobDesc>& dstBlobs);
+    std::vector<Result> BatchCopyBlob(const std::vector<std::string> &keys, const std::vector<MmcMemBlobDesc> &srcBlobs,
+                                      const std::vector<MmcMemBlobDesc> &dstBlobs);
 
-    Result BlobDelete(const std::string& key, const MmcMemBlobDesc &blob);
+    Result BlobDelete(const std::string &key, const MmcMemBlobDesc &blob);
 
     const std::string &Name() const override;
 
@@ -70,17 +69,16 @@ public:
 private:
     struct BatchIoParams {
         std::vector<std::string> keys;
-        std::vector<void*> vas;
+        std::vector<void *> vas;
         std::vector<size_t> sizes;
         std::vector<size_t> validIdx;
     };
 
-    void CollectBatchIoParams(const std::vector<std::string>& keys,
-                              const std::vector<MmcMemBlobDesc>& srcBlobs,
-                              const std::vector<MmcMemBlobDesc>& dstBlobs,
-                              bool srcIsSsd, std::vector<Result>& results, BatchIoParams& out);
+    void CollectBatchIoParams(const std::vector<std::string> &keys, const std::vector<MmcMemBlobDesc> &srcBlobs,
+                              const std::vector<MmcMemBlobDesc> &dstBlobs, bool srcIsSsd, std::vector<Result> &results,
+                              BatchIoParams &out);
 
-    void ExecuteBatchIo(BatchIoParams& params, bool srcIsSsd, std::vector<Result>& results);
+    void ExecuteBatchIo(BatchIoParams &params, bool srcIsSsd, std::vector<Result> &results);
 
     void HandleUbsIoMetaEvents(int type, const std::vector<std::string> &keys);
 

@@ -80,8 +80,9 @@ class TestServer:
     def _register_inner_command(self):
         self._commands = {
             "help": CliCommand("help", "show command list information", self._help, 0),
-            "getServerCommands": CliCommand("getServerCommands", "getServerCommands, get the registered Commands",
-                                            self._get_server_commands, 0),
+            "getServerCommands": CliCommand(
+                "getServerCommands", "getServerCommands, get the registered Commands", self._get_server_commands, 0
+            ),
         }
 
     def register_command(self, cmds: List[CliCommand]):
@@ -239,7 +240,9 @@ class MmcTest(TestServer):
                 if unreg_ret != 0:
                     logging.error(
                         "unregister_buffer failed, ret=%s ptr=%s size=%s",
-                        unreg_ret, ptr, sz,
+                        unreg_ret,
+                        ptr,
+                        sz,
                     )
             except Exception:
                 logging.exception("unregister_buffer raised ptr=%s size=%s", ptr, sz)
@@ -248,12 +251,14 @@ class MmcTest(TestServer):
         cmds = [
             CliCommand("init_mmc", "initialize memcache", self.init_mmc, 0),
             CliCommand("close_mmc", "destruct memcache", self.close_mmc, 0),
-            CliCommand("set_local_configs", "set multiple LocalConfig fields in one shot: [config_map(dict)]",
-                       self.set_local_configs, 1),
-            CliCommand("local_config_str", "show current LocalConfig",
-                       self.local_config_str, 0),
-            CliCommand("setup_mmc", "call DistributedObjectStore.setup with current LocalConfig",
-                       self.setup_mmc, 0),
+            CliCommand(
+                "set_local_configs",
+                "set multiple LocalConfig fields in one shot: [config_map(dict)]",
+                self.set_local_configs,
+                1,
+            ),
+            CliCommand("local_config_str", "show current LocalConfig", self.local_config_str, 0),
+            CliCommand("setup_mmc", "call DistributedObjectStore.setup with current LocalConfig", self.setup_mmc, 0),
             CliCommand("get_local_service_id", "get local service id", self.get_local_service_id, 0),
             CliCommand("put", "put data in bytes format: [key] [data]", self.put, 2),
             CliCommand("put_batch", "put batch datas in bytes format: [keys] [values]", self.put_batch, 2),
@@ -270,22 +275,54 @@ class MmcTest(TestServer):
             CliCommand("remove_all", "remove all keys", self.remove_all, 0),
             CliCommand("get_key_info", "get data info of: [key]", self.get_key_info, 1),
             CliCommand("batch_get_key_info", "batch get data info of: [keys]", self.batch_get_key_info, 1),
-            CliCommand("put_from_layers", "put data from multiple buffers [key] [sizes] [media(0:cpu 1:npu)]",
-                       self.put_from_layers, 3),
-            CliCommand("get_into_layers", "get data into multiple buffers [key] [sizes] [media(0:cpu 1:npu)]",
-                       self.get_into_layers, 3),
-            CliCommand("batch_put_from_layers", func=self.batch_put_from_layers, required_args_num=3,
-                cmd_desc="batch put data from multiple buffers [keys] [sizes] [media(0:cpu 1:npu)]"),
-            CliCommand("batch_get_into_layers", func=self.batch_get_into_layers, required_args_num=3,
-                cmd_desc="batch get data into multiple buffers [keys] [sizes] [media(0:cpu 1:npu)]"),
-            CliCommand("perf_test_put_from", func=self.perf_test_put_from, required_args_num=2,
-                cmd_desc="test put_from performance: [size] [iter_count] [medium] [register] [preferred_rank]"),
-            CliCommand("perf_test_get_into", func=self.perf_test_get_into, required_args_num=2,
-                cmd_desc="test get_into performance: [size] [iter_count] [medium] [register]"),
-            CliCommand("perf_test_put_from_layers", func=self.perf_test_put_from_layers, required_args_num=2,
-                cmd_desc="test put_from_layers performance: [sizes] [iter_count] [medium] [register] [preferred_rank]"),
-            CliCommand("perf_test_get_into_layers", func=self.perf_test_get_into_layers, required_args_num=2,
-                cmd_desc="test get_into_layers performance: [sizes] [iter_count] [medium] [register]"),
+            CliCommand(
+                "put_from_layers",
+                "put data from multiple buffers [key] [sizes] [media(0:cpu 1:npu)]",
+                self.put_from_layers,
+                3,
+            ),
+            CliCommand(
+                "get_into_layers",
+                "get data into multiple buffers [key] [sizes] [media(0:cpu 1:npu)]",
+                self.get_into_layers,
+                3,
+            ),
+            CliCommand(
+                "batch_put_from_layers",
+                func=self.batch_put_from_layers,
+                required_args_num=3,
+                cmd_desc="batch put data from multiple buffers [keys] [sizes] [media(0:cpu 1:npu)]",
+            ),
+            CliCommand(
+                "batch_get_into_layers",
+                func=self.batch_get_into_layers,
+                required_args_num=3,
+                cmd_desc="batch get data into multiple buffers [keys] [sizes] [media(0:cpu 1:npu)]",
+            ),
+            CliCommand(
+                "perf_test_put_from",
+                func=self.perf_test_put_from,
+                required_args_num=2,
+                cmd_desc="test put_from performance: [size] [iter_count] [medium] [register] [preferred_rank]",
+            ),
+            CliCommand(
+                "perf_test_get_into",
+                func=self.perf_test_get_into,
+                required_args_num=2,
+                cmd_desc="test get_into performance: [size] [iter_count] [medium] [register]",
+            ),
+            CliCommand(
+                "perf_test_put_from_layers",
+                func=self.perf_test_put_from_layers,
+                required_args_num=2,
+                cmd_desc="test put_from_layers performance: [sizes] [iter_count] [medium] [register] [preferred_rank]",
+            ),
+            CliCommand(
+                "perf_test_get_into_layers",
+                func=self.perf_test_get_into_layers,
+                required_args_num=2,
+                cmd_desc="test get_into_layers performance: [sizes] [iter_count] [medium] [register]",
+            ),
         ]
         self.register_command(cmds)
 
@@ -308,7 +345,6 @@ class MmcTest(TestServer):
             self.cli_return(res)
         else:
             self.cli_return(0)
-
 
     @result_handler
     def set_local_configs(self, config_map: dict):
@@ -350,8 +386,13 @@ class MmcTest(TestServer):
         self.cli_return(res)
 
     @result_handler
-    def put_batch(self, keys: List[str], values: List[bytes], replica_num: int | None = None,
-                  preferred_ranks: List[int] | None = None):
+    def put_batch(
+        self,
+        keys: List[str],
+        values: List[bytes],
+        replica_num: int | None = None,
+        preferred_ranks: List[int] | None = None,
+    ):
         rep_conf = ReplicateConfig()
         if replica_num is not None:
             rep_conf.replicaNum = replica_num
@@ -361,8 +402,9 @@ class MmcTest(TestServer):
         self.cli_return(res)
 
     @result_handler
-    def put_from(self, key: str, size: int, media: int, replica_num: int | None = None,
-                 preferred_ranks: List[int] | None = None):
+    def put_from(
+        self, key: str, size: int, media: int, replica_num: int | None = None, preferred_ranks: List[int] | None = None
+    ):
         if media == 0:
             direct = int(MmcDirect.COPY_H2G.value)
             tensor = self.malloc_tensor(mini_block_size=size, device='cpu')
@@ -445,7 +487,8 @@ class MmcTest(TestServer):
                     reg_ret = self._store.register_buffer(tensor.data_ptr(), size)
                     if reg_ret != 0:
                         raise RuntimeError(
-                            f"register_buffer failed, ret={reg_ret} (ptr={tensor.data_ptr()}, size={size})")
+                            f"register_buffer failed, ret={reg_ret} (ptr={tensor.data_ptr()}, size={size})"
+                        )
                     registered.append((tensor.data_ptr(), size))
                 blocks.append(tensor)
             for i in range(len(sizes)):
@@ -462,8 +505,14 @@ class MmcTest(TestServer):
             self._unregister_registered_buffers(registered)
 
     @result_handler
-    def batch_put_from(self, keys: list, sizes: list, media: int, replica_num: int | None = None,
-                       preferred_ranks: List[int] | None = None):
+    def batch_put_from(
+        self,
+        keys: list,
+        sizes: list,
+        media: int,
+        replica_num: int | None = None,
+        preferred_ranks: List[int] | None = None,
+    ):
         data_ptrs = []
         blocks = []
         if media == 0:
@@ -480,7 +529,8 @@ class MmcTest(TestServer):
                     reg_ret = self._store.register_buffer(tensor.data_ptr(), size)
                     if reg_ret != 0:
                         raise RuntimeError(
-                            f"register_buffer failed, ret={reg_ret} (ptr={tensor.data_ptr()}, size={size})")
+                            f"register_buffer failed, ret={reg_ret} (ptr={tensor.data_ptr()}, size={size})"
+                        )
                     registered.append((tensor.data_ptr(), size))
                 blocks.append(tensor)
             for i in range(len(sizes)):
@@ -539,8 +589,14 @@ class MmcTest(TestServer):
         self.cli_return(res)
 
     @result_handler
-    def put_from_layers(self, key: str, sizes: List[int], media: int, replica_num: int | None = None,
-                        preferred_ranks: List[int] | None = None):
+    def put_from_layers(
+        self,
+        key: str,
+        sizes: List[int],
+        media: int,
+        replica_num: int | None = None,
+        preferred_ranks: List[int] | None = None,
+    ):
         layers_num = len(sizes)
         mini_block_size = max(sizes, default=0)
         if media == 0:
@@ -558,7 +614,8 @@ class MmcTest(TestServer):
                 reg_ret = self._store.register_buffer(tensor.data_ptr(), reg_sz)
                 if reg_ret != 0:
                     raise RuntimeError(
-                        f"register_buffer failed, ret={reg_ret} (ptr={tensor.data_ptr()}, size={reg_sz})")
+                        f"register_buffer failed, ret={reg_ret} (ptr={tensor.data_ptr()}, size={reg_sz})"
+                    )
                 registered.append((tensor.data_ptr(), reg_sz))
 
             rep_conf = ReplicateConfig()
@@ -567,11 +624,9 @@ class MmcTest(TestServer):
             if preferred_ranks is not None:
                 rep_conf.preferredLocalServiceIDs = preferred_ranks
 
-            res = self._store.put_from_layers(key,
-                                              [] if tensor is None else [layer.data_ptr() for layer in tensor],
-                                              sizes,
-                                              direct,
-                                              rep_conf)
+            res = self._store.put_from_layers(
+                key, [] if tensor is None else [layer.data_ptr() for layer in tensor], sizes, direct, rep_conf
+            )
             if device == 'npu':
                 self.sync_stream()
             value = tensor_sum(tensor, sizes)
@@ -598,12 +653,12 @@ class MmcTest(TestServer):
                 reg_ret = self._store.register_buffer(tensor.data_ptr(), reg_sz)
                 if reg_ret != 0:
                     raise RuntimeError(
-                        f"register_buffer failed, ret={reg_ret} (ptr={tensor.data_ptr()}, size={reg_sz})")
+                        f"register_buffer failed, ret={reg_ret} (ptr={tensor.data_ptr()}, size={reg_sz})"
+                    )
                 registered.append((tensor.data_ptr(), reg_sz))
-            res = self._store.get_into_layers(key,
-                                              [] if tensor is None else [layer.data_ptr() for layer in tensor],
-                                              sizes,
-                                              direct)
+            res = self._store.get_into_layers(
+                key, [] if tensor is None else [layer.data_ptr() for layer in tensor], sizes, direct
+            )
             if device == 'npu':
                 self.sync_stream()
             value = tensor_sum(tensor, sizes)
@@ -612,8 +667,14 @@ class MmcTest(TestServer):
             self._unregister_registered_buffers(registered)
 
     @result_handler
-    def batch_put_from_layers(self, keys: List[str], sizes: List[List[int]], media: int, replica_num: int | None = None,
-                              preferred_ranks: List[int] | None = None):
+    def batch_put_from_layers(
+        self,
+        keys: List[str],
+        sizes: List[List[int]],
+        media: int,
+        replica_num: int | None = None,
+        preferred_ranks: List[int] | None = None,
+    ):
         if media == 0:
             direct = MmcDirect.COPY_H2G.value
             device = 'cpu'
@@ -625,14 +686,16 @@ class MmcTest(TestServer):
         try:
             for sizes_ in sizes:
                 tensor = self.malloc_tensor(
-                    layer_num=len(sizes_), mini_block_size=max(sizes_, default=0), device=device)
+                    layer_num=len(sizes_), mini_block_size=max(sizes_, default=0), device=device
+                )
                 # tensor is None in negative cases whose sizes is 0
                 if tensor is not None:
                     reg_sz = max(sizes_, default=0) * len(sizes_)
                     reg_ret = self._store.register_buffer(tensor.data_ptr(), reg_sz)
                     if reg_ret != 0:
                         raise RuntimeError(
-                            f"register_buffer fail, ret={reg_ret} (ptr={tensor.data_ptr()}, size={reg_sz})")
+                            f"register_buffer fail, ret={reg_ret} (ptr={tensor.data_ptr()}, size={reg_sz})"
+                        )
                     registered.append((tensor.data_ptr(), reg_sz))
                 blocks.append(tensor)
 
@@ -644,12 +707,10 @@ class MmcTest(TestServer):
 
             results = self._store.batch_put_from_layers(
                 keys,
-                [[] if block is None
-                 else [layer.data_ptr() for layer in block]
-                 for block in blocks],
+                [[] if block is None else [layer.data_ptr() for layer in block] for block in blocks],
                 sizes,
                 direct,
-                rep_conf
+                rep_conf,
             )
             if device == 'npu':
                 self.sync_stream()
@@ -671,23 +732,23 @@ class MmcTest(TestServer):
         try:
             for sizes_ in sizes:
                 tensor = self.malloc_tensor(
-                    layer_num=len(sizes_), mini_block_size=max(sizes_, default=0), device=device)
+                    layer_num=len(sizes_), mini_block_size=max(sizes_, default=0), device=device
+                )
                 # tensor is None in negative cases whose sizes is 0
                 if tensor is not None:
                     reg_sz = max(sizes_, default=0) * len(sizes_)
                     reg_ret = self._store.register_buffer(tensor.data_ptr(), reg_sz)
                     if reg_ret != 0:
                         raise RuntimeError(
-                            f"register_buffer fail, ret={reg_ret} (ptr={tensor.data_ptr()}, size={reg_sz})")
+                            f"register_buffer fail, ret={reg_ret} (ptr={tensor.data_ptr()}, size={reg_sz})"
+                        )
                     registered.append((tensor.data_ptr(), reg_sz))
                 blocks.append(tensor)
             results = self._store.batch_get_into_layers(
                 keys,
-                [[] if block is None
-                 else [layer.data_ptr() for layer in block]
-                 for block in blocks],
+                [[] if block is None else [layer.data_ptr() for layer in block] for block in blocks],
                 sizes,
-                direct
+                direct,
             )
             if device == 'npu':
                 self.sync_stream()
@@ -697,8 +758,9 @@ class MmcTest(TestServer):
             self._unregister_registered_buffers(registered)
 
     @result_handler
-    def perf_test_put_from(self, size: int, iter_count: int, medium: str = 'npu', register: bool = True,
-                           preferred_rank: int | None = None):
+    def perf_test_put_from(
+        self, size: int, iter_count: int, medium: str = 'npu', register: bool = True, preferred_rank: int | None = None
+    ):
         if medium not in ('cpu', 'npu'):
             raise RuntimeError(f"Invalid device: {medium}")
 
@@ -729,7 +791,9 @@ class MmcTest(TestServer):
             if unreg_ret != 0:
                 logging.error(
                     "unregister_buffer failed, ret=%s ptr=%s size=%s",
-                    unreg_ret, tensor.data_ptr(), size,
+                    unreg_ret,
+                    tensor.data_ptr(),
+                    size,
                 )
 
         self.cli_return(str([res, end - start]))
@@ -762,14 +826,22 @@ class MmcTest(TestServer):
             if unreg_ret != 0:
                 logging.error(
                     "unregister_buffer failed, ret=%s ptr=%s size=%s",
-                    unreg_ret, tensor.data_ptr(), size,
+                    unreg_ret,
+                    tensor.data_ptr(),
+                    size,
                 )
 
         self.cli_return(str([res, end - start]))
 
     @result_handler
-    def perf_test_put_from_layers(self, sizes: List[int], iter_count: int, medium: str = 'npu', register: bool = True,
-                                  preferred_rank: int | None = None):
+    def perf_test_put_from_layers(
+        self,
+        sizes: List[int],
+        iter_count: int,
+        medium: str = 'npu',
+        register: bool = True,
+        preferred_rank: int | None = None,
+    ):
         if medium not in ('cpu', 'npu'):
             raise RuntimeError(f"Invalid device: {medium}")
 
@@ -804,7 +876,9 @@ class MmcTest(TestServer):
             if unreg_ret != 0:
                 logging.error(
                     "unregister_buffer failed, ret=%s ptr=%s size=%s",
-                    unreg_ret, tensor.data_ptr(), reg_sz,
+                    unreg_ret,
+                    tensor.data_ptr(),
+                    reg_sz,
                 )
 
         self.cli_return(str([res, end - start]))
@@ -841,7 +915,9 @@ class MmcTest(TestServer):
             if unreg_ret != 0:
                 logging.error(
                     "unregister_buffer failed, ret=%s ptr=%s size=%s",
-                    unreg_ret, tensor.data_ptr(), reg_sz,
+                    unreg_ret,
+                    tensor.data_ptr(),
+                    reg_sz,
                 )
 
         self.cli_return(str([res, end - start]))
@@ -859,6 +935,7 @@ class MmcTest(TestServer):
 
     def sync_stream(self):
         import torch_npu
+
         torch_npu.npu.current_stream().synchronize()
 
     def malloc_tensor(self, layer_num: int = 1, mini_block_size: int = 1024, device='cpu'):
@@ -874,13 +951,9 @@ class MmcTest(TestServer):
 
     def malloc_npu_tensor(self, shape: Tuple[int]):
         import torch_npu
+
         self.set_device()
-        raw_blocks = torch.randint(
-            low=0, high=256,
-            size=shape,
-            dtype=torch.uint8,
-            device=torch.device('npu')
-        )
+        raw_blocks = torch.randint(low=0, high=256, size=shape, dtype=torch.uint8, device=torch.device('npu'))
         self.sync_stream()
         return raw_blocks
 
@@ -890,15 +963,16 @@ class MmcTest(TestServer):
         aligned_size = total_bytes + align
 
         buffer = torch.randint(
-            low=0, high=256,
-            size=(aligned_size, ),
+            low=0,
+            high=256,
+            size=(aligned_size,),
             dtype=torch.uint8,
         )
 
         data_ptr = buffer.data_ptr()
         offset = (align - (data_ptr % align)) % align
 
-        aligned_tensor = buffer[offset:offset + total_bytes].view(shape)
+        aligned_tensor = buffer[offset : offset + total_bytes].view(shape)
         return aligned_tensor
 
 

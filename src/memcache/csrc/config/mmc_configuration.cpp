@@ -332,8 +332,8 @@ bool Configuration::SetWithStrAutoConvert(const std::string &key, const std::str
         key == ConfConstant::OCK_MMC_CLIENT_BATCH_CHUNK_SIZE.first) {
         auto memSize = ParseMemSize(tempValue);
         if (memSize == UINT64_MAX) {
-            std::cerr << "Memory size value (" << tempValue << ") is invalid." << std::endl <<
-                         "please check 'ock.mmc.local_service.dram.size' 'ock.mmc.local_service.hbm.size'" << std::endl;
+            std::cerr << "Memory size value (" << tempValue << ") is invalid." << std::endl
+                      << "please check 'ock.mmc.local_service.dram.size' 'ock.mmc.local_service.hbm.size'" << std::endl;
             return false;
         }
         mUInt64Items.insert(std::make_pair(key, memSize));
@@ -602,7 +602,7 @@ const std::string Configuration::GetLogPath(const std::string &logPath)
 
 int Configuration::ValidateLogPathConfig(const std::string &logPath)
 {
-    struct stat pathStat{};
+    struct stat pathStat {};
 
     if (logPath.empty()) {
         MMC_LOG_ERROR("path is empty.");

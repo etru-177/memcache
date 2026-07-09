@@ -16,7 +16,7 @@ namespace mmc {
 const StateTransTable MmcMemBlob::stateTransTable_ = BlobStateMachine::GetGlobalTransTable();
 SsdPreFreeHandler MmcMemBlob::ssdPreFreeHandler_ = nullptr;
 
-void MmcMemBlob::SsdPreFree(const std::string& key, const MmcMemBlobDesc& desc)
+void MmcMemBlob::SsdPreFree(const std::string &key, const MmcMemBlobDesc &desc)
 {
     if (ssdPreFreeHandler_ != nullptr && desc.mediaType_ == MEDIA_SSD) {
         ssdPreFreeHandler_(key, desc);
@@ -28,20 +28,20 @@ Result MmcMemBlob::UpdateState(const std::string &key, uint32_t rankId, uint32_t
     auto curStateIter = stateTransTable_.find(state_);
     if (curStateIter == stateTransTable_.end()) {
         MMC_LOG_ERROR("Cannot update state:" << ret << "! The current state " << state_
-                                             << " is not in the stateTransTable! key:" << key
-                                             << ", gva=" << gva_ << ", type=" << mediaType_);
+                                             << " is not in the stateTransTable! key:" << key << ", gva=" << gva_
+                                             << ", type=" << mediaType_);
         return MMC_UNMATCHED_STATE;
     }
 
     const auto retIter = curStateIter->second.find(ret);
     if (retIter == curStateIter->second.end()) {
-        MMC_LOG_ERROR("Cannot find " << ret << "from " << state_ << "! key:" << key
-                                     << ", gva=" << gva_ << ", type=" << mediaType_);
+        MMC_LOG_ERROR("Cannot find " << ret << "from " << state_ << "! key:" << key << ", gva=" << gva_
+                                     << ", type=" << mediaType_);
         return MMC_UNMATCHED_RET;
     }
 
-    MMC_LOG_DEBUG("update [" << key << "] state from " << state_ << " to " << retIter->second.state_
-                             << ", gva=" << gva_ << ", type=" << mediaType_);
+    MMC_LOG_DEBUG("update [" << key << "] state from " << state_ << " to " << retIter->second.state_ << ", gva=" << gva_
+                             << ", type=" << mediaType_);
 
     auto oldState = state_;
     state_ = retIter->second.state_;

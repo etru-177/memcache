@@ -46,9 +46,7 @@ class TestExample(unittest.TestCase):
         print(f"object store init res: {res}")
 
         cls.npu_tensor = torch.empty(
-            size=(cls.layer_number, cls.block_number, cls.block_size),
-            dtype=torch.uint8,
-            device=torch.device('npu')
+            size=(cls.layer_number, cls.block_number, cls.block_size), dtype=torch.uint8, device=torch.device('npu')
         )
         cls.npu_blocks = []
         for block_id in range(cls.block_number):
@@ -64,28 +62,16 @@ class TestExample(unittest.TestCase):
         print(self.npu_tensor[0][5])
         res = self.store.batch_put_from_layers(
             ["2d-0", "2d-1"],
-            [
-                [layer.data_ptr() for layer in self.npu_blocks[2]],
-                [layer.data_ptr() for layer in self.npu_blocks[3]]
-            ],
-            [
-                [self.block_size for _ in range(self.layer_number)],
-                [self.block_size for _ in range(self.layer_number)]
-            ],
-            MmcDirect.COPY_AUTO.value
+            [[layer.data_ptr() for layer in self.npu_blocks[2]], [layer.data_ptr() for layer in self.npu_blocks[3]]],
+            [[self.block_size for _ in range(self.layer_number)], [self.block_size for _ in range(self.layer_number)]],
+            MmcDirect.COPY_AUTO.value,
         )
         self.assertTrue(all(i == 0 for i in res))
         res = self.store.batch_get_into_layers(
             ["2d-0", "2d-1"],
-            [
-                [layer.data_ptr() for layer in self.npu_blocks[4]],
-                [layer.data_ptr() for layer in self.npu_blocks[5]]
-            ],
-            [
-                [self.block_size for _ in range(self.layer_number)],
-                [self.block_size for _ in range(self.layer_number)]
-            ],
-            MmcDirect.COPY_AUTO.value
+            [[layer.data_ptr() for layer in self.npu_blocks[4]], [layer.data_ptr() for layer in self.npu_blocks[5]]],
+            [[self.block_size for _ in range(self.layer_number)], [self.block_size for _ in range(self.layer_number)]],
+            MmcDirect.COPY_AUTO.value,
         )
         self.assertTrue(all(i == 0 for i in res))
         self.assertTrue(self.npu_tensor[0][2].eq(self.npu_tensor[0][4]).all())
@@ -105,7 +91,7 @@ class TestExample(unittest.TestCase):
                 torch.full(size=(3,), fill_value=3, dtype=torch.uint8),
                 torch.full(size=(4,), fill_value=4, dtype=torch.uint8),
                 torch.full(size=(5,), fill_value=5, dtype=torch.uint8),
-            ]
+            ],
         ]
         dst_blocks = [
             [
@@ -116,28 +102,22 @@ class TestExample(unittest.TestCase):
                 torch.zeros(size=(3,), dtype=torch.uint8),
                 torch.zeros(size=(4,), dtype=torch.uint8),
                 torch.zeros(size=(5,), dtype=torch.uint8),
-            ]
+            ],
         ]
         print(src_blocks)
         print(dst_blocks)
         res = self.store.batch_put_from_layers(
             ["1d-0", "1d-1"],
             [[layer.data_ptr() for layer in block] for block in src_blocks],
-            [
-                [2, 3],
-                [3, 4, 5]
-            ],
-            MmcDirect.COPY_AUTO.value
+            [[2, 3], [3, 4, 5]],
+            MmcDirect.COPY_AUTO.value,
         )
         self.assertTrue(all(i == 0 for i in res))
         res = self.store.batch_get_into_layers(
             ["1d-0", "1d-1"],
             [[layer.data_ptr() for layer in block] for block in dst_blocks],
-            [
-                [2, 3],
-                [3, 4, 5]
-            ],
-            MmcDirect.COPY_AUTO.value
+            [[2, 3], [3, 4, 5]],
+            MmcDirect.COPY_AUTO.value,
         )
         self.assertTrue(all(i == 0 for i in res))
         print(src_blocks)

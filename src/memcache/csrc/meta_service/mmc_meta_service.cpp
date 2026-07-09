@@ -38,12 +38,11 @@ Result MmcMetaService::Start(const mmc_meta_service_config_t &options)
     MMC_VALIDATE_RETURN(options.evictThresholdHigh > options.evictThresholdLow,
                         "invalid param, evictThresholdHigh must large than evictThresholdLow", MMC_INVALID_PARAM);
     options_.leaseTtlMs = options.leaseTtlMs == 0 ? MMC_DATA_TTL_MS : options.leaseTtlMs;
-    MMC_VALIDATE_RETURN(options_.leaseTtlMs > 0, "invalid param, leaseTtlMs must be greater than 0",
-                        MMC_INVALID_PARAM);
+    MMC_VALIDATE_RETURN(options_.leaseTtlMs > 0, "invalid param, leaseTtlMs must be greater than 0", MMC_INVALID_PARAM);
 
     metaNetServer_ = MmcMakeRef<MetaNetServer>(this, name_ + "_MetaServer").Get();
-    MMC_ASSERT_LOG_AND_RETURN(metaNetServer_.Get() != nullptr,
-        "metaNetServer_.Get() is nullptr", MMC_NEW_OBJECT_FAILED);
+    MMC_ASSERT_LOG_AND_RETURN(metaNetServer_.Get() != nullptr, "metaNetServer_.Get() is nullptr",
+                              MMC_NEW_OBJECT_FAILED);
     /* init engine */
     NetEngineOptions netOptions;
     std::string url{options_.discoveryURL};
@@ -69,13 +68,13 @@ Result MmcMetaService::Start(const mmc_meta_service_config_t &options)
     extConfig.prefetchEnabled = options.prefetchEnabled;
     MMC_RETURN_ERROR(metaMgrProxy_->Start(options_.leaseTtlMs, options.evictThresholdHigh, options.evictThresholdLow,
                                           options.rewarmDramWatermark, extConfig),
-        "Failed to start meta mgr proxy of meta service " << name_);
+                     "Failed to start meta mgr proxy of meta service " << name_);
 
     NetEngineOptions configStoreOpt{};
     NetEngineOptions::ExtractIpPortFromUrl(options_.configStoreURL, configStoreOpt);
     smem::StoreFactory::SetTlsInfo(MmcSmemBmHelper::TransSmemTlsConfig(options_.configStoreTlsConfig));
-    confStore_ = ock::smem::StoreFactory::CreateStoreByUrl(options_.configStoreURL,
-                                                           ock::smem::ConfigStoreModel::CSM_SERVER);
+    confStore_ =
+        ock::smem::StoreFactory::CreateStoreByUrl(options_.configStoreURL, ock::smem::ConfigStoreModel::CSM_SERVER);
     MMC_VALIDATE_RETURN(confStore_ != nullptr, "Failed to start config store server", MMC_ERROR);
 
     started_ = true;
@@ -87,8 +86,7 @@ Result MmcMetaService::Start(const mmc_meta_service_config_t &options)
 
 Result MmcMetaService::BmRegister(uint32_t rank, std::vector<uint16_t> mediaType, std::vector<uint64_t> bm,
                                   std::vector<uint64_t> capacity,
-                                  std::vector<std::pair<std::string, MmcMemBlobDesc>> &blobList,
-                                  bool storageEnabled)
+                                  std::vector<std::pair<std::string, MmcMemBlobDesc>> &blobList, bool storageEnabled)
 {
     std::lock_guard<std::mutex> guard(mutex_);
     if (!started_) {
@@ -195,8 +193,8 @@ bool MmcMetaService::StartPeriodicTask(const std::string &taskName, uint32_t int
                                        MmcPeriodicTask::Task task)
 {
     if (intervalSeconds == 0 || !task) {
-        MMC_LOG_ERROR("Failed to start periodic task in meta service, invalid param: taskName=" << taskName
-                      << ", intervalSeconds=" << intervalSeconds);
+        MMC_LOG_ERROR("Failed to start periodic task in meta service, invalid param: taskName="
+                      << taskName << ", intervalSeconds=" << intervalSeconds);
         return false;
     }
     if (periodicTask_ == nullptr) {
@@ -213,8 +211,7 @@ bool MmcMetaService::StartPeriodicTask(const std::string &taskName, uint32_t int
         return false;
     }
 
-    MMC_LOG_INFO("Registered periodic task in meta service: " << taskName
-                 << ", intervalSeconds=" << intervalSeconds);
+    MMC_LOG_INFO("Registered periodic task in meta service: " << taskName << ", intervalSeconds=" << intervalSeconds);
     return true;
 }
 
@@ -234,21 +231,19 @@ void MmcMetaService::StartMetricsReportTask()
         return;
     }
     const uint32_t intervalSeconds = options_.metricsReportIntervalSeconds;
-    const bool started = StartPeriodicTask(
-        "metrics_report", intervalSeconds,
-        [this]() {
-            if (metaMgrProxy_ == nullptr) {
-                MMC_LOG_WARN("Skip metrics report task because metaMgrProxy is null");
-                return;
-            }
-            MmcRestApiFacade facade(this, metaMgrProxy_);
-            std::string metricsSummary;
-            if (facade.BuildMetricsSummary(true, metricsSummary) == MMC_OK) {
-                MMC_AUDIT_LOG("Metrics summary: " + metricsSummary);
-            } else {
-                MMC_LOG_WARN("Failed to build periodic metrics summary");
-            }
-        });
+    const bool started = StartPeriodicTask("metrics_report", intervalSeconds, [this]() {
+        if (metaMgrProxy_ == nullptr) {
+            MMC_LOG_WARN("Skip metrics report task because metaMgrProxy is null");
+            return;
+        }
+        MmcRestApiFacade facade(this, metaMgrProxy_);
+        std::string metricsSummary;
+        if (facade.BuildMetricsSummary(true, metricsSummary) == MMC_OK) {
+            MMC_AUDIT_LOG("Metrics summary: " + metricsSummary);
+        } else {
+            MMC_LOG_WARN("Failed to build periodic metrics summary");
+        }
+    });
     if (!started) {
         MMC_LOG_ERROR("Failed to start metrics report task");
     }

@@ -79,10 +79,10 @@ public:
         }
 
         /* relative time instead of abs */
-        struct timespec currentTime{};
+        struct timespec currentTime {};
         clock_gettime(CLOCK_MONOTONIC, &currentTime);
 
-        struct timespec futureTime{};
+        struct timespec futureTime {};
         if (currentTime.tv_sec > std::numeric_limits<time_t>::max() - static_cast<time_t>(second)) {
             pthread_mutex_unlock(&mutex_);
             MMC_LOG_ERROR("Time overflow");
