@@ -386,6 +386,8 @@ private:
         MmcMemObjMetaPtr memObj;
         MmcMemBlobPtr ssdBlob;
         MmcMemBlobDesc ssdDesc;
+        MmcMemBlobPtr dstBlob;
+        MmcMemBlobDesc dstDesc;
         uint32_t opRankId = 0;
         uint32_t opSeq = 0;
     };
@@ -394,12 +396,6 @@ private:
         size_t index;
         MmcMemObjMetaPtr memObj;
         MmcMemBlobPtr pendingBlob;
-    };
-
-    struct AllocResults {
-        std::vector<MmcMemBlobPtr> dstBlobs;
-        std::vector<MmcMemBlobDesc> dstDescs;
-        std::vector<bool> allocOk;
     };
 
     struct BatchRpcData {
@@ -427,14 +423,8 @@ private:
     void PendingWaitAndFill(const std::vector<std::string> &keys, uint32_t opRankId, uint32_t opSeq,
                             std::vector<MmcMemMetaDesc> &objMetas, PendingRewarmWait &w);
 
-    size_t BatchAllocForRewarm(const std::vector<std::string> &keys, const std::vector<RewarmEntry> &group,
-                               AllocResults &results);
-
-    size_t AttachAndCollectBatch(const std::vector<std::string> &keys, const std::vector<RewarmEntry> &group,
-                                 AllocResults &results, BatchRpcData &batch);
-
     Result SendBatchRpc(uint32_t rank, const std::vector<std::string> &keys, const std::vector<RewarmEntry> &group,
-                        BatchRpcData &batch, AllocResults &results);
+                        BatchRpcData &batch, size_t groupSize, std::vector<bool> &copyOk);
 
     void RollbackEntry(const std::string &key, const RewarmEntry &entry, MmcMemBlobPtr &dstBlob,
                        const MmcMemBlobDesc &dstDesc, MediaType dstMedia);

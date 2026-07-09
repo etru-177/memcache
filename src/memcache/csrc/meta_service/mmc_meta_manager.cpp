@@ -298,10 +298,13 @@ Result MmcMetaManager::GetByRank(const std::vector<std::string> &keys, uint64_t 
 
     std::map<uint32_t, std::vector<RewarmEntry>> rankGroups;
     std::vector<PendingRewarmWait> pendingWaitList;
+    TP_TRACE_BEGIN(TP_MMC_META_BATCH_GET_CLASSIFY);
     ClassifyAndGroupKeys(keys, opRankId, opSeq, objMetas, rankGroups, pendingWaitList);
+    TP_TRACE_END(TP_MMC_META_BATCH_GET_CLASSIFY, MMC_OK);
 
     std::vector<std::future<void>> futures;
     if (!rankGroups.empty() || !pendingWaitList.empty()) {
+        TP_TRACE_BEGIN(TP_MMC_META_BATCH_GET_REWARM_WAIT);
         for (auto &[rank, group] : rankGroups) {
             futures.push_back(rewarmThreadPool_->Enqueue([this, rank, &group, &keys, opRankId, opSeq, &objMetas]() {
                 RewarmRankGroup(rank, group, keys, opRankId, opSeq, objMetas);
@@ -321,9 +324,11 @@ Result MmcMetaManager::GetByRank(const std::vector<std::string> &keys, uint64_t 
                 MMC_LOG_WARN("GetByRank future failed: " << e.what());
             }
         }
+        TP_TRACE_END(TP_MMC_META_BATCH_GET_REWARM_WAIT, MMC_OK);
     }
 
     size_t metaCount = objMetas.size();
+    TP_TRACE_BEGIN(TP_MMC_META_BATCH_GET_READ_START);
     for (size_t i = 0; i < keys.size() && i < metaCount; ++i) {
         auto &objMeta = objMetas[i];
         if (objMeta.numBlobs_ == 0 || objMeta.blobs_.empty()) {
@@ -358,6 +363,7 @@ Result MmcMetaManager::GetByRank(const std::vector<std::string> &keys, uint64_t 
             }
         }
     }
+    TP_TRACE_END(TP_MMC_META_BATCH_GET_READ_START, MMC_OK);
 
     return MMC_OK;
 }
@@ -435,11 +441,47 @@ void MmcMetaManager::ClassifyAndGroupKeys(const std::vector<std::string> &keys, 
                     MMC_LOG_WARN("key: " << keys[i] << " lowerBlob READ_START failed (rewarm), ret: " << readRet);
                     continue;
                 }
+                AllocOptions allocOpt{};
+                allocOpt.blobSize_ = lowerBlob->Size();
+                allocOpt.numBlobs_ = 1;
+                allocOpt.mediaType_ = dstMedia;
+                allocOpt.flags_ = ALLOC_FORCE_BY_RANK;
+                allocOpt.preferredRank_.push_back(lowerBlob->GetDesc().rank_);
+                std::vector<MmcMemBlobPtr> newBlobs;
+                auto allocRet = globalAllocator_->Alloc(allocOpt, newBlobs);
+                if (allocRet != MMC_OK || newBlobs.empty()) {
+                    MMC_LOG_WARN("key: " << keys[i] << " rewarm alloc failed, ret: " << allocRet);
+                    auto finishRet = lowerBlob->UpdateState(keys[i], opRankId, opSeq, MMC_READ_FINISH);
+                    if (finishRet != MMC_OK) {
+                        MMC_LOG_WARN("key: " << keys[i]
+                                             << " READ_FINISH rollback failed after alloc fail, ret: " << finishRet);
+                    }
+                    MmcMetaMetricManager::GetInstance().IncrementRewarmFailCounter(lowerBlob->GetDesc().rank_);
+                    continue;
+                }
+                newBlobs[0]->SetRewarmOrigin();
+                auto addRet = memObj->AddBlob(newBlobs[0]);
+                if (addRet != MMC_OK) {
+                    MMC_LOG_WARN("key: " << keys[i] << " rewarm AddBlob failed, ret: " << addRet);
+                    globalAllocator_->Free(newBlobs);
+                    auto finishRet = lowerBlob->UpdateState(keys[i], opRankId, opSeq, MMC_READ_FINISH);
+                    if (finishRet != MMC_OK) {
+                        MMC_LOG_WARN("key: " << keys[i]
+                                             << " READ_FINISH rollback failed after AddBlob fail, ret: " << finishRet);
+                    }
+                    MmcMetaMetricManager::GetInstance().IncrementRewarmFailCounter(lowerBlob->GetDesc().rank_);
+                    continue;
+                }
+                // 与 FreeBlobs 的 DecrementRewarmBytesCurrent 配对，否则量表下溢
+                MmcMetaMetricManager::GetInstance().IncrementRewarmBytesCurrent(newBlobs[0]->Size(),
+                                                                                newBlobs[0]->GetDesc().rank_);
                 RewarmEntry entry;
                 entry.index = i;
                 entry.memObj = memObj;
                 entry.ssdBlob = lowerBlob;
                 entry.ssdDesc = lowerBlob->GetDesc();
+                entry.dstBlob = newBlobs[0];
+                entry.dstDesc = newBlobs[0]->GetDesc();
                 entry.opRankId = opRankId;
                 entry.opSeq = opSeq;
                 rankGroups[entry.ssdDesc.rank_].push_back(std::move(entry));
@@ -448,97 +490,39 @@ void MmcMetaManager::ClassifyAndGroupKeys(const std::vector<std::string> &keys, 
     }
 }
 
-size_t MmcMetaManager::BatchAllocForRewarm(const std::vector<std::string> &keys, const std::vector<RewarmEntry> &group,
-                                           AllocResults &results)
-{
-    auto &dstBlobs = results.dstBlobs;
-    auto &dstDescs = results.dstDescs;
-    auto &allocOk = results.allocOk;
-
-    for (size_t j = 0; j < group.size(); ++j) {
-        auto &entry = group[j];
-        MediaType dstMedia = MoveUp(static_cast<MediaType>(entry.ssdDesc.mediaType_));
-        AllocOptions allocOpt{};
-        allocOpt.blobSize_ = entry.ssdDesc.size_;
-        allocOpt.numBlobs_ = 1;
-        allocOpt.mediaType_ = dstMedia;
-        allocOpt.flags_ = ALLOC_FORCE_BY_RANK;
-        allocOpt.preferredRank_.push_back(entry.ssdDesc.rank_);
-
-        std::vector<MmcMemBlobPtr> newBlobs;
-        auto ret = globalAllocator_->Alloc(allocOpt, newBlobs);
-        if (ret != MMC_OK || newBlobs.empty()) {
-            MMC_LOG_WARN("alloc failed for key=" << keys[entry.index] << ", ret=" << ret);
-            continue;
-        }
-        dstBlobs[j] = newBlobs[0];
-        dstDescs[j] = newBlobs[0]->GetDesc();
-        allocOk[j] = true;
-        newBlobs[0]->SetRewarmOrigin();
-    }
-    return std::count(allocOk.begin(), allocOk.end(), true);
-}
-
-size_t MmcMetaManager::AttachAndCollectBatch(const std::vector<std::string> &keys,
-                                             const std::vector<RewarmEntry> &group, AllocResults &results,
-                                             BatchRpcData &batch)
-{
-    for (size_t j = 0; j < group.size(); ++j) {
-        if (!results.allocOk[j]) {
-            continue;
-        }
-        auto &entry = group[j];
-        std::unique_lock<std::mutex> guard(entry.memObj->Mutex());
-
-        Result ret = entry.memObj->AddBlob(results.dstBlobs[j]);
-        if (ret != MMC_OK) {
-            MMC_LOG_WARN("AddBlob failed for key=" << keys[entry.index] << ", ret=" << ret);
-            globalAllocator_->Free(results.dstBlobs[j]);
-            results.dstBlobs[j] = nullptr;
-            results.allocOk[j] = false;
-            MmcMetaMetricManager::GetInstance().IncrementRewarmFailCounter(entry.ssdDesc.rank_);
-            continue;
-        }
-        MmcMetaMetricManager::GetInstance().IncrementRewarmBytesCurrent(entry.ssdDesc.size_, entry.ssdDesc.rank_);
-        batch.keys.push_back(keys[entry.index]);
-        batch.srcBlobs.push_back(entry.ssdDesc);
-        batch.dstBlobs.push_back(results.dstDescs[j]);
-        batch.groupIndices.push_back(j);
-    }
-    return batch.keys.size();
-}
-
 Result MmcMetaManager::SendBatchRpc(uint32_t rank, const std::vector<std::string> &keys,
-                                    const std::vector<RewarmEntry> &group, BatchRpcData &batch, AllocResults &results)
+                                    const std::vector<RewarmEntry> &group, BatchRpcData &batch, size_t groupSize,
+                                    std::vector<bool> &copyOk)
 {
     if (batch.keys.empty()) {
         return MMC_OK;
     }
     if (metaNetServer_.Get() == nullptr) {
-        MMC_LOG_ERROR("metaNetServer_ is null, rank=" << rank << ", marking " << batch.groupIndices.size()
-                                                      << " keys as failed");
-        std::for_each(batch.groupIndices.begin(), batch.groupIndices.end(),
-                      [&](auto gj) { results.allocOk[gj] = false; });
+        MMC_LOG_ERROR("metaNetServer_ is null, rank=" << rank);
         return MMC_ERROR;
     }
 
+    // move 前先拷出 groupIndices，用于回填逐 key 结果
+    std::vector<size_t> groupIndices = batch.groupIndices;
     BatchBlobCopyRequest request(std::move(batch.keys), std::move(batch.srcBlobs), std::move(batch.dstBlobs));
     BatchBlobCopyResponse batchResp;
     auto ret = metaNetServer_->SyncCall(rank, request, batchResp, TIMEOUT_SECOND);
     if (ret != MMC_OK) {
-        MMC_LOG_ERROR("batch RPC to rank " << rank << " failed, ret=" << ret << ", marking "
-                                           << batch.groupIndices.size() << " keys as failed");
-        std::for_each(batch.groupIndices.begin(), batch.groupIndices.end(),
-                      [&](auto gj) { results.allocOk[gj] = false; });
+        MMC_LOG_ERROR("batch RPC to rank " << rank << " failed, ret=" << ret);
         return ret;
     }
-    if (batchResp.results_.size() == batch.groupIndices.size()) {
-        for (size_t bi = 0; bi < batch.groupIndices.size(); ++bi) {
-            if (batchResp.results_[bi] != MMC_OK) {
-                results.allocOk[batch.groupIndices[bi]] = false;
-                MMC_LOG_WARN("copy failed for key=" << keys[group[batch.groupIndices[bi]].index]
-                                                    << ", ret=" << batchResp.results_[bi]);
-            }
+    if (batchResp.results_.size() != groupIndices.size()) {
+        MMC_LOG_ERROR("batch RPC resp size mismatch, rank=" << rank << ", expect=" << groupIndices.size()
+                                                            << ", got=" << batchResp.results_.size());
+        return MMC_ERROR;
+    }
+    // 逐 key 回填：批量整体成功不代表每个 key 都成功
+    for (size_t bi = 0; bi < groupIndices.size(); ++bi) {
+        if (batchResp.results_[bi] == MMC_OK) {
+            copyOk[groupIndices[bi]] = true;
+        } else {
+            MMC_LOG_WARN("copy failed for key=" << keys[group[groupIndices[bi]].index] << ", rank=" << rank
+                                                << ", ret=" << batchResp.results_[bi]);
         }
     }
     return MMC_OK;
@@ -603,52 +587,53 @@ void MmcMetaManager::RewarmRankGroup(uint32_t rank, std::vector<RewarmEntry> &gr
                                      std::vector<MmcMemMetaDesc> &objMetas)
 {
     size_t groupSize = group.size();
-    AllocResults results{std::vector<MmcMemBlobPtr>(groupSize), std::vector<MmcMemBlobDesc>(groupSize),
-                         std::vector<bool>(groupSize, false)};
+    if (groupSize == 0) { // 防越界：下面 group[0] 及各索引依赖非空
+        return;
+    }
+    BatchRpcData batch;
+    for (size_t j = 0; j < groupSize; ++j) {
+        auto &entry = group[j];
+        batch.keys.push_back(keys[entry.index]);
+        batch.srcBlobs.push_back(entry.ssdDesc);
+        batch.dstBlobs.push_back(entry.dstDesc);
+        batch.groupIndices.push_back(j);
+    }
 
-    // Step 1: Allocate DRAM
-    size_t allocCnt = BatchAllocForRewarm(keys, group, results);
-    MMC_LOG_DEBUG("allocated " << allocCnt << "/" << groupSize << " blobs for rank=" << rank);
-    if (allocCnt == 0) {
-        MMC_LOG_WARN("allocation failed for all " << groupSize << " keys in rank=" << rank);
-        for (auto &entry : group) {
-            MmcMetaMetricManager::GetInstance().IncrementRewarmFailCounter(entry.ssdDesc.rank_);
+    std::vector<bool> copyOk(groupSize, false);
+    TP_TRACE_BEGIN(TP_MMC_META_BATCH_GET_REWARM_RPC);
+    Result rpcRet = SendBatchRpc(rank, keys, group, batch, groupSize, copyOk);
+    TP_TRACE_END(TP_MMC_META_BATCH_GET_REWARM_RPC, rpcRet);
+
+    RewarmCtx ctx{opRankId, opSeq, static_cast<MediaType>(group[0].ssdDesc.mediaType_),
+                  MoveUp(static_cast<MediaType>(group[0].ssdDesc.mediaType_))};
+
+    size_t okCnt = 0;
+    if (rpcRet != MMC_OK) {
+        MMC_LOG_ERROR("batch RPC failed for rank=" << rank << ", ret=" << rpcRet);
+        for (size_t j = 0; j < groupSize; ++j) {
+            RollbackEntry(keys[group[j].index], group[j], group[j].dstBlob, group[j].dstDesc, ctx.dstMedia);
+            MmcMetaMetricManager::GetInstance().IncrementRewarmFailCounter(group[j].ssdDesc.rank_);
         }
         return;
     }
 
-    // Step 2: Attach to memObj + collect batch request
-    BatchRpcData batch;
-    size_t attachCnt = AttachAndCollectBatch(keys, group, results, batch);
-    MMC_LOG_DEBUG("attached " << attachCnt << "/" << allocCnt << " blobs for rank=" << rank);
-
-    // Step 3: Send batch RPC
-    Result rpcRet = SendBatchRpc(rank, keys, group, batch, results);
-    if (rpcRet != MMC_OK) {
-        MMC_LOG_ERROR("batch RPC failed for rank=" << rank << ", ret=" << rpcRet);
-    }
-
-    // Rollback failed entries
-    RewarmCtx ctx{opRankId, opSeq, static_cast<MediaType>(group[0].ssdDesc.mediaType_),
-                  MoveUp(static_cast<MediaType>(group[0].ssdDesc.mediaType_))};
+    TP_TRACE_BEGIN(TP_MMC_META_BATCH_GET_REWARM_FINALIZE);
     for (size_t j = 0; j < groupSize; ++j) {
-        if (results.dstBlobs[j] != nullptr && !results.allocOk[j]) {
-            RollbackEntry(keys[group[j].index], group[j], results.dstBlobs[j], results.dstDescs[j], ctx.dstMedia);
+        // 拷贝失败的 key：回滚，不能置 READABLE
+        if (!copyOk[j]) {
+            RollbackEntry(keys[group[j].index], group[j], group[j].dstBlob, group[j].dstDesc, ctx.dstMedia);
+            MmcMetaMetricManager::GetInstance().IncrementRewarmFailCounter(group[j].ssdDesc.rank_);
+            continue;
+        }
+        Result ret = ApplyRewarm(keys[group[j].index], group[j], group[j].dstBlob, ctx, objMetas[group[j].index]);
+        if (ret == MMC_OK) {
+            okCnt++;
+        } else {
+            // ApplyRewarm 失败时已自行回滚，这里只计失败
             MmcMetaMetricManager::GetInstance().IncrementRewarmFailCounter(group[j].ssdDesc.rank_);
         }
     }
-
-    // Step 4: Finalize
-    size_t okCnt = 0;
-    for (size_t j = 0; j < groupSize; ++j) {
-        if (!results.allocOk[j]) {
-            continue;
-        }
-        Result ret = ApplyRewarm(keys[group[j].index], group[j], results.dstBlobs[j], ctx, objMetas[group[j].index]);
-        if (ret == MMC_OK) {
-            okCnt++;
-        }
-    }
+    TP_TRACE_END(TP_MMC_META_BATCH_GET_REWARM_FINALIZE, MMC_OK);
     MMC_LOG_DEBUG("finalized " << okCnt << "/" << groupSize << " keys for rank=" << rank);
 }
 
