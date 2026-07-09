@@ -41,7 +41,7 @@ TEST_F(TestMetaConfigUtils, CreateDefaultMetaConfigReturnsExpectedDefaults)
     EXPECT_EQ(config.logRotationFileCount, 50);
     EXPECT_EQ(config.evictThresholdHigh, 90U);
     EXPECT_EQ(config.evictThresholdLow, 80U);
-    EXPECT_EQ(config.leaseTtlMs, 2000U);
+    EXPECT_EQ(config.leaseTtlMs, 10000U);
 
     EXPECT_FALSE(config.accTlsConfig.tlsEnable);
     EXPECT_STREQ(config.accTlsConfig.caPath, "");
