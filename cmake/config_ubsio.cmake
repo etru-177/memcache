@@ -25,14 +25,14 @@ if (BUILD_UBSIO)
     include(FetchContent)
 
     set(UBSIO_SRC_DIR "${FETCHCONTENT_BASE_DIR}/ubs-io-src")
-    if (EXISTS "${UBSIO_SRC_DIR}/ubsio-boostio" AND EXISTS "${UBSIO_SRC_DIR}/ubsio-kv")
+    if (EXISTS "${UBSIO_SRC_DIR}/ubsio-boostio")
         message(STATUS "ubs-io local source found at ${UBSIO_SRC_DIR}, skip clone")
         FetchContent_Declare(ubs-io SOURCE_DIR ${UBSIO_SRC_DIR})
     else()
         FetchContent_Declare(
             ubs-io
             GIT_REPOSITORY https://gitcode.com/openeuler/ubs-io.git
-            GIT_TAG develop
+            GIT_TAG openEuler-24.03-LTS-SP4
         )
     endif()
 
@@ -45,7 +45,7 @@ if (BUILD_UBSIO)
 
     message(STATUS "Building ubs-io boostio...")
     execute_process(
-        COMMAND bash ${ubs-io_SOURCE_DIR}/ubsio-boostio/build.sh -t release
+        COMMAND bash ${ubs-io_SOURCE_DIR}/ubsio-boostio/build.sh -t release --cli --pkg
         WORKING_DIRECTORY ${ubs-io_SOURCE_DIR}/ubsio-boostio
         RESULT_VARIABLE UBSIO_BOOSTIO_RESULT
     )
@@ -53,25 +53,13 @@ if (BUILD_UBSIO)
         message(FATAL_ERROR "Failed to build ubsio-boostio")
     endif ()
 
-    message(STATUS "Building ubs-io kv...")
-    execute_process(
-        COMMAND bash ${ubs-io_SOURCE_DIR}/ubsio-kv/build.sh -t release
-        WORKING_DIRECTORY ${ubs-io_SOURCE_DIR}/ubsio-kv
-        RESULT_VARIABLE UBSIO_KV_RESULT
-    )
-    if (NOT UBSIO_KV_RESULT EQUAL 0)
-        message(FATAL_ERROR "Failed to build ubsio-kv")
-    endif ()
-
     message(STATUS "ubs-io build completed")
 
     # install .so files to project output (mirrors hcom: output/3rdparty/hcom/lib/)
     file(MAKE_DIRECTORY ${UBSIO_OUTPUT_DIR}/lib)
     file(GLOB UBSIO_SO_FILES
-        ${ubs-io_SOURCE_DIR}/ubsio-boostio/dist/boostio/lib/*.so*
-        ${ubs-io_SOURCE_DIR}/ubsio-boostio/dist/3rdparty/libboundscheck/lib/*.so*
-        ${ubs-io_SOURCE_DIR}/ubsio-boostio/dist/3rdparty/libaio/lib/*.so*
-        ${ubs-io_SOURCE_DIR}/ubsio-kv/dist/lib/*.so*)
+        ${ubs-io_SOURCE_DIR}/ubsio-boostio/dist/lib/*.so*
+        ${ubs-io_SOURCE_DIR}/ubsio-boostio/dist/test_tools/lib/*.so*)
     file(COPY ${UBSIO_SO_FILES} DESTINATION ${UBSIO_OUTPUT_DIR}/lib)
     message(STATUS "ubs-io lib installed to ${UBSIO_OUTPUT_DIR}/lib")
 
