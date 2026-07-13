@@ -17,7 +17,7 @@ BUILD_MODE="RELEASE"
 BUILD_PYTHON="ON"
 BUILD_TEST="OFF"
 INCREMENTAL="OFF"
-BUILD_UBSIO="OFF"
+BUILD_UBSIO="ON"
 
 show_help() {
     echo "Usage: $0 [options]"
@@ -25,7 +25,7 @@ show_help() {
     echo "  --build_mode <mode>     Set build mode (RELEASE/DEBUG/ASAN), default: RELEASE"
     echo "  --build_test <ON/OFF>   Enable/disable package test utilities, default: OFF"
     echo "  --incremental           Enable incremental build (skip clean), default: OFF"
-    echo "  --build_ubsio <ON/OFF>  Enable/disable build and package ubs-io (SSD backend), default: OFF"
+    echo "  --build_ubsio <ON/OFF>  Enable/disable build and package ubs-io (SSD backend), default: ON"
     echo "  --help                  Show this help message"
     echo ""
     echo "Example:"
