@@ -230,6 +230,15 @@ public:
                    0);
         AddStrConf(OCK_MMC_CS_TLS_DECRYPTER_PATH,
                    VStrLength::Create(OCK_MMC_CS_TLS_DECRYPTER_PATH.first, TLS_PATH_MAX_LEN), 0);
+
+        AddBoolConf(OCK_MMC_KV_EVENTS_ENABLE, VStrEnum::Create(OCK_MMC_KV_EVENTS_ENABLE.first, BOOL_ENUM_STR), 0);
+        AddStrConf(OCK_MMC_KV_EVENTS_ENDPOINT, VNoCheck::Create(), 0);
+        AddStrConf(OCK_MMC_KV_EVENTS_MODEL_NAME, VNoCheck::Create(), 0);
+        AddStrConf(OCK_MMC_KV_EVENTS_TENANT_ID, VNoCheck::Create(), 0);
+        AddIntConf(OCK_MMC_KV_EVENTS_BLOCK_SIZE, VNoCheck::Create(), 0);
+        AddIntConf(OCK_MMC_KV_EVENTS_QUEUE_CAPACITY, VNoCheck::Create(), 0);
+        AddBoolConf(OCK_MMC_KV_EVENTS_HASH_AS_INT, VStrEnum::Create(OCK_MMC_KV_EVENTS_HASH_AS_INT.first, BOOL_ENUM_STR),
+                    0);
     }
 
     void GetMetaServiceConfig(mmc_meta_service_config_t &config)
@@ -257,6 +266,13 @@ public:
         config.metricsReportIntervalSeconds = GetUInt64(ConfConstant::OCK_MMC_METRICS_REPORT_INTERVAL_SECONDS);
         GetAccTlsConfig(config.accTlsConfig);
         GetConfigStoreTlsConfig(config.configStoreTlsConfig);
+        config.kvEvents.enable = GetBool(ConfConstant::OCK_MMC_KV_EVENTS_ENABLE);
+        SafeCopy(GetString(ConfConstant::OCK_MMC_KV_EVENTS_ENDPOINT), config.kvEvents.endpoint, DISCOVERY_URL_SIZE);
+        SafeCopy(GetString(ConfConstant::OCK_MMC_KV_EVENTS_MODEL_NAME), config.kvEvents.modelName, KV_EVENT_FIELD_SIZE);
+        SafeCopy(GetString(ConfConstant::OCK_MMC_KV_EVENTS_TENANT_ID), config.kvEvents.tenantId, KV_EVENT_FIELD_SIZE);
+        config.kvEvents.blockSize = static_cast<uint32_t>(GetInt(ConfConstant::OCK_MMC_KV_EVENTS_BLOCK_SIZE));
+        config.kvEvents.queueCapacity = static_cast<uint32_t>(GetInt(ConfConstant::OCK_MMC_KV_EVENTS_QUEUE_CAPACITY));
+        config.kvEvents.hashAsInt = GetBool(ConfConstant::OCK_MMC_KV_EVENTS_HASH_AS_INT);
     }
 };
 
@@ -294,6 +310,7 @@ public:
         AddIntConf(OKC_MMC_LOCAL_SERVICE_WORLD_SIZE,
                    VIntRange::Create(OKC_MMC_LOCAL_SERVICE_WORLD_SIZE.first, MIN_WORLD_SIZE, MAX_WORLD_SIZE), 0);
         AddStrConf(OKC_MMC_LOCAL_SERVICE_BM_IP_PORT, VNoCheck::Create(), 0);
+
         AddStrConf(OKC_MMC_LOCAL_SERVICE_PROTOCOL,
                    VStrEnum::Create(OKC_MMC_LOCAL_SERVICE_PROTOCOL.first, LOCAL_SERVER_PROTOCAL_ENUM_STR),
                    1);                                                      // REQUIRED
@@ -304,6 +321,7 @@ public:
 
         // HCOM TLS config
         AddStrConf(OKC_MMC_LOCAL_SERVICE_BM_HCOM_URL, VNoCheck::Create(), 0);
+        AddStrConf(OKC_MMC_LOCAL_SERVICE_BACKEND_ID, VNoCheck::Create(), 0);
         AddBoolConf(OCK_MMC_HCOM_TLS_ENABLE, VStrEnum::Create(OCK_MMC_HCOM_TLS_ENABLE.first, BOOL_ENUM_STR), 0);
         AddStrConf(OCK_MMC_HCOM_TLS_CA_PATH, VStrLength::Create(OCK_MMC_HCOM_TLS_CA_PATH.first, TLS_PATH_MAX_LEN), 0);
         AddStrConf(OCK_MMC_HCOM_TLS_CRL_PATH, VStrLength::Create(OCK_MMC_HCOM_TLS_CRL_PATH.first, TLS_PATH_MAX_LEN), 0);
@@ -344,6 +362,7 @@ public:
         config.worldSize = static_cast<uint32_t>(GetInt(ConfConstant::OKC_MMC_LOCAL_SERVICE_WORLD_SIZE));
         SafeCopy(GetString(ConfConstant::OKC_MMC_LOCAL_SERVICE_BM_IP_PORT), config.bmIpPort, DISCOVERY_URL_SIZE);
         SafeCopy(GetString(ConfConstant::OKC_MMC_LOCAL_SERVICE_BM_HCOM_URL), config.bmHcomUrl, DISCOVERY_URL_SIZE);
+        SafeCopy(GetString(ConfConstant::OKC_MMC_LOCAL_SERVICE_BACKEND_ID), config.backendId, DISCOVERY_URL_SIZE);
         config.createId = 0;
         SafeCopy(GetString(ConfConstant::OKC_MMC_LOCAL_SERVICE_PROTOCOL), config.dataOpType, PROTOCOL_SIZE);
         config.localDRAMSize = GetUInt64(ConfConstant::OKC_MMC_LOCAL_SERVICE_DRAM_SIZE.first, GB_MEM_BYTES);

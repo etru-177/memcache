@@ -26,3 +26,11 @@
 	path = 3rdparty/prometheus-cpp-lite
 	url = https://github.com/biaks/prometheus-cpp-lite.git
 	branch = master
+[submodule "3rdparty/msgpack-c"]
+	path = 3rdparty/msgpack-c
+	url = https://github.com/msgpack/msgpack-c.git
+	branch = tags/cpp-6.1.0
+[submodule "3rdparty/libzmq"]
+	path = 3rdparty/libzmq
+	url = https://github.com/zeromq/libzmq.git
+	branch = tags/v4.3.5

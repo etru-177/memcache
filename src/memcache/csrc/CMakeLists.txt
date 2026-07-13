@@ -22,6 +22,7 @@ include_directories(
         ${PROJECT_MMC_SRC_BASE}/csrc/entities
         ${PROJECT_MMC_SRC_BASE}/csrc/ha
         ${PROJECT_MMC_SRC_BASE}/csrc/meta_service
+        ${PROJECT_MMC_SRC_BASE}/csrc/kv_event
         ${PROJECT_MMC_SRC_BASE}/csrc/log
         ${PROJECT_MMC_SRC_BASE}/csrc/net
         ${PROJECT_MMC_SRC_BASE}/csrc/net/acc_links_impl
@@ -64,6 +65,7 @@ set(MMC_SRC_NET "")
 set(MMC_SRC_PROTO "")
 set(MMC_SRC_UNDER_API_MF_SMEM "")
 set(MMC_SRC_UNDER_API_UBS_IO "")
+set(MMC_SRC_KV_EVENT_RUNTIME "")
 
 ## add files into src variables
 aux_source_directory(common MMC_SRC_COMMON)
@@ -80,6 +82,21 @@ aux_source_directory(proto MMC_SRC_PROTO)
 aux_source_directory(under_api/mf_smem MMC_SRC_UNDER_API_MF_SMEM)
 aux_source_directory(under_api/ubs_io MMC_SRC_UNDER_API_UBS_IO)
 
+# KV cache event publisher (opt-in). Default OFF keeps existing build untouched
+# and introduces no hard dependency on system libzmq / msgpack.
+set(MMC_SRC_KV_EVENT "")
+if (MMC_ENABLE_KV_EVENTS)
+    aux_source_directory(kv_event MMC_SRC_KV_EVENT)
+    if (NOT MMC_KV_EVENTS_MSGPACK_INCLUDE_DIR OR NOT MMC_KV_EVENTS_ZMQ_LIBRARY)
+        message(FATAL_ERROR "MMC_ENABLE_KV_EVENTS=ON but 3rdparty kv_events deps not configured. "
+                            "Run: git submodule update --init 3rdparty/msgpack-c 3rdparty/libzmq")
+    endif ()
+    include_directories(${MMC_KV_EVENTS_MSGPACK_INCLUDE_DIR} ${MMC_KV_EVENTS_ZMQ_INCLUDE_DIR})
+    message(STATUS "kv_events enabled: zmq=${MMC_KV_EVENTS_ZMQ_LIBRARY} msgpack=${MMC_KV_EVENTS_MSGPACK_INCLUDE_DIR}")
+else ()
+    set(MMC_SRC_KV_EVENT_RUNTIME kv_event/mmc_kv_event_runtime.cpp)
+endif ()
+
 # set whole source for platform
 set(PLATFORM_SRC ${MMC_SRC_COMMON}
         ${MMC_SRC_CONFIG}
@@ -94,6 +111,8 @@ set(PLATFORM_SRC ${MMC_SRC_COMMON}
         ${MMC_SRC_PROTO}
         ${MMC_SRC_UNDER_API_MF_SMEM}
         ${MMC_SRC_UNDER_API_UBS_IO}
+        ${MMC_SRC_KV_EVENT_RUNTIME}
+        ${MMC_SRC_KV_EVENT}
         mmc.cpp
         mmc_client.cpp
         mmcache_store.cpp
@@ -104,10 +123,18 @@ add_library(mmc_objects OBJECT ${PLATFORM_SRC})
 target_include_directories(mmc_objects BEFORE PUBLIC ${PROJECT_MMC_SRC_BASE}/csrc/under_api/mf_smem)
 target_link_libraries(mmc_objects PUBLIC config_store_object)
 target_compile_options(mmc_objects PRIVATE -fPIC -Wno-float-equal)
+if (MMC_ENABLE_KV_EVENTS)
+    target_compile_definitions(mmc_objects PRIVATE ZMQ_STATIC)
+endif ()
+# 注：MMC_ENABLE_KV_EVENTS / MSGPACK_NO_BOOST 已在顶层 add_compile_definitions 全局开启（ON 时），
+# 保证库与测试 TU 类布局一致。
 
 add_library(mmc_static STATIC $<TARGET_OBJECTS:mmc_objects> $<TARGET_OBJECTS:ptracer_object> $<TARGET_OBJECTS:config_store_object>)
 set_target_properties(mmc_static PROPERTIES OUTPUT_NAME "mf_memcache")
 target_link_libraries(mmc_static PUBLIC pthread acc_tcp_net_static)
+if (MMC_ENABLE_KV_EVENTS)
+    target_link_libraries(mmc_static PUBLIC ${MMC_KV_EVENTS_ZMQ_LIBRARY})
+endif ()
 target_link_directories(mmc_static PUBLIC ${PROJECT_3RDPARTY_BIN_DIR}/spdlog/lib)
 target_link_directories(mmc_static PUBLIC ${PROJECT_3RDPARTY_BIN_DIR}/spdlog/lib64)
 if (BUILD_PYTHON STREQUAL "ON")
@@ -123,6 +150,9 @@ endif ()
 add_library(mmc_shared SHARED $<TARGET_OBJECTS:mmc_objects> $<TARGET_OBJECTS:ptracer_object> $<TARGET_OBJECTS:config_store_object>)
 set_target_properties(mmc_shared PROPERTIES OUTPUT_NAME "mf_memcache")
 target_link_libraries(mmc_shared PUBLIC pthread acc_tcp_net_static)
+if (MMC_ENABLE_KV_EVENTS)
+    target_link_libraries(mmc_shared PUBLIC ${MMC_KV_EVENTS_ZMQ_LIBRARY})
+endif ()
 target_link_directories(mmc_shared PUBLIC ${PROJECT_3RDPARTY_BIN_DIR}/spdlog/lib)
 target_link_directories(mmc_shared PUBLIC ${PROJECT_3RDPARTY_BIN_DIR}/spdlog/lib64)
 if (x${CMAKE_BUILD_TYPE} STREQUAL "xDEBUG")

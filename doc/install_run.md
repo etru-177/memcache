@@ -39,7 +39,7 @@ git -c submodule.3rdparty/memfabric_hybrid.branch=master submodule update --remo
 ```
 
 **说明：**
-- `--init 3rdparty` 只初始化并更新指定的子模块，避免拉取 test 目录等不必要的依赖
+- `--init 3rdparty/` 初始化并更新 `3rdparty/` 下全部子模块（含 memfabric_hybrid、spdlog、nlohmann、msgpack-c、libzmq 等），避免拉取 test 目录等不必要的依赖
 - 通过 `-c submodule.3rdparty/memfabric_hybrid.branch=<branch_name>` 参数可以指定拉取的目标分支
 - 若需拉取所有子模块（包括测试依赖），可使用 `git submodule update --recursive --init`
 

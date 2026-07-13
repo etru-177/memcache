@@ -110,6 +110,10 @@ int MmcMetaServiceProcess::MainForPython()
     MMC_AUDIT_LOG("Meta Service launched successfully");
     while (g_processExitRequested == 0) {
         std::this_thread::sleep_for(PROCESS_EXIT_POLL_INTERVAL);
+        if (config_.haEnable && leaderElection_ != nullptr && metaService_ != nullptr) {
+            const bool isLeader = (leaderElection_->GetSnapshot().role == "leader");
+            metaService_->SetPublishActive(isLeader);
+        }
     }
 
     std::cout << "Received exit signal[" << g_receivedExitSignal << "]" << std::endl;

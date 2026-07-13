@@ -14,11 +14,13 @@
 
 #include <stdint.h>
 
-#define DISCOVERY_URL_SIZE 1024
-#define PATH_MAX_SIZE      1024
-#define PROTOCOL_SIZE      64
-#define TLS_PATH_SIZE      256
-#define TLS_PATH_MAX_LEN   (TLS_PATH_SIZE - 1)
+#define DISCOVERY_URL_SIZE  1024
+#define PATH_MAX_SIZE       1024
+#define PROTOCOL_SIZE       64
+#define KV_EVENT_FIELD_SIZE 256
+#define MAX_BATCH_OP_COUNT  16384
+#define TLS_PATH_SIZE       256
+#define TLS_PATH_MAX_LEN    (TLS_PATH_SIZE - 1)
 
 #ifdef __cplusplus
 extern "C" {
@@ -43,6 +45,16 @@ typedef struct {
 } mmc_tls_config;
 
 typedef struct {
+    bool enable;
+    char endpoint[DISCOVERY_URL_SIZE]; /* ZMQ PUB bind, e.g. tcp://0.0.0.0:5557 */
+    char modelName[KV_EVENT_FIELD_SIZE];
+    char tenantId[KV_EVENT_FIELD_SIZE];
+    uint32_t blockSize;
+    uint32_t queueCapacity;
+    bool hashAsInt; /* true: u64 hash (default); false: hex string */
+} mmc_kv_events_config_t;
+
+typedef struct {
     char discoveryURL[DISCOVERY_URL_SIZE];   /* composed by schema and url, e.g. tcp:// or etcd:// or zk:// */
     char configStoreURL[DISCOVERY_URL_SIZE]; /* composed by schema and url, e.g. tcp:// or etcd:// or zk:// */
     char httpURL[DISCOVERY_URL_SIZE];
@@ -58,6 +70,8 @@ typedef struct {
     mmc_tls_config accTlsConfig;
     mmc_tls_config configStoreTlsConfig;
     uint32_t metricsReportIntervalSeconds;
+    /* KV cache event publisher (opt-in, default disabled). */
+    mmc_kv_events_config_t kvEvents;
     uint16_t rewarmDramWatermark;
     bool prefetchEnabled;
 } mmc_meta_service_config_t;
@@ -69,6 +83,7 @@ typedef struct {
     uint32_t worldSize;
     char bmIpPort[DISCOVERY_URL_SIZE];
     char bmHcomUrl[DISCOVERY_URL_SIZE];
+    char backendId[DISCOVERY_URL_SIZE]; // Backend identity for kv_event (pod IP etc.)
     uint32_t createId;
     char dataOpType[PROTOCOL_SIZE];
     uint64_t localDRAMSize;

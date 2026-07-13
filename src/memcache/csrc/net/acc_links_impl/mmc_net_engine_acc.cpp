@@ -79,6 +79,7 @@ void NetEngineAcc::Stop()
     }
     if (threadPool_ != nullptr) {
         threadPool_->Destroy();
+        threadPool_ = nullptr;
     }
     Result result = StopInner();
     MMC_ASSERT(result == MMC_OK, "StopInner = " << result);

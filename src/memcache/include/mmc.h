@@ -42,6 +42,9 @@ typedef struct {
     // Keep consistent with the same name configuration in mmc-meta.conf
     char config_store_url[DISCOVERY_URL_SIZE];
 
+    // Backend identity for kv_event, e.g. pod IP. If empty, runtime falls back to MMC_LOCAL_SERVICE_BACKEND_ID env var.
+    char backend_id[DISCOVERY_URL_SIZE];
+
     // Log level: debug, info, warn, error
     char log_level[10];
 

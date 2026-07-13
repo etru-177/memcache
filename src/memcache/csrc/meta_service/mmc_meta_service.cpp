@@ -12,6 +12,7 @@
 #include "mmc_meta_service.h"
 
 #include <memory>
+#include <utility>
 
 #include "mmc_logger.h"
 #include "mmc_ref.h"
@@ -25,6 +26,20 @@
 
 namespace ock {
 namespace mmc {
+
+namespace {
+
+std::vector<uint32_t> CollectRanks(const std::unordered_map<uint32_t, std::unordered_set<uint16_t>> &rankMediaTypeMap)
+{
+    std::vector<uint32_t> ranks;
+    ranks.reserve(rankMediaTypeMap.size());
+    for (const auto &entry : rankMediaTypeMap) {
+        ranks.push_back(entry.first);
+    }
+    return ranks;
+}
+
+} // namespace
 
 Result MmcMetaService::Start(const mmc_meta_service_config_t &options)
 {
@@ -77,6 +92,24 @@ Result MmcMetaService::Start(const mmc_meta_service_config_t &options)
         ock::smem::StoreFactory::CreateStoreByUrl(options_.configStoreURL, ock::smem::ConfigStoreModel::CSM_SERVER);
     MMC_VALIDATE_RETURN(confStore_ != nullptr, "Failed to start config store server", MMC_ERROR);
 
+    MmcMetaManager *metaManager = nullptr;
+    if (metaMgrProxy_ != nullptr && metaMgrProxy_->GetMetaManager() != nullptr) {
+        metaManager = metaMgrProxy_->GetMetaManager().Get();
+    }
+    kvEvents_.Start(options_, [this](uint32_t rank) { return GetBackendIdForRank(rank); });
+    if (metaManager != nullptr) {
+        MmcMetaChangeCallbacks callbacks;
+        callbacks.stored = [this](const std::string &key, uint32_t rank, uint16_t mediaType) {
+            kvEvents_.OnMetaStored(key, rank, mediaType);
+        };
+        callbacks.removed = [this](const std::string &key, uint32_t rank, uint16_t mediaType) {
+            kvEvents_.OnMetaRemoved(key, rank, mediaType);
+        };
+        metaManager->SetChangeCallbacks(callbacks);
+    }
+    kvEvents_.SetPublishActive(!options.haEnable);
+    kvEventsPublishActive_ = !options.haEnable;
+
     started_ = true;
     MMC_LOG_INFO("Started MetaService (" << name_ << ") at " << options_.discoveryURL);
 
@@ -86,7 +119,8 @@ Result MmcMetaService::Start(const mmc_meta_service_config_t &options)
 
 Result MmcMetaService::BmRegister(uint32_t rank, std::vector<uint16_t> mediaType, std::vector<uint64_t> bm,
                                   std::vector<uint64_t> capacity,
-                                  std::vector<std::pair<std::string, MmcMemBlobDesc>> &blobList, bool storageEnabled)
+                                  std::vector<std::pair<std::string, MmcMemBlobDesc>> &blobList, bool storageEnabled,
+                                  const std::string &backendId)
 {
     std::lock_guard<std::mutex> guard(mutex_);
     if (!started_) {
@@ -124,6 +158,12 @@ Result MmcMetaService::BmRegister(uint32_t rank, std::vector<uint16_t> mediaType
             rankMediaTypeMap_[rank].insert(mediaType[i]);
         }
     }
+
+    if (!backendId.empty()) {
+        std::lock_guard<std::mutex> backendLock(rankBackendIdMapLock_);
+        rankBackendIdMap_[rank] = backendId;
+    }
+
     return MMC_OK;
 }
 
@@ -144,6 +184,10 @@ Result MmcMetaService::BmUnregister(uint32_t rank, uint16_t mediaType)
     }
     if (rankMediaTypeMap_.find(rank) != rankMediaTypeMap_.end() && rankMediaTypeMap_[rank].empty()) {
         rankMediaTypeMap_.erase(rank);
+    }
+    if (rankMediaTypeMap_.find(rank) == rankMediaTypeMap_.end()) {
+        std::lock_guard<std::mutex> backendLock(rankBackendIdMapLock_);
+        rankBackendIdMap_.erase(rank);
     }
     return MMC_OK;
 }
@@ -171,6 +215,31 @@ Result MmcMetaService::ClearResource(uint32_t rank)
     return MMC_OK;
 }
 
+void MmcMetaService::SetPublishActive(bool active)
+{
+    std::vector<uint32_t> ranks;
+    {
+        std::lock_guard<std::mutex> guard(mutex_);
+        const bool activated = active && !kvEventsPublishActive_;
+        kvEvents_.SetPublishActive(active);
+        kvEventsPublishActive_ = active;
+        if (activated) {
+            ranks = CollectRanks(rankMediaTypeMap_);
+        }
+    }
+    PublishClearedForRanks(ranks);
+}
+
+bool MmcMetaService::KvEventsEnabled() const
+{
+    return kvEvents_.Enabled();
+}
+
+kv_event::KvEventStats MmcMetaService::GetKvEventStats() const
+{
+    return kvEvents_.GetStats();
+}
+
 void MmcMetaService::Stop()
 {
     std::lock_guard<std::mutex> guard(mutex_);
@@ -179,14 +248,38 @@ void MmcMetaService::Stop()
         return;
     }
     StopPeriodicTask();
+    PublishClearedForRanks(CollectRanks(rankMediaTypeMap_));
+    kvEventsPublishActive_ = false;
+    MmcMetaManager *metaManager = nullptr;
+    if (metaMgrProxy_ != nullptr && metaMgrProxy_->GetMetaManager() != nullptr) {
+        metaManager = metaMgrProxy_->GetMetaManager().Get();
+    }
+    if (metaManager != nullptr) {
+        metaManager->SetChangeCallbacks({});
+    }
     metaBackUpMgrPtr_->Stop();
     metaMgrProxy_->Stop();
     metaNetServer_->Stop();
+    kvEvents_.Shutdown();
     confStore_ = nullptr;
     metadata_.clear();
     ock::smem::StoreFactory::DestroyStore(options_.configStoreURL);
     MMC_LOG_INFO("Stop MmcMetaServiceDefault (" << name_ << ") at " << options_.discoveryURL);
     started_ = false;
+}
+
+void MmcMetaService::PublishClearedForRanks(const std::vector<uint32_t> &ranks)
+{
+    for (const auto &rank : ranks) {
+        kvEvents_.PublishCleared(rank);
+    }
+}
+
+std::string MmcMetaService::GetBackendIdForRank(uint32_t rank)
+{
+    std::lock_guard<std::mutex> backendLock(rankBackendIdMapLock_);
+    const auto it = rankBackendIdMap_.find(rank);
+    return (it != rankBackendIdMap_.end()) ? it->second : std::string();
 }
 
 bool MmcMetaService::StartPeriodicTask(const std::string &taskName, uint32_t intervalSeconds,

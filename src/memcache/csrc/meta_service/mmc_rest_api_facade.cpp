@@ -711,8 +711,108 @@ Result MmcRestApiFacade::BuildPrometheusMetrics(bool serviceReady, std::string &
     AppendMetricHeader(oss, "memcache_stored_keys", "Current number of stored keys", "gauge");
     AppendMetricValue(oss, "memcache_stored_keys", keys.size());
 
+    AppendMetricHeader(oss, "memcache_segment_capacity_bytes", "Segment total capacity in bytes", "gauge");
+    for (size_t i = 0; i < segments.size(); ++i) {
+        AppendLabeledMetricValue(oss, "memcache_segment_capacity_bytes", "segment", segments[i].segmentName,
+                                 segments[i].totalBytes);
+    }
+    AppendMetricHeader(oss, "memcache_segment_allocated_bytes", "Segment allocated bytes", "gauge");
+    for (size_t i = 0; i < segments.size(); ++i) {
+        AppendLabeledMetricValue(oss, "memcache_segment_allocated_bytes", "segment", segments[i].segmentName,
+                                 segments[i].usedBytes);
+    }
+
+    AppendMetricHeader(oss, "memcache_total_capacity_bytes", "Total capacity by medium in bytes", "gauge");
+    AppendLabeledMetricValue(oss, "memcache_total_capacity_bytes", "medium", kLowerMediumHbm, hbmUsage.totalBytes);
+    AppendLabeledMetricValue(oss, "memcache_total_capacity_bytes", "medium", kLowerMediumDram, dramUsage.totalBytes);
+    if (ssdUsage.totalBytes > 0 || ssdUsage.usedBytes > 0) {
+        AppendLabeledMetricValue(oss, "memcache_total_capacity_bytes", "medium", kLowerMediumSsd, ssdUsage.totalBytes);
+    }
+
+    AppendMetricHeader(oss, "memcache_allocated_bytes", "Allocated bytes by medium", "gauge");
+    AppendLabeledMetricValue(oss, "memcache_allocated_bytes", "medium", kLowerMediumHbm, hbmUsage.usedBytes);
+    AppendLabeledMetricValue(oss, "memcache_allocated_bytes", "medium", kLowerMediumDram, dramUsage.usedBytes);
+    if (ssdUsage.totalBytes > 0 || ssdUsage.usedBytes > 0) {
+        AppendLabeledMetricValue(oss, "memcache_allocated_bytes", "medium", kLowerMediumSsd, ssdUsage.usedBytes);
+    }
+
+    const kv_event::KvEventStats kvStats =
+        metaService_ != nullptr ? metaService_->GetKvEventStats() : kv_event::KvEventStats{};
+    AppendMetricHeader(oss, "memcache_kv_events_published_total", "Total KV cache events published", "counter");
+    AppendMetricValue(oss, "memcache_kv_events_published_total", kvStats.publishedEvents);
+    AppendMetricHeader(oss, "memcache_kv_events_published_by_type_total",
+                       "Total KV cache events published by event type", "counter");
+    AppendLabeledMetricValue(oss, "memcache_kv_events_published_by_type_total", "type", "stored",
+                             kvStats.publishedStoredEvents);
+    AppendLabeledMetricValue(oss, "memcache_kv_events_published_by_type_total", "type", "removed",
+                             kvStats.publishedRemovedEvents);
+    AppendLabeledMetricValue(oss, "memcache_kv_events_published_by_type_total", "type", "cleared",
+                             kvStats.publishedClearedEvents);
+    AppendMetricHeader(oss, "memcache_kv_events_published_by_medium_total",
+                       "Total KV cache events published by storage medium", "counter");
+    AppendLabeledMetricValue(oss, "memcache_kv_events_published_by_medium_total", "medium", kLowerMediumHbm,
+                             kvStats.publishedHbmEvents);
+    AppendLabeledMetricValue(oss, "memcache_kv_events_published_by_medium_total", "medium", kLowerMediumDram,
+                             kvStats.publishedDramEvents);
+    AppendLabeledMetricValue(oss, "memcache_kv_events_published_by_medium_total", "medium", kLowerMediumSsd,
+                             kvStats.publishedSsdEvents);
+    AppendLabeledMetricValue(oss, "memcache_kv_events_published_by_medium_total", "medium", "unknown",
+                             kvStats.publishedUnknownMediumEvents);
+    AppendMetricHeader(oss, "memcache_kv_events_dropped_total", "Total KV cache events dropped on queue pressure",
+                       "counter");
+    AppendMetricValue(oss, "memcache_kv_events_dropped_total", kvStats.droppedEvents);
+    AppendMetricHeader(oss, "memcache_kv_events_dropped_stored_total",
+                       "Total KV cache stored events dropped on full queue", "counter");
+    AppendMetricValue(oss, "memcache_kv_events_dropped_stored_total", kvStats.droppedStoredEvents);
+    AppendMetricHeader(oss, "memcache_kv_events_dropped_high_priority_total",
+                       "Total KV cache removed or cleared events dropped after hard queue limit", "counter");
+    AppendMetricValue(oss, "memcache_kv_events_dropped_high_priority_total", kvStats.droppedHighPriorityEvents);
+    AppendMetricHeader(oss, "memcache_kv_events_skipped_unparsed_total",
+                       "Total KV cache events that could not derive block_hashes from object key", "counter");
+    AppendMetricValue(oss, "memcache_kv_events_skipped_unparsed_total", kvStats.skippedUnparsedKeys);
+    AppendMetricHeader(oss, "memcache_kv_events_queue_size", "Current KV cache event queue size", "gauge");
+    AppendMetricValue(oss, "memcache_kv_events_queue_size", kvStats.queueSize);
+    AppendMetricHeader(oss, "memcache_kv_events_queue_capacity", "Configured KV cache event soft queue capacity",
+                       "gauge");
+    AppendMetricValue(oss, "memcache_kv_events_queue_capacity", kvStats.queueCapacity);
+    AppendMetricHeader(oss, "memcache_kv_events_publisher_active", "Whether KV event publishing is active", "gauge");
+    AppendMetricValue(oss, "memcache_kv_events_publisher_active", kvStats.publisherActive ? 1 : 0);
+    AppendMetricHeader(oss, "memcache_kv_events_last_sequence", "Last published KV event ZMQ sequence", "gauge");
+    AppendMetricValue(oss, "memcache_kv_events_last_sequence", kvStats.lastSequence);
+
     result = oss.str();
     return MMC_OK;
+}
+
+nlohmann::json MmcRestApiFacade::BuildKvEventsStatus() const
+{
+    nlohmann::json body;
+    const bool enabled = metaService_ != nullptr && metaService_->KvEventsEnabled();
+    const kv_event::KvEventStats stats =
+        metaService_ != nullptr ? metaService_->GetKvEventStats() : kv_event::KvEventStats{};
+    body["enabled"] = enabled;
+    body["published_batches"] = stats.publishedBatches;
+    body["published_events"] = stats.publishedEvents;
+    body["dropped_events"] = stats.droppedEvents;
+    body["dropped_stored_events"] = stats.droppedStoredEvents;
+    body["dropped_high_priority_events"] = stats.droppedHighPriorityEvents;
+    body["skipped_unparsed_keys"] = stats.skippedUnparsedKeys;
+    body["queue_size"] = stats.queueSize;
+    body["queue_capacity"] = stats.queueCapacity;
+    body["publisher_active"] = stats.publisherActive;
+    body["last_sequence"] = stats.lastSequence;
+    body["published_by_type"] = {
+        {"stored", stats.publishedStoredEvents},
+        {"removed", stats.publishedRemovedEvents},
+        {"cleared", stats.publishedClearedEvents},
+    };
+    body["published_by_medium"] = {
+        {"hbm", stats.publishedHbmEvents},
+        {"dram", stats.publishedDramEvents},
+        {"ssd", stats.publishedSsdEvents},
+        {"unknown", stats.publishedUnknownMediumEvents},
+    };
+    return body;
 }
 
 Result MmcRestApiFacade::GetPtracerText(std::string &result) const

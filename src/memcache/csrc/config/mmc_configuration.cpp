@@ -65,6 +65,7 @@ bool Configuration::Setup(const local_config *config)
     bool res{true};
     res &= SetWithTypeAutoConvert(ConfConstant::OCK_MMC_META_SERVICE_URL.first, config->meta_service_url);
     res &= SetWithTypeAutoConvert(ConfConstant::OKC_MMC_LOCAL_SERVICE_BM_IP_PORT.first, config->config_store_url);
+    res &= SetWithTypeAutoConvert(ConfConstant::OKC_MMC_LOCAL_SERVICE_BACKEND_ID.first, config->backend_id);
     res &= SetWithTypeAutoConvert(ConfConstant::OCK_MMC_LOG_LEVEL.first, config->log_level);
     res &= SetWithTypeAutoConvert(ConfConstant::OKC_MMC_LOCAL_SERVICE_WORLD_SIZE.first, config->world_size);
     res &= SetWithTypeAutoConvert(ConfConstant::OKC_MMC_LOCAL_SERVICE_PROTOCOL.first, config->protocol);

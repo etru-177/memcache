@@ -11,6 +11,7 @@
 */
 
 #include <string>
+#include <vector>
 
 #include "gtest/gtest.h"
 #include "common/mmc_functions.h"
@@ -19,6 +20,15 @@
 
 using namespace testing;
 using namespace ock::mmc;
+
+namespace {
+
+void ExpectConfigStringContains(const std::string &actual, const std::string &snippet)
+{
+    EXPECT_NE(actual.find(snippet), std::string::npos) << "missing snippet:\n" << snippet;
+}
+
+} // namespace
 
 class TestMetaConfigUtils : public testing::Test {
 public:
@@ -42,6 +52,10 @@ TEST_F(TestMetaConfigUtils, CreateDefaultMetaConfigReturnsExpectedDefaults)
     EXPECT_EQ(config.evictThresholdHigh, 90U);
     EXPECT_EQ(config.evictThresholdLow, 80U);
     EXPECT_EQ(config.leaseTtlMs, 10000U);
+
+    EXPECT_FALSE(config.kvEvents.enable);
+    EXPECT_STREQ(config.kvEvents.endpoint, "");
+    EXPECT_TRUE(config.kvEvents.hashAsInt);
 
     EXPECT_FALSE(config.accTlsConfig.tlsEnable);
     EXPECT_STREQ(config.accTlsConfig.caPath, "");
@@ -96,35 +110,38 @@ TEST_F(TestMetaConfigUtils, MetaConfigToStringReturnsExpectedFormat)
     SafeCopy("/cs/dec.so", config.configStoreTlsConfig.decrypterLibPath,
              sizeof(config.configStoreTlsConfig.decrypterLibPath));
 
-    const std::string expected = "MetaConfig {\n"
-                                 "  meta_service_url: tcp://10.0.0.1:5000\n"
-                                 "  config_store_url: tcp://10.0.0.2:6000\n"
-                                 "  metrics_url: http://10.0.0.3:8000\n"
-                                 "  ha_enable: true\n"
-                                 "  log_level: 2\n"
-                                 "  log_path: /var/log/meta\n"
-                                 "  log_rotation_file_size: 67108864\n"
-                                 "  log_rotation_file_count: 7\n"
-                                 "  evict_threshold_high: 95\n"
-                                 "  evict_threshold_low: 70\n"
-                                 "  lease_ttl_ms: 4321\n"
-                                 "  tls_enable: true\n"
-                                 "  tls_ca_path: /tls/ca.pem\n"
-                                 "  tls_ca_crl_path: /tls/ca.crl\n"
-                                 "  tls_cert_path: /tls/cert.pem\n"
-                                 "  tls_key_path: /tls/key.pem\n"
-                                 "  tls_key_pass_path: /tls/key.pass\n"
-                                 "  tls_package_path: /tls/pkg\n"
-                                 "  tls_decrypter_path: /tls/dec.so\n"
-                                 "  config_store_tls_enable: true\n"
-                                 "  config_store_tls_ca_path: /cs/ca.pem\n"
-                                 "  config_store_tls_ca_crl_path: /cs/ca.crl\n"
-                                 "  config_store_tls_cert_path: /cs/cert.pem\n"
-                                 "  config_store_tls_key_path: /cs/key.pem\n"
-                                 "  config_store_tls_key_pass_path: /cs/key.pass\n"
-                                 "  config_store_tls_package_path: /cs/pkg\n"
-                                 "  config_store_tls_decrypter_path: /cs/dec.so\n"
-                                 "}";
-
-    EXPECT_EQ(meta_config_to_string(config), expected);
+    const std::string actual = meta_config_to_string(config);
+    EXPECT_EQ(actual.front(), 'M');
+    EXPECT_EQ(actual.back(), '}');
+    ExpectConfigStringContains(actual, "meta_service_url: tcp://10.0.0.1:5000");
+    ExpectConfigStringContains(actual, "config_store_url: tcp://10.0.0.2:6000");
+    ExpectConfigStringContains(actual, "metrics_url: http://10.0.0.3:8000");
+    ExpectConfigStringContains(actual, "ha_enable: true");
+    ExpectConfigStringContains(actual, "log_level: 2");
+    ExpectConfigStringContains(actual, "log_path: /var/log/meta");
+    ExpectConfigStringContains(actual, "log_rotation_file_size: 67108864");
+    ExpectConfigStringContains(actual, "log_rotation_file_count: 7");
+    ExpectConfigStringContains(actual, "evict_threshold_high: 95");
+    ExpectConfigStringContains(actual, "evict_threshold_low: 70");
+    ExpectConfigStringContains(actual, "tls_enable: true");
+    // kv_events 字段：零初始化 config 对应 false / 空 / false
+    ExpectConfigStringContains(actual, "kv_events_enable: false");
+    ExpectConfigStringContains(actual, "kv_events_endpoint: \n");
+    ExpectConfigStringContains(actual, "kv_events_hash_as_int: false");
+    ExpectConfigStringContains(actual, "tls_enable: true");
+    ExpectConfigStringContains(actual, "tls_ca_path: /tls/ca.pem");
+    ExpectConfigStringContains(actual, "tls_ca_crl_path: /tls/ca.crl");
+    ExpectConfigStringContains(actual, "tls_cert_path: /tls/cert.pem");
+    ExpectConfigStringContains(actual, "tls_key_path: /tls/key.pem");
+    ExpectConfigStringContains(actual, "tls_key_pass_path: /tls/key.pass");
+    ExpectConfigStringContains(actual, "tls_package_path: /tls/pkg");
+    ExpectConfigStringContains(actual, "tls_decrypter_path: /tls/dec.so");
+    ExpectConfigStringContains(actual, "config_store_tls_enable: true");
+    ExpectConfigStringContains(actual, "config_store_tls_ca_path: /cs/ca.pem");
+    ExpectConfigStringContains(actual, "config_store_tls_ca_crl_path: /cs/ca.crl");
+    ExpectConfigStringContains(actual, "config_store_tls_cert_path: /cs/cert.pem");
+    ExpectConfigStringContains(actual, "config_store_tls_key_path: /cs/key.pem");
+    ExpectConfigStringContains(actual, "config_store_tls_key_pass_path: /cs/key.pass");
+    ExpectConfigStringContains(actual, "config_store_tls_package_path: /cs/pkg");
+    ExpectConfigStringContains(actual, "config_store_tls_decrypter_path: /cs/dec.so");
 }

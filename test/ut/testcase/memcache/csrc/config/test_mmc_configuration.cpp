@@ -42,6 +42,7 @@ static local_config CreateLocalConfigWithCurrentDefaults()
     local_config config{};
     SafeCopy("tcp://127.0.0.1:5000", config.meta_service_url, sizeof(config.meta_service_url));
     SafeCopy("tcp://127.0.0.1:6000", config.config_store_url, sizeof(config.config_store_url));
+    SafeCopy("", config.backend_id, sizeof(config.backend_id));
     SafeCopy("info", config.log_level, sizeof(config.log_level));
     config.world_size = 256UL;
     SafeCopy("host_rdma", config.protocol, sizeof(config.protocol));

@@ -13,6 +13,7 @@
 #define MEM_FABRIC_MMC_CONFIG_CONST_H
 
 #include <utility>
+#include <cstdint>
 
 namespace ock {
 namespace mmc {
@@ -30,6 +31,7 @@ constexpr auto OCK_MMC_META_BACKUP_ENABLE = std::make_pair("ock.mmc.meta.backup.
 constexpr auto OKC_MMC_EVICT_THRESHOLD_HIGH = std::make_pair("ock.mmc.evict_threshold_high", 90);
 constexpr auto OKC_MMC_EVICT_THRESHOLD_LOW = std::make_pair("ock.mmc.evict_threshold_low", 80);
 constexpr auto OCK_MMC_META_LEASE_TTL_MS = std::make_pair("ock.mmc.meta.lease_ttl_ms", 10000);
+constexpr auto OKC_MMC_LOCAL_SERVICE_BACKEND_ID = std::make_pair("ock.mmc.local_service.backend_id", "");
 constexpr auto OCK_MMC_LOG_LEVEL = std::make_pair("ock.mmc.log_level", "info");
 constexpr auto OCK_MMC_LOG_PATH = std::make_pair("ock.mmc.log_path", "/var/log/memcache_hybrid");
 constexpr auto OCK_MMC_LOG_ROTATION_FILE_SIZE = std::make_pair("ock.mmc.log_rotation_file_size", 20);
@@ -55,6 +57,7 @@ constexpr auto OCK_MMC_CS_TLS_DECRYPTER_PATH = std::make_pair("ock.mmc.config_st
 constexpr auto OKC_MMC_LOCAL_SERVICE_WORLD_SIZE = std::make_pair("ock.mmc.local_service.world_size", 256);
 constexpr auto OKC_MMC_LOCAL_SERVICE_BM_IP_PORT =
     std::make_pair("ock.mmc.local_service.config_store_url", "tcp://127.0.0.1:6000");
+
 constexpr auto OKC_MMC_LOCAL_SERVICE_PROTOCOL = std::make_pair("ock.mmc.local_service.protocol", "host_rdma");
 constexpr auto OKC_MMC_LOCAL_SERVICE_DRAM_SIZE = std::make_pair("ock.mmc.local_service.dram.size", "128MB");
 constexpr auto OKC_MMC_LOCAL_SERVICE_MAX_DRAM_SIZE = std::make_pair("ock.mmc.local_service.max.dram.size", "64GB");
@@ -79,6 +82,16 @@ constexpr auto OCK_MMC_CLIENT_WRITE_THREAD_POOL_SIZE = std::make_pair("ock.mmc.c
 constexpr auto OCK_MMC_CLIENT_BATCH_CHUNK_SIZE = std::make_pair("ock.mmc.client.batch_option.chunk.size", "8MB");
 constexpr auto OCK_MMC_CLIENT_BATCH_CHUNK_COUNT = std::make_pair("ock.mmc.client.batch_option.chunk.count", 3);
 
+constexpr auto OCK_MMC_LOCAL_SERVICE_SSD_SIZE = std::make_pair("ock.mmc.local_service.storage.size", "0");
+
+// KV cache event publisher (opt-in, default disabled).
+constexpr auto OCK_MMC_KV_EVENTS_ENABLE = std::make_pair("ock.mmc.kv_events.enable", false);
+constexpr auto OCK_MMC_KV_EVENTS_ENDPOINT = std::make_pair("ock.mmc.kv_events.endpoint", "");
+constexpr auto OCK_MMC_KV_EVENTS_MODEL_NAME = std::make_pair("ock.mmc.kv_events.model_name", "");
+constexpr auto OCK_MMC_KV_EVENTS_TENANT_ID = std::make_pair("ock.mmc.kv_events.tenant_id", "default");
+constexpr auto OCK_MMC_KV_EVENTS_BLOCK_SIZE = std::make_pair("ock.mmc.kv_events.block_size", 0);
+constexpr auto OCK_MMC_KV_EVENTS_QUEUE_CAPACITY = std::make_pair("ock.mmc.kv_events.queue_capacity", 65536);
+constexpr auto OCK_MMC_KV_EVENTS_HASH_AS_INT = std::make_pair("ock.mmc.kv_events.hash_as_int", true);
 constexpr uint16_t DEFAULT_REWARM_WATERMARK_VAL = 95U;
 constexpr auto OCK_MMC_REWARM_DRAM_WATERMARK =
     std::make_pair("ock.mmc.rewarm.dram_watermark", DEFAULT_REWARM_WATERMARK_VAL);

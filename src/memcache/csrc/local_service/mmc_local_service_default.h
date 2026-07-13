@@ -93,6 +93,8 @@ private:
     mmc_local_service_config_t options_;
     std::map<std::string, std::vector<MmcMemBlobDesc>> blobMap_;
     const int32_t blobRebuildSendMaxCount = 10240;
+
+    std::string ResolveBackendId();
     MmcThreadPoolPtr ubsioEventPool_;
 };
 

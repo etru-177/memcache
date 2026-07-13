@@ -42,6 +42,7 @@ option(BUILD_GIT_COMMIT_GEN_FILE "generate commit log file" ON)
 option(BUILD_PYTHON "build python file" ON)
 option(ENABLE_PTRACER "build ptracer" OFF)
 option(BUILD_CPP_EXAMPLE "Compile and package the c++ example." OFF)
+option(MMC_ENABLE_KV_EVENTS "build KV cache event publisher (uses 3rdparty msgpack-c + libzmq)" ON)
 option(BUILD_UBSIO "Enable/disable build and package ubs-io (SSD backend)" OFF)
 
 if (NOT CMAKE_BUILD_TYPE)
@@ -55,6 +56,7 @@ message(STATUS "BUILD_GIT_COMMIT = ${BUILD_GIT_COMMIT}")
 message(STATUS "BUILD_GIT_COMMIT_GEN_FILE = ${BUILD_GIT_COMMIT_GEN_FILE}")
 message(STATUS "BUILD_PYTHON = ${BUILD_PYTHON}")
 message(STATUS "ENABLE_PTRACER = ${ENABLE_PTRACER}")
+message(STATUS "MMC_ENABLE_KV_EVENTS = ${MMC_ENABLE_KV_EVENTS}")
 message(STATUS "CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
 find_program(NINJA_EXE NAMES ninja)
 if (NINJA_EXE)
@@ -107,6 +109,12 @@ endif ()
 
 if (ENABLE_CPU_MONOTONIC STREQUAL "ON")
     add_compile_options(-DENABLE_CPU_MONOTONIC)
+endif ()
+
+# 全局开启 KV 事件特性宏，保证库与测试等所有 TU 对 mmc_meta_service.h 的类布局一致（避免 ODR 不一致）。
+# MSGPACK_NO_BOOST 关闭 msgpack-cxx 对 boost 的依赖。
+if (MMC_ENABLE_KV_EVENTS)
+    add_compile_definitions(MMC_ENABLE_KV_EVENTS MSGPACK_NO_BOOST)
 endif ()
 
 # set log commit into compile definition

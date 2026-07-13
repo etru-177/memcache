@@ -820,6 +820,7 @@ Result MmcMetaManager::UpdateState(const std::string &key, const MmcLocation &lo
         return MMC_UNMATCHED_KEY;
     }
     MmcBlobFilterPtr filter = MmcMakeRef<MmcBlobFilter>(loc.rank_, loc.mediaType_, NONE);
+    std::vector<std::pair<uint32_t, uint16_t>> storedBlobs;
     {
         std::unique_lock<std::mutex> guard(metaObj->Mutex());
 
@@ -841,9 +842,22 @@ Result MmcMetaManager::UpdateState(const std::string &key, const MmcLocation &lo
                               << ", curState=" << static_cast<uint32_t>(blob->State())
                               << ", action=" << static_cast<uint32_t>(actRet) << ", ret=" << ret);
                 result = MMC_ERROR;
+                continue;
             } else if (actRet == MMC_READ_START) {
                 blob->NotifyReadable();
             }
+            if (actRet == MMC_WRITE_OK) {
+                std::lock_guard<std::mutex> cbLock(changeCallbacks_.mutex);
+                if (changeCallbacks_.stored) {
+                    storedBlobs.emplace_back(blob->Rank(), blob->Type());
+                }
+            }
+        }
+    }
+    for (const auto &b : storedBlobs) {
+        std::lock_guard<std::mutex> cbLock(changeCallbacks_.mutex);
+        if (changeCallbacks_.stored) {
+            changeCallbacks_.stored(key, b.first, b.second);
         }
     }
     MMC_LOG_DEBUG("UpdateState exit, key=" << key << ", loc=" << loc << ", action=" << static_cast<uint32_t>(actRet)
@@ -899,10 +913,28 @@ Result MmcMetaManager::UpdateBlobState(const uint64_t gva, const uint64_t size, 
 
     std::unique_lock<std::mutex> metaGuard(metaObj->Mutex());
     ret = blobPtr->UpdateState(key, opRankId, opSeq, actRet);
+    uint32_t storedRank = 0;
+    uint16_t storedMedia = 0;
+    bool emitStored = false;
+    if (ret == MMC_OK && actRet == MMC_WRITE_OK && blobPtr != nullptr) {
+        std::lock_guard<std::mutex> cbLock(changeCallbacks_.mutex);
+        if (changeCallbacks_.stored) {
+            storedRank = blobPtr->Rank();
+            storedMedia = blobPtr->Type();
+            emitStored = true;
+        }
+    }
     metaGuard.unlock(); // 必须释放锁，否则在 Remove 调用中会死锁
     if (ret != MMC_OK) {
         MMC_LOG_ERROR("failed to update gva:" << gva << ", size: " << size << ", key:" << key << " with " << actRet
                                               << ", ret:" << ret);
+    } else if (emitStored) {
+        {
+            std::lock_guard<std::mutex> cbLock(changeCallbacks_.mutex);
+            if (changeCallbacks_.stored) {
+                changeCallbacks_.stored(key, storedRank, storedMedia);
+            }
+        }
     }
 
     return ret;
@@ -919,6 +951,15 @@ void MmcMetaManager::PushRemoveList(const std::string &key, const MmcMemObjMetaP
             for (auto &blob : blobs) {
                 UnregisterGvaPendingWriteBlob(blob);
             }
+            {
+                std::lock_guard<std::mutex> cbLock(changeCallbacks_.mutex);
+                if (changeCallbacks_.removed) {
+                    for (const auto &blob : blobs) {
+                        changeCallbacks_.removed(keyL, blob->Rank(), blob->Type());
+                    }
+                }
+            }
+
             if (metaL->NumBlobs() == 0) {
                 metaContainer_->Erase(keyL);
             }
@@ -932,6 +973,14 @@ void MmcMetaManager::PushRemoveList(const std::string &key, const MmcMemObjMetaP
         blobs = meta->FreeBlobs(key, globalAllocator_, filter, true, triggerSsdPreFree);
         for (auto &blob : blobs) {
             UnregisterGvaPendingWriteBlob(blob);
+        }
+        {
+            std::lock_guard<std::mutex> cbLock(changeCallbacks_.mutex);
+            if (changeCallbacks_.removed) {
+                for (const auto &blob : blobs) {
+                    changeCallbacks_.removed(key, blob->Rank(), blob->Type());
+                }
+            }
         }
         if (meta->NumBlobs() == 0) {
             metaContainer_->Erase(key);
@@ -1209,12 +1258,30 @@ Result MmcMetaManager::Unmount(const MmcLocation &loc)
         std::unique_lock<std::mutex> guard(objMeta->Mutex());
         auto blobs = objMeta->FreeBlobs(key, globalAllocator_, filter, false, false);
         const bool shouldErase = (objMeta->NumBlobs() == 0);
+        std::vector<std::pair<uint32_t, uint16_t>> removedBlobs;
+        {
+            std::lock_guard<std::mutex> cbLock(changeCallbacks_.mutex);
+            if (changeCallbacks_.removed) {
+                removedBlobs.reserve(blobs.size());
+                for (const auto &blob : blobs) {
+                    if (blob != nullptr) {
+                        removedBlobs.emplace_back(blob->Rank(), blob->Type());
+                    }
+                }
+            }
+        }
         guard.unlock();
-
+        {
+            std::lock_guard<std::mutex> cbLock(changeCallbacks_.mutex);
+            if (changeCallbacks_.removed) {
+                for (const auto &removedBlob : removedBlobs) {
+                    changeCallbacks_.removed(key, removedBlob.first, removedBlob.second);
+                }
+            }
+        }
         for (auto &blob : blobs) {
             UnregisterGvaPendingWriteBlob(blob);
         }
-
         return shouldErase;
     };
 
@@ -1428,6 +1495,13 @@ Result MmcMetaManager::CopyBlobAlloc(const std::string &key, const MmcMemObjMeta
     outBlob = blobs[0];
     outDesc = blobs[0]->GetDesc();
     MMC_LOG_DEBUG("alloc ok, key=" << key << ", dstRank=" << outDesc.rank_ << ", size=" << outDesc.size_);
+
+    {
+        std::lock_guard<std::mutex> cbLock(changeCallbacks_.mutex);
+        if (changeCallbacks_.stored) {
+            changeCallbacks_.stored(key, outDesc.rank_, outDesc.mediaType_);
+        }
+    }
     return MMC_OK;
 }
 
@@ -1589,6 +1663,16 @@ Result MmcMetaManager::MoveBlob(const std::string &key, const MmcLocation &src, 
         guard.unlock();
         for (auto &blob : blobs) {
             UnregisterGvaPendingWriteBlob(blob);
+        }
+        {
+            std::lock_guard<std::mutex> cbLock(changeCallbacks_.mutex);
+            if (changeCallbacks_.removed) {
+                for (const auto &blob : blobs) {
+                    if (blob != nullptr) {
+                        changeCallbacks_.removed(key, blob->Rank(), blob->Type());
+                    }
+                }
+            }
         }
     }
     metaContainer_->InsertLru(key, dst.mediaType_);

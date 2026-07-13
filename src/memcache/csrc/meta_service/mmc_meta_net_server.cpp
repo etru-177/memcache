@@ -31,7 +31,7 @@ std::string Join(const std::vector<std::string> &vec)
     return result;
 }
 
-MetaNetServer::MetaNetServer(const MmcMetaServicePtr &metaService, const std::string inputName)
+MetaNetServer::MetaNetServer(MmcMetaServicePtr metaService, const std::string inputName)
     : metaService_(metaService), name_(inputName)
 {}
 MetaNetServer::~MetaNetServer() {}
@@ -43,7 +43,7 @@ Result ock::mmc::MetaNetServer::Start(NetEngineOptions &options)
         return MMC_OK;
     }
 
-    MMC_ASSERT_LOG_AND_RETURN(metaService_.Get() != nullptr, "metaService_.Get() is nullptr", MMC_INVALID_PARAM);
+    MMC_ASSERT_LOG_AND_RETURN(metaService_ != nullptr, "metaService_.Get() is nullptr", MMC_INVALID_PARAM);
 
     NetEnginePtr server = NetEngine::Create();
     MMC_ASSERT_LOG_AND_RETURN(server != nullptr, "server is nullptr", MMC_MALLOC_FAILED);
@@ -110,7 +110,7 @@ Result MetaNetServer::HandleBmRegister(const NetContextPtr &context)
     context->GetRequest<BmRegisterRequest>(req);
     TP_TRACE_BEGIN(TP_MMC_META_BM_REGISTER);
     auto result = metaService_->BmRegister(req.rank_, req.mediaType_, req.addr_, req.capacity_, req.blobList_,
-                                           req.storageEnabled_);
+                                           req.storageEnabled_, req.backendId_);
     TP_TRACE_END(TP_MMC_META_BM_REGISTER, result);
     MMC_LOG_INFO("HandleBmRegister rank: " << req.rank_ << ", storageEnabled: " << req.storageEnabled_
                                            << ", rebuild blob size: " << req.blobList_.size() << ", ret: " << result);

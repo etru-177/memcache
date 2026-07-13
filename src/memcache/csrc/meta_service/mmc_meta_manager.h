@@ -12,11 +12,14 @@
 #ifndef MEM_FABRIC_MMC_META_MANAGER_H
 #define MEM_FABRIC_MMC_META_MANAGER_H
 
+#include <cstdint>
 #include <functional>
-#include <thread>
 #include <list>
 #include <mutex>
 #include <atomic>
+#include <string>
+#include <thread>
+#include <utility>
 
 #include "mmc_global_allocator.h"
 #include "mmc_mem_obj_meta.h"
@@ -35,6 +38,14 @@ constexpr uint16_t DEFAULT_REWARM_HIGH_WATERMARK = 95U;
 constexpr uint16_t REWARM_WATERMARK_DELTA = 5U;
 constexpr uint16_t REWARM_WATERMARK_MIN = 10U;
 constexpr uint16_t REWARM_WATERMARK_MAX = 95U;
+
+struct MmcMetaChangeCallbacks {
+    using Callback = std::function<void(const std::string &key, uint32_t rank, uint16_t mediaType)>;
+
+    mutable std::mutex mutex;
+    Callback stored;
+    Callback removed;
+};
 
 struct MmcMemMetaDesc {
     uint16_t prot_{0};
@@ -328,6 +339,13 @@ public:
         metaNetServer_ = metaNetServer;
     }
 
+    void SetChangeCallbacks(const MmcMetaChangeCallbacks &callbacks)
+    {
+        std::lock_guard<std::mutex> lock(changeCallbacks_.mutex);
+        changeCallbacks_.stored = callbacks.stored;
+        changeCallbacks_.removed = callbacks.removed;
+    }
+
     // UBS IO metadata event handlers
     Result RemoveSsdBlob(const std::string &key, uint32_t rank);
 
@@ -454,6 +472,8 @@ private:
     MmcMetaExtConfig extConfig_;
     MetaNetServerPtr metaNetServer_;
     MmcThreadPoolPtr threadPool_;
+
+    MmcMetaChangeCallbacks changeCallbacks_;
     MmcThreadPoolPtr rewarmThreadPool_;
     std::unordered_set<uint32_t> ssdEnabledRanks_;
     mutable std::mutex ssdMutex_;

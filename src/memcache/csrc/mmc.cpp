@@ -51,6 +51,13 @@ mmc_meta_service_config_t create_default_meta_config()
     config.accTlsConfig.tlsEnable = false;
     config.configStoreTlsConfig.tlsEnable = false;
     config.metricsReportIntervalSeconds = 0U;
+    config.kvEvents.enable = false;
+    SafeCopy("", config.kvEvents.endpoint, sizeof(config.kvEvents.endpoint));
+    SafeCopy("", config.kvEvents.modelName, sizeof(config.kvEvents.modelName));
+    SafeCopy("default", config.kvEvents.tenantId, sizeof(config.kvEvents.tenantId));
+    config.kvEvents.blockSize = 0U;
+    config.kvEvents.queueCapacity = 65536U;
+    config.kvEvents.hashAsInt = true;
     return config;
 }
 
@@ -68,6 +75,9 @@ std::string meta_config_to_string(const mmc_meta_service_config_t &config)
     oss << "  log_rotation_file_count: " << config.logRotationFileCount << "\n";
     oss << "  evict_threshold_high: " << config.evictThresholdHigh << "\n";
     oss << "  evict_threshold_low: " << config.evictThresholdLow << "\n";
+    oss << "  kv_events_enable: " << (config.kvEvents.enable ? "true" : "false") << "\n";
+    oss << "  kv_events_endpoint: " << config.kvEvents.endpoint << "\n";
+    oss << "  kv_events_hash_as_int: " << (config.kvEvents.hashAsInt ? "true" : "false") << "\n";
     oss << "  lease_ttl_ms: " << config.leaseTtlMs << "\n";
     oss << "  tls_enable: " << (config.accTlsConfig.tlsEnable ? "true" : "false") << "\n";
     oss << "  tls_ca_path: " << config.accTlsConfig.caPath << "\n";
@@ -94,6 +104,7 @@ local_config create_default_local_config()
     local_config cfg{};
     SafeCopy("tcp://127.0.0.1:5000", cfg.meta_service_url, sizeof(cfg.meta_service_url));
     SafeCopy("tcp://127.0.0.1:6000", cfg.config_store_url, sizeof(cfg.config_store_url));
+    SafeCopy("", cfg.backend_id, sizeof(cfg.backend_id));
     SafeCopy("info", cfg.log_level, sizeof(cfg.log_level));
     cfg.world_size = 256UL;
     SafeCopy("host_rdma", cfg.protocol, sizeof(cfg.protocol));
@@ -120,6 +131,7 @@ std::string local_config_to_string(const local_config &config)
     oss << "LocalConfig {\n";
     oss << "  meta_service_url: " << config.meta_service_url << "\n";
     oss << "  config_store_url: " << config.config_store_url << "\n";
+    oss << "  backend_id: " << config.backend_id << "\n";
     oss << "  log_level: " << config.log_level << "\n";
     oss << "  world_size: " << config.world_size << "\n";
     oss << "  protocol: " << config.protocol << "\n";

@@ -76,6 +76,14 @@ void DefineMmcStructModule(py::module_ &m)
              Config store url.
          )pbdoc")
             .def_property(
+                "backend_id", [](const local_config &cfg) { return std::string(cfg.backend_id); },
+                [](local_config &cfg, const std::string &value) {
+                    SafeCopy(value, cfg.backend_id, sizeof(cfg.backend_id));
+                },
+                R"pbdoc(
+             Backend identity for kv_event, e.g. pod IP.
+         )pbdoc")
+            .def_property(
                 "log_level", [](const local_config &cfg) { return std::string(cfg.log_level); },
                 [](local_config &cfg, const std::string &value) {
                     SafeCopy(value, cfg.log_level, sizeof(cfg.log_level));
@@ -430,6 +438,61 @@ void DefineMmcStructModule(py::module_ &m)
             .def_readwrite("lease_ttl_ms", &mmc_meta_service_config_t::leaseTtlMs,
                            R"pbdoc(
                     Default read lease TTL in milliseconds.
+                )pbdoc")
+            .def_property(
+                "kv_events_enable", [](const mmc_meta_service_config_t &config) { return config.kvEvents.enable; },
+                [](mmc_meta_service_config_t &config, bool value) { config.kvEvents.enable = value; },
+                R"pbdoc(
+                    Enable KV cache event publisher (default false).
+                )pbdoc")
+            .def_property(
+                "kv_events_hash_as_int",
+                [](const mmc_meta_service_config_t &config) { return config.kvEvents.hashAsInt; },
+                [](mmc_meta_service_config_t &config, bool value) { config.kvEvents.hashAsInt = value; },
+                R"pbdoc(
+                    Emit seq/block hash as low-64-bit int (true, default; aligns vLLM
+                    VLLM_KV_EVENTS_USE_INT_BLOCK_HASHES) or full hex string (false).
+                )pbdoc")
+            .def_property(
+                "kv_events_endpoint",
+                [](const mmc_meta_service_config_t &config) { return std::string(config.kvEvents.endpoint); },
+                [](mmc_meta_service_config_t &config, const std::string &value) {
+                    SafeCopy(value, config.kvEvents.endpoint, sizeof(config.kvEvents.endpoint));
+                },
+                R"pbdoc(
+                    ZMQ PUB bind endpoint for KV events, e.g. tcp://0.0.0.0:5557.
+                )pbdoc")
+            .def_property(
+                "kv_events_model_name",
+                [](const mmc_meta_service_config_t &config) { return std::string(config.kvEvents.modelName); },
+                [](mmc_meta_service_config_t &config, const std::string &value) {
+                    SafeCopy(value, config.kvEvents.modelName, sizeof(config.kvEvents.modelName));
+                },
+                R"pbdoc(
+                    Model name tag for published KV events.
+                )pbdoc")
+            .def_property(
+                "kv_events_tenant_id",
+                [](const mmc_meta_service_config_t &config) { return std::string(config.kvEvents.tenantId); },
+                [](mmc_meta_service_config_t &config, const std::string &value) {
+                    SafeCopy(value, config.kvEvents.tenantId, sizeof(config.kvEvents.tenantId));
+                },
+                R"pbdoc(
+                    tenant_id for published KV events.
+                )pbdoc")
+            .def_property(
+                "kv_events_block_size",
+                [](const mmc_meta_service_config_t &config) { return config.kvEvents.blockSize; },
+                [](mmc_meta_service_config_t &config, uint32_t value) { config.kvEvents.blockSize = value; },
+                R"pbdoc(
+                    block_size for published KV events (0 = omit).
+                )pbdoc")
+            .def_property(
+                "kv_events_queue_capacity",
+                [](const mmc_meta_service_config_t &config) { return config.kvEvents.queueCapacity; },
+                [](mmc_meta_service_config_t &config, uint32_t value) { config.kvEvents.queueCapacity = value; },
+                R"pbdoc(
+                    Bounded queue capacity for async KV event publishing.
                 )pbdoc")
             .def_property(
                 "tls_enable", [](const mmc_meta_service_config_t &config) { return config.accTlsConfig.tlsEnable; },

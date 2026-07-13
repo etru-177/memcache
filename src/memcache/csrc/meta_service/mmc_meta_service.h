@@ -15,6 +15,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <utility>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -25,6 +26,7 @@
 #include "mmc_meta_mgr_proxy.h"
 #include "mmc_periodic_task.h"
 #include "smem_config_store.h"
+#include "kv_event/mmc_kv_event_runtime.h"
 
 namespace ock {
 namespace mmc {
@@ -38,7 +40,7 @@ public:
 
     Result BmRegister(uint32_t rank, std::vector<uint16_t> mediaType, std::vector<uint64_t> bm,
                       std::vector<uint64_t> capacity, std::vector<std::pair<std::string, MmcMemBlobDesc>> &blobList,
-                      bool storageEnabled = false);
+                      bool storageEnabled = false, const std::string &backendId = "");
 
     Result BmUnregister(uint32_t rank, uint16_t mediaType);
 
@@ -58,7 +60,13 @@ public:
 
     Result DeleteMetadata(const std::string &key);
 
+    void SetPublishActive(bool active);
+    bool KvEventsEnabled() const;
+    kv_event::KvEventStats GetKvEventStats() const;
+
 private:
+    void PublishClearedForRanks(const std::vector<uint32_t> &ranks);
+
     MetaNetServerPtr metaNetServer_;
     MmcMetaMgrProxyPtr metaMgrProxy_;
     MMCMetaBackUpMgrPtr metaBackUpMgrPtr_;
@@ -69,12 +77,17 @@ private:
     std::string name_;
     mmc_meta_service_config_t options_;
     std::unordered_map<uint32_t, std::unordered_set<uint16_t>> rankMediaTypeMap_;
+    std::mutex rankBackendIdMapLock_;
+    std::unordered_map<uint32_t, std::string> rankBackendIdMap_;
     std::unordered_map<std::string, std::string> metadata_;
     ock::smem::StorePtr confStore_ = nullptr;
+    MmcKvEventRuntime kvEvents_;
+    bool kvEventsPublishActive_{false};
 
     bool StartPeriodicTask(const std::string &taskName, uint32_t intervalSeconds, MmcPeriodicTask::Task task);
     void StopPeriodicTask();
     void StartMetricsReportTask();
+    std::string GetBackendIdForRank(uint32_t rank);
 };
 inline const std::string &MmcMetaService::Name() const
 {

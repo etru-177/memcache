@@ -68,6 +68,7 @@ public:
     std::string GetHaStatus() const;
     nlohmann::json BuildHealth(bool serviceReady) const;
     nlohmann::json BuildLeader() const;
+    nlohmann::json BuildKvEventsStatus() const;
 
     Result QueryKey(const std::string &key, nlohmann::json &result) const;
     Result BatchQueryKeys(const std::vector<std::string> &keys, nlohmann::json &result) const;

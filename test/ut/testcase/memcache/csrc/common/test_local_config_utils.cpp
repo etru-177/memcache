@@ -35,6 +35,7 @@ TEST_F(TestLocalConfigUtils, CreateDefaultLocalConfigReturnsExpectedDefaults)
     EXPECT_STREQ(config.config_path, "");
     EXPECT_STREQ(config.meta_service_url, "tcp://127.0.0.1:5000");
     EXPECT_STREQ(config.config_store_url, "tcp://127.0.0.1:6000");
+    EXPECT_STREQ(config.backend_id, "");
     EXPECT_STREQ(config.log_level, "info");
     EXPECT_EQ(config.world_size, 256u);
     EXPECT_STREQ(config.protocol, "host_rdma");
@@ -83,6 +84,8 @@ TEST_F(TestLocalConfigUtils, LocalConfigToStringReturnsExpectedFormat)
     SafeCopy("/tmp/local.conf", config.config_path, sizeof(config.config_path));
     SafeCopy("tcp://10.0.0.1:5000", config.meta_service_url, sizeof(config.meta_service_url));
     SafeCopy("tcp://10.0.0.2:6000", config.config_store_url, sizeof(config.config_store_url));
+    SafeCopy("10.0.0.99", config.backend_id, sizeof(config.backend_id));
+
     SafeCopy("debug", config.log_level, sizeof(config.log_level));
     config.world_size = 8UL;
     SafeCopy("device_rdma", config.protocol, sizeof(config.protocol));
@@ -124,6 +127,7 @@ TEST_F(TestLocalConfigUtils, LocalConfigToStringReturnsExpectedFormat)
     const std::string expected = "LocalConfig {\n"
                                  "  meta_service_url: tcp://10.0.0.1:5000\n"
                                  "  config_store_url: tcp://10.0.0.2:6000\n"
+                                 "  backend_id: 10.0.0.99\n"
                                  "  log_level: debug\n"
                                  "  world_size: 8\n"
                                  "  protocol: device_rdma\n"

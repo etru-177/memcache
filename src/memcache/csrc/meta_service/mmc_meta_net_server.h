@@ -19,7 +19,7 @@ namespace ock {
 namespace mmc {
 class MetaNetServer : public MmcReferable {
 public:
-    explicit MetaNetServer(const MmcMetaServicePtr &metaService, const std::string inputName = "");
+    explicit MetaNetServer(MmcMetaServicePtr metaService, const std::string inputName = "");
 
     ~MetaNetServer() override;
 

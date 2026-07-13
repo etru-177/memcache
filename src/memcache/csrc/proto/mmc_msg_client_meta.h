@@ -571,6 +571,7 @@ struct BatchUpdateResponse : MsgBase {
 
 struct BmRegisterRequest : MsgBase {
     uint32_t rank_{UINT32_MAX};
+    std::string backendId_{};
     std::vector<uint16_t> mediaType_{};
     std::vector<uint64_t> addr_{};
     std::vector<uint64_t> capacity_{};
@@ -585,6 +586,7 @@ struct BmRegisterRequest : MsgBase {
         packer.Serialize(msgId);
         packer.Serialize(destRankId);
         packer.Serialize(rank_);
+        packer.Serialize(backendId_);
         packer.Serialize(mediaType_);
         packer.Serialize(addr_);
         packer.Serialize(capacity_);
@@ -599,6 +601,7 @@ struct BmRegisterRequest : MsgBase {
         packer.Deserialize(msgId);
         packer.Deserialize(destRankId);
         packer.Deserialize(rank_);
+        packer.Deserialize(backendId_);
         packer.Deserialize(mediaType_);
         packer.Deserialize(addr_);
         packer.Deserialize(capacity_);

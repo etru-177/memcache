@@ -156,6 +156,14 @@ void MmcHttpServer::RegisterHealthCheckEndpoint()
         }
         ReplyJsonOk(res, restApiFacade_->BuildLeader());
     });
+
+    server_.Get("/kv_events/status", [this](const httplib::Request &, httplib::Response &res) {
+        if (restApiFacade_ == nullptr) {
+            ReplyJsonError200(res, kErrorInternalServer);
+            return;
+        }
+        ReplyJsonOk(res, restApiFacade_->BuildKvEventsStatus());
+    });
 }
 
 void MmcHttpServer::RegisterDataManagementEndpoints()

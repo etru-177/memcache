@@ -1549,3 +1549,88 @@ TIME                   NAME                                    BEGIN          GO
 | `success` | 请求是否成功；错误场景固定为 `false` | 全局统一错误返回规则 |
 | `error_message` | 实际错误原因；此处仅为格式示例 | 全局错误返回格式规则 |
 | `timestamp` | 错误返回格式中的时间戳字段 | 全局错误返回格式规则 |
+
+### 25 `GET /kv_events/status`
+
+#### 作用
+返回 KV Event Publisher 的运行状态和统计信息。
+
+#### curl
+
+```bash
+curl "http://127.0.0.1:8000/kv_events/status"
+```
+
+#### 请求参数
+
+无
+
+#### 成功示例
+
+`application/json; charset=utf-8`：
+
+```json
+{
+   "dropped_events":0,
+   "dropped_high_priority_events":0,
+   "dropped_stored_events":0,
+   "enabled":true,
+   "last_sequence":0,
+   "published_batches":0,
+   "published_by_medium":{
+      "dram":0,
+      "hbm":0,
+      "ssd":0,
+      "unknown":0
+   },
+   "published_by_type":{
+      "cleared":0,
+      "removed":0,
+      "stored":0
+   },
+   "published_events":0,
+   "publisher_active":true,
+   "queue_capacity":65536,
+   "queue_size":0,
+   "skipped_unparsed_keys":0
+}
+
+```
+
+**解释**
+
+| 字段 | 含义 | 来源 |
+|---|---|---|
+| `enabled` | KV Event 功能是否启用（配置 + 构建开关） | 运行时状态 |
+| `publisher_active` | 发布线程是否正常运行 | 实时状态 |
+| `published_batches` | 已发布的批次总数 | 累计统计 |
+| `published_events` | 已发布的事件总数 | 累计统计 |
+| `published_by_type` | 按事件类型（stored / removed / cleared）分组的发布统计 | 累计统计 |
+| `published_by_medium` | 按存储介质（hbm / dram / ssd / unknown）分组的发布统计 | 累计统计 |
+| `last_sequence` | 最后发布的 ZMQ 序列号 | 实时状态 |
+| `dropped_events` | 因队列满丢弃的事件总数 | 累计统计 |
+| `dropped_stored_events` | 丢弃的 stored 类型事件数 | 累计统计 |
+| `dropped_high_priority_events` | 丢弃的高优先级事件数（removed / cleared） | 累计统计 |
+| `skipped_unparsed_keys` | 无法解析为 hash 的 key 数量 | 累计统计 |
+| `queue_size` | 当前队列中的事件数量 | 实时状态 |
+| `queue_capacity` | 队列最大容量（配置值） | 配置参数 |
+
+#### 错误示例
+
+`application/json; charset=utf-8`：
+
+```json
+{
+  "success": false,
+  "error_message": "actual error reason",
+  "timestamp": 0
+}
+```
+
+**解释**
+
+| 字段 | 含义 | 来源 |
+|---|---|---|
+| `success` | 请求是否成功；错误场景固定为 `false` | 全局统一错误返回规则 |
+| `error_message` | 实际错误原因；此处仅为格式示例 | 全局错误返回格式规则 |
+| `timestamp` | 错误返回格式中的时间戳字段 | 全局错误返回格式规则 |

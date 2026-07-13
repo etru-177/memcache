@@ -13,12 +13,15 @@
 #include "mmc_meta_net_client.h"
 #include "mmc_msg_client_meta.h"
 #include "mmc_ptracer.h"
+#include "mmc_functions.h"
 
 namespace ock {
 namespace mmc {
 constexpr int TIMEOUT_THIRTY = 30;
 constexpr int CLIENT_THREAD_COUNT = 2;
+
 MmcLocalServiceDefault::~MmcLocalServiceDefault() {}
+
 Result MmcLocalServiceDefault::Start(const mmc_local_service_config_t &config)
 {
     MMC_LOG_INFO("Starting meta service " << name_);
@@ -184,6 +187,7 @@ Result MmcLocalServiceDefault::RegisterBm()
 
     BmRegisterRequest req;
     req.rank_ = options_.rankId;
+    req.backendId_ = ResolveBackendId();
     req.storageEnabled_ = options_.storageEnabled;
     for (MediaType type = MEDIA_HBM; type != MEDIA_NONE;) {
         uint64_t gva = bmProxyPtr_->GetGva(type);
@@ -421,6 +425,19 @@ Result MmcLocalServiceDefault::BlobDelete(const std::string &key, const MmcMemBl
     return MMC_OK;
 }
 
+std::string MmcLocalServiceDefault::ResolveBackendId()
+{
+    if (options_.backendId[0] != '\0') {
+        return std::string(options_.backendId);
+    }
+
+    std::string envBackendId = SafeGetEnv("MMC_LOCAL_SERVICE_BACKEND_ID");
+    if (envBackendId.empty()) {
+        MMC_LOG_WARN("backend_id is not set in config and MMC_LOCAL_SERVICE_BACKEND_ID is empty; "
+                     "backend_id will be emitted as empty string");
+    }
+    return envBackendId;
+}
 std::vector<Result> MmcLocalServiceDefault::BatchCopyBlob(const std::vector<std::string> &keys,
                                                           const std::vector<MmcMemBlobDesc> &srcBlobs,
                                                           const std::vector<MmcMemBlobDesc> &dstBlobs)
