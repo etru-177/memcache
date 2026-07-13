@@ -85,6 +85,7 @@ MemCache核心能力是提供大容量内存池和高性能的H2D、D2H、**D2RH
 - 安装使用：[whl安装和使用](./doc/install_whl.md)（适用于Python用户），[run编译、安装和使用](./doc/install_run.md)（适用于C++用户）
 - [配置文件](doc/memcache_config.md)：涉及MetaService、LocalService公共配置
 - [样例执行](./example/examples.md)：介绍如何端到端执行样例代码，包括C++和Python样例
+- [DevContainer 远端开发](./doc/devcontainer_quickstart.md)：VS Code Remote-SSH + DevContainer 一站式开发环境搭建与全量示例运行指南
 
 ## 📑学习教程
 
