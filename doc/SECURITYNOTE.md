@@ -5,10 +5,11 @@
 | Local/Client客户端 | 客户端通信IP地址 | 随机端口（由操作系统自动分配） | meta service    | meta_service_url中的\<ip\> | meta_service_url中的\<port\> , 默认值5000, 可配范围[1025, 65535] | TCP           | 用于元数据对象管理                | 是         | TLS  |
 | memory fabric实例 | 客户端通信IP地址 | 随机端口（由操作系统自动分配） | memory fabric实例 | config_store_url中的\<ip\> | config_store_url中的\<port\> , 默认值6000, 可配范围[1025, 65535] | TCP           | 用于memory fabric中BM信息交换同步 | 是         | TLS  |
 | 参与hcom通信的实例     | 客户端通信IP地址 | 随机端口（由操作系统自动分配） | 参与hcom通信的实例     | hcom_url中的\<ip\>         | hcom_url中的\<port\> , 默认值7000, 可配范围[1025, 65535]         | TCP/RDMA/SDMA | 用于hcom通信                 | 是         | TLS  |
-| 本机管理/监控客户端      | 127.0.0.1 | 随机端口（由操作系统自动分配） | meta service    | 127.0.0.1                | metrics_url中的\<port\> , 默认值8000, 可配范围[1025, 65535]      | HTTPS/HTTP    | 用于RESTful API管理与监控        | 是         | TLS(可选)/无认证 |
+| 管理/监控客户端        | 客户端通信IP地址 | 随机端口（由操作系统自动分配） | meta service    | metrics_url中的\<ip\>    | metrics_url中的\<port\> , 默认值8000, 可配范围[1025, 65535]      | HTTPS/HTTP    | 用于RESTful API管理与监控        | 是         | mTLS(可选，默认关闭)/无认证 |
 
 说明：
 支持通过配置文件配置TLS私钥、证书、口令等，进行TLS安全连接。
+支持对 metrics HTTP 服务独立配置 mTLS（双向认证），通过 `ock.mmc.metrics.tls.*` 配置项开启。
 建议用户开启TLS配置开关，并使用加密的方式保存私钥，保证通信安全。
 系统启动后，建议删除本地秘钥证书等信息敏感文件。
 支持通过环境变量 `ACCLINK_CHECK_PERIOD_HOURS`和`ACCLINK_CERT_CHECK_AHEAD_DAYS` 配置证书检查周期与证书过期预警时间。

@@ -51,6 +51,10 @@ private:
     static void RegisterSignal();
     static void SignalInterruptHandler(const int signal);
     static int InitLogger(const mmc_meta_service_config_t &options);
+    static acc::AccTlsOption BuildMetricsTlsOption(const mmc_meta_service_config_t &config);
+    int ValidateMetaServiceReady() const;
+    int ResolveAndValidateHttpUrl(std::string &host, uint16_t &port) const;
+    int CreateAndStartHttpServer(const std::string &host, uint16_t port);
     int StartHttpServer();
     void Exit();
 

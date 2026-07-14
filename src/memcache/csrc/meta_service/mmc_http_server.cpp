@@ -10,21 +10,16 @@
  * See the Mulan PSL v2 for more details.
  */
 
-#include <chrono>
 #include <ctime>
-#include <sstream>
 
 #include "nlohmann/json.hpp"
 
 #include "mmc_logger.h"
+#include "mf_tls_util.h"
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wstack-usage="
-#pragma GCC diagnostic ignored "-Wfloat-equal"
 #include "mmc_http_server.h"
-#pragma GCC diagnostic pop
 
-constexpr int HTTP_INIT_WAIT_MILLISECONDS = 100;
+constexpr uint32_t kHttpWorkerCount = 2;
 constexpr char kContentTypeJsonUtf8[] = "application/json; charset=utf-8";
 constexpr char kContentTypeTextUtf8[] = "text/plain; charset=utf-8";
 constexpr char kContentTypePrometheus[] = "text/plain; version=0.0.4";
@@ -50,33 +45,40 @@ std::string BuildMissingParameterMessage(const std::string &paramName)
     return "Missing '" + paramName + "' parameter";
 }
 
-void ReplyTextOk(httplib::Response &res, const std::string &body, const char *contentType = kContentTypeTextUtf8)
+std::string BodyToString(ock::acc::AccHttpRequestContext &ctx)
 {
-    res.status = httplib::OK_200;
-    res.set_content(body, contentType);
+    if (ctx.BodyPtr() != nullptr && ctx.BodyLen() > 0) {
+        return std::string(static_cast<const char *>(ctx.BodyPtr()), ctx.BodyLen());
+    }
+    return {};
 }
 
-void ReplyJsonOk(httplib::Response &res, const nlohmann::json &body)
+int ReplyTextOk(ock::acc::AccHttpRequestContext &ctx, const std::string &body,
+                const char *contentType = kContentTypeTextUtf8)
 {
-    res.status = httplib::OK_200;
-    res.set_content(body.dump(), kContentTypeJsonUtf8);
+    return ctx.Reply(ock::acc::AccHttpStatusCode::OK, contentType, body);
 }
 
-void ReplyJsonError200(httplib::Response &res, const std::string &message)
+int ReplyJsonOk(ock::acc::AccHttpRequestContext &ctx, const nlohmann::json &body)
+{
+    return ctx.Reply(ock::acc::AccHttpStatusCode::OK, kContentTypeJsonUtf8, body.dump());
+}
+
+int ReplyJsonError200(ock::acc::AccHttpRequestContext &ctx, const std::string &message)
 {
     nlohmann::json errorBody;
     errorBody["success"] = false;
     errorBody["error_message"] = message;
     errorBody["timestamp"] = CurrentTimestamp();
-    ReplyJsonOk(res, errorBody);
+    return ReplyJsonOk(ctx, errorBody);
 }
 
-bool GetRequiredParam(const httplib::Request &req, const std::string &paramName, std::string &value,
-                      httplib::Response &res)
+bool GetRequiredParam(ock::acc::AccHttpRequestContext &ctx, const std::string &paramName, std::string &value)
 {
-    const auto paramIt = req.params.find(paramName);
-    if (paramIt == req.params.end()) {
-        ReplyJsonError200(res, BuildMissingParameterMessage(paramName));
+    const auto params = ctx.Params();
+    const auto paramIt = params.find(paramName);
+    if (paramIt == params.end()) {
+        ReplyJsonError200(ctx, BuildMissingParameterMessage(paramName));
         return false;
     }
     value = paramIt->second;
@@ -125,196 +127,189 @@ void MmcHttpServer::RegisterUrls()
 
 void MmcHttpServer::RegisterHealthCheckEndpoint()
 {
-    server_.Get("/health", [this](const httplib::Request &, httplib::Response &res) {
+    auto healthHandler = [this](acc::AccHttpRequestContext &ctx) -> int32_t {
         if (restApiFacade_ == nullptr) {
-            ReplyJsonError200(res, kErrorInternalServer);
-            return;
+            return ReplyJsonError200(ctx, kErrorInternalServer);
         }
-        ReplyJsonOk(res, restApiFacade_->BuildHealth(IsRunning()));
-    });
+        return ReplyJsonOk(ctx, restApiFacade_->BuildHealth(IsRunning()));
+    };
+    server_->RegisterHttpHandler(acc::AccHttpMethod::GET, "/health", healthHandler);
 
-    server_.Get("/role", [this](const httplib::Request &, httplib::Response &res) {
+    auto roleHandler = [this](acc::AccHttpRequestContext &ctx) -> int32_t {
         if (restApiFacade_ == nullptr) {
-            ReplyJsonError200(res, kErrorInternalServer);
-            return;
+            return ReplyJsonError200(ctx, kErrorInternalServer);
         }
-        ReplyTextOk(res, restApiFacade_->GetRole());
-    });
+        return ReplyTextOk(ctx, restApiFacade_->GetRole());
+    };
+    server_->RegisterHttpHandler(acc::AccHttpMethod::GET, "/role", roleHandler);
 
-    server_.Get("/ha_status", [this](const httplib::Request &, httplib::Response &res) {
+    auto haStatusHandler = [this](acc::AccHttpRequestContext &ctx) -> int32_t {
         if (restApiFacade_ == nullptr) {
-            ReplyJsonError200(res, kErrorInternalServer);
-            return;
+            return ReplyJsonError200(ctx, kErrorInternalServer);
         }
-        ReplyTextOk(res, restApiFacade_->GetHaStatus());
-    });
+        return ReplyTextOk(ctx, restApiFacade_->GetHaStatus());
+    };
+    server_->RegisterHttpHandler(acc::AccHttpMethod::GET, "/ha_status", haStatusHandler);
 
-    server_.Get("/leader", [this](const httplib::Request &, httplib::Response &res) {
+    auto leaderHandler = [this](acc::AccHttpRequestContext &ctx) -> int32_t {
         if (restApiFacade_ == nullptr) {
-            ReplyJsonError200(res, kErrorInternalServer);
-            return;
+            return ReplyJsonError200(ctx, kErrorInternalServer);
         }
-        ReplyJsonOk(res, restApiFacade_->BuildLeader());
-    });
+        return ReplyJsonOk(ctx, restApiFacade_->BuildLeader());
+    };
+    server_->RegisterHttpHandler(acc::AccHttpMethod::GET, "/leader", leaderHandler);
 
-    server_.Get("/kv_events/status", [this](const httplib::Request &, httplib::Response &res) {
+    auto kvEventsHandler = [this](acc::AccHttpRequestContext &ctx) -> int32_t {
         if (restApiFacade_ == nullptr) {
-            ReplyJsonError200(res, kErrorInternalServer);
-            return;
+            return ReplyJsonError200(ctx, kErrorInternalServer);
         }
-        ReplyJsonOk(res, restApiFacade_->BuildKvEventsStatus());
-    });
+        return ReplyJsonOk(ctx, restApiFacade_->BuildKvEventsStatus());
+    };
+    server_->RegisterHttpHandler(acc::AccHttpMethod::GET, "/kv_events/status", kvEventsHandler);
 }
 
 void MmcHttpServer::RegisterDataManagementEndpoints()
 {
-    server_.Get("/metadata", [this](const httplib::Request &req, httplib::Response &res) {
+    server_->RegisterHttpHandler(
+        acc::AccHttpMethod::GET, "/metadata", [this](acc::AccHttpRequestContext &ctx) -> int32_t {
+            if (restApiFacade_ == nullptr) {
+                return ReplyJsonError200(ctx, kErrorInternalServer);
+            }
+
+            std::string key;
+            if (!GetRequiredParam(ctx, "key", key)) {
+                return acc::ACC_OK;
+            }
+
+            std::string value;
+            const Result ret = restApiFacade_->GetMetadata(key, value);
+            if (ret != MMC_OK) {
+                const std::string message =
+                    ret == ock::smem::StoreErrorCode::NOT_EXIST ? kErrorMetadataNotFound : kErrorInternalServer;
+                return ReplyJsonError200(ctx, message);
+            }
+            return ReplyTextOk(ctx, value);
+        });
+
+    auto putMetadataHandler = [this](acc::AccHttpRequestContext &ctx) -> int32_t {
         if (restApiFacade_ == nullptr) {
-            ReplyJsonError200(res, kErrorInternalServer);
-            return;
+            return ReplyJsonError200(ctx, kErrorInternalServer);
         }
 
         std::string key;
-        if (!GetRequiredParam(req, "key", key, res)) {
-            return;
+        if (!GetRequiredParam(ctx, "key", key)) {
+            return acc::ACC_OK;
         }
 
-        std::string value;
-        const Result ret = restApiFacade_->GetMetadata(key, value);
+        const std::string body = BodyToString(ctx);
+        const Result ret = restApiFacade_->PutMetadata(key, body);
         if (ret != MMC_OK) {
-            const std::string message =
-                ret == ock::smem::StoreErrorCode::NOT_EXIST ? kErrorMetadataNotFound : kErrorInternalServer;
-            ReplyJsonError200(res, message);
-            return;
+            return ReplyJsonError200(ctx, kErrorInternalServer);
         }
-        ReplyTextOk(res, value);
-    });
+        return ReplyTextOk(ctx, kMetadataUpdatedText);
+    };
+    server_->RegisterHttpHandler(acc::AccHttpMethod::PUT, "/metadata", putMetadataHandler);
 
-    server_.Put("/metadata", [this](const httplib::Request &req, httplib::Response &res) {
+    server_->RegisterHttpHandler(
+        acc::AccHttpMethod::DELETE, "/metadata", [this](acc::AccHttpRequestContext &ctx) -> int32_t {
+            if (restApiFacade_ == nullptr) {
+                return ReplyJsonError200(ctx, kErrorInternalServer);
+            }
+
+            std::string key;
+            if (!GetRequiredParam(ctx, "key", key)) {
+                return acc::ACC_OK;
+            }
+
+            const Result ret = restApiFacade_->DeleteMetadata(key);
+            if (ret != MMC_OK) {
+                const std::string message =
+                    ret == ock::smem::StoreErrorCode::NOT_EXIST ? kErrorMetadataNotFound : kErrorInternalServer;
+                return ReplyJsonError200(ctx, message);
+            }
+            return ReplyTextOk(ctx, kMetadataDeletedText);
+        });
+
+    server_->RegisterHttpHandler(
+        acc::AccHttpMethod::DELETE, "/key", [this](acc::AccHttpRequestContext &ctx) -> int32_t {
+            if (restApiFacade_ == nullptr) {
+                return ReplyJsonError200(ctx, kErrorInternalServer);
+            }
+
+            std::string key;
+            if (!GetRequiredParam(ctx, "key", key)) {
+                return acc::ACC_OK;
+            }
+
+            const Result ret = restApiFacade_->RemoveKey(key);
+            if (ret != MMC_OK) {
+                const std::string message = ret == MMC_UNMATCHED_KEY ? kErrorKeyNotFound : kErrorInternalServer;
+                return ReplyJsonError200(ctx, message);
+            }
+            nlohmann::json body;
+            body["success"] = true;
+            body["message"] = K_KEY_DELETED_TEXT;
+            return ReplyJsonOk(ctx, body);
+        });
+
+    auto removeAllKeysHandler = [this](acc::AccHttpRequestContext &ctx) -> int32_t {
         if (restApiFacade_ == nullptr) {
-            ReplyJsonError200(res, kErrorInternalServer);
-            return;
-        }
-
-        std::string key;
-        if (!GetRequiredParam(req, "key", key, res)) {
-            return;
-        }
-
-        const Result ret = restApiFacade_->PutMetadata(key, req.body);
-        if (ret != MMC_OK) {
-            ReplyJsonError200(res, kErrorInternalServer);
-            return;
-        }
-        ReplyTextOk(res, kMetadataUpdatedText);
-    });
-
-    server_.Delete("/metadata", [this](const httplib::Request &req, httplib::Response &res) {
-        if (restApiFacade_ == nullptr) {
-            ReplyJsonError200(res, kErrorInternalServer);
-            return;
-        }
-
-        std::string key;
-        if (!GetRequiredParam(req, "key", key, res)) {
-            return;
-        }
-
-        const Result ret = restApiFacade_->DeleteMetadata(key);
-        if (ret != MMC_OK) {
-            const std::string message =
-                ret == ock::smem::StoreErrorCode::NOT_EXIST ? kErrorMetadataNotFound : kErrorInternalServer;
-            ReplyJsonError200(res, message);
-            return;
-        }
-        ReplyTextOk(res, kMetadataDeletedText);
-    });
-
-    server_.Delete("/key", [this](const httplib::Request &req, httplib::Response &res) {
-        if (restApiFacade_ == nullptr) {
-            ReplyJsonError200(res, kErrorInternalServer);
-            return;
-        }
-
-        std::string key;
-        if (!GetRequiredParam(req, "key", key, res)) {
-            return;
-        }
-
-        const Result ret = restApiFacade_->RemoveKey(key);
-        if (ret != MMC_OK) {
-            const std::string message = ret == MMC_UNMATCHED_KEY ? kErrorKeyNotFound : kErrorInternalServer;
-            ReplyJsonError200(res, message);
-            return;
-        }
-        nlohmann::json body;
-        body["success"] = true;
-        body["message"] = K_KEY_DELETED_TEXT;
-        ReplyJsonOk(res, body);
-    });
-
-    server_.Delete("/all_keys", [this](const httplib::Request &, httplib::Response &res) {
-        if (restApiFacade_ == nullptr) {
-            ReplyJsonError200(res, kErrorInternalServer);
-            return;
+            return ReplyJsonError200(ctx, kErrorInternalServer);
         }
 
         const Result ret = restApiFacade_->RemoveAllKeys();
         if (ret != MMC_OK) {
-            ReplyJsonError200(res, kErrorInternalServer);
-            return;
+            return ReplyJsonError200(ctx, kErrorInternalServer);
         }
         nlohmann::json body;
         body["success"] = true;
         body["message"] = K_ALL_KEYS_DELETED_TEXT;
-        ReplyJsonOk(res, body);
-    });
+        return ReplyJsonOk(ctx, body);
+    };
+    server_->RegisterHttpHandler(acc::AccHttpMethod::DELETE, "/all_keys", removeAllKeysHandler);
 
-    server_.Get("/get_all_keys", [this](const httplib::Request &, httplib::Response &res) {
+    auto getAllKeysHandler = [this](acc::AccHttpRequestContext &ctx) -> int32_t {
         if (restApiFacade_ == nullptr) {
-            ReplyJsonError200(res, kErrorInternalServer);
-            return;
+            return ReplyJsonError200(ctx, kErrorInternalServer);
         }
 
         std::string result;
         const Result ret = restApiFacade_->GetAllKeysText(result);
         if (ret != MMC_OK) {
-            ReplyJsonError200(res, kErrorInternalServer);
-            return;
+            return ReplyJsonError200(ctx, kErrorInternalServer);
         }
-        ReplyTextOk(res, result);
-    });
+        return ReplyTextOk(ctx, result);
+    };
+    server_->RegisterHttpHandler(acc::AccHttpMethod::GET, "/get_all_keys", getAllKeysHandler);
 
-    server_.Get("/query_key", [this](const httplib::Request &req, httplib::Response &res) {
+    server_->RegisterHttpHandler(
+        acc::AccHttpMethod::GET, "/query_key", [this](acc::AccHttpRequestContext &ctx) -> int32_t {
+            if (restApiFacade_ == nullptr) {
+                return ReplyJsonError200(ctx, kErrorInternalServer);
+            }
+
+            std::string key;
+            if (!GetRequiredParam(ctx, "key", key)) {
+                return acc::ACC_OK;
+            }
+
+            nlohmann::json result;
+            const Result ret = restApiFacade_->QueryKey(key, result);
+            if (ret != MMC_OK) {
+                const std::string message = ret == MMC_UNMATCHED_KEY ? kErrorKeyNotFound : kErrorInternalServer;
+                return ReplyJsonError200(ctx, message);
+            }
+            return ReplyJsonOk(ctx, result);
+        });
+
+    auto batchQueryKeysHandler = [this](acc::AccHttpRequestContext &ctx) -> int32_t {
         if (restApiFacade_ == nullptr) {
-            ReplyJsonError200(res, kErrorInternalServer);
-            return;
-        }
-
-        std::string key;
-        if (!GetRequiredParam(req, "key", key, res)) {
-            return;
-        }
-
-        nlohmann::json result;
-        const Result ret = restApiFacade_->QueryKey(key, result);
-        if (ret != MMC_OK) {
-            const std::string message = ret == MMC_UNMATCHED_KEY ? kErrorKeyNotFound : kErrorInternalServer;
-            ReplyJsonError200(res, message);
-            return;
-        }
-        ReplyJsonOk(res, result);
-    });
-
-    server_.Get("/batch_query_keys", [this](const httplib::Request &req, httplib::Response &res) {
-        if (restApiFacade_ == nullptr) {
-            ReplyJsonError200(res, kErrorInternalServer);
-            return;
+            return ReplyJsonError200(ctx, kErrorInternalServer);
         }
 
         std::string keyString;
-        if (!GetRequiredParam(req, "keys", keyString, res)) {
-            return;
+        if (!GetRequiredParam(ctx, "keys", keyString)) {
+            return acc::ACC_OK;
         }
 
         std::vector<std::string> keys;
@@ -322,174 +317,167 @@ void MmcHttpServer::RegisterDataManagementEndpoints()
         nlohmann::json result;
         const Result ret = restApiFacade_->BatchQueryKeys(keys, result);
         if (ret != MMC_OK) {
-            ReplyJsonError200(res, kErrorInternalServer);
-            return;
+            return ReplyJsonError200(ctx, kErrorInternalServer);
         }
-        ReplyJsonOk(res, result);
-    });
+        return ReplyJsonOk(ctx, result);
+    };
+    server_->RegisterHttpHandler(acc::AccHttpMethod::GET, "/batch_query_keys", batchQueryKeysHandler);
 }
 
 void MmcHttpServer::RegisterSegmentManagementEndpoints()
 {
-    server_.Get("/get_all_segments", [this](const httplib::Request &, httplib::Response &res) {
+    auto getAllSegmentsHandler = [this](acc::AccHttpRequestContext &ctx) -> int32_t {
         if (restApiFacade_ == nullptr) {
-            ReplyJsonError200(res, kErrorInternalServer);
-            return;
+            return ReplyJsonError200(ctx, kErrorInternalServer);
         }
 
         std::string result;
         const Result ret = restApiFacade_->GetAllSegmentsText(result);
         if (ret != MMC_OK) {
-            ReplyJsonError200(res, kErrorInternalServer);
-            return;
+            return ReplyJsonError200(ctx, kErrorInternalServer);
         }
-        ReplyTextOk(res, result);
-    });
+        return ReplyTextOk(ctx, result);
+    };
+    server_->RegisterHttpHandler(acc::AccHttpMethod::GET, "/get_all_segments", getAllSegmentsHandler);
 
-    server_.Get("/query_segment", [this](const httplib::Request &req, httplib::Response &res) {
+    auto querySegmentHandler = [this](acc::AccHttpRequestContext &ctx) -> int32_t {
         if (restApiFacade_ == nullptr) {
-            ReplyJsonError200(res, kErrorInternalServer);
-            return;
+            return ReplyJsonError200(ctx, kErrorInternalServer);
         }
 
         std::string segmentId;
-        if (!GetRequiredParam(req, "segment", segmentId, res)) {
-            return;
+        if (!GetRequiredParam(ctx, "segment", segmentId)) {
+            return acc::ACC_OK;
         }
 
         RestSegmentSnapshot segment;
         const Result ret = restApiFacade_->QuerySegment(segmentId, segment);
         if (ret != MMC_OK) {
             const std::string message = ret == MMC_UNMATCHED_KEY ? kErrorSegmentNotFound : kErrorInternalServer;
-            ReplyJsonError200(res, message);
-            return;
+            return ReplyJsonError200(ctx, message);
         }
-        ReplyJsonOk(res, restApiFacade_->BuildSegment(segment));
-    });
+        return ReplyJsonOk(ctx, restApiFacade_->BuildSegment(segment));
+    };
+    server_->RegisterHttpHandler(acc::AccHttpMethod::GET, "/query_segment", querySegmentHandler);
 
-    server_.Get("/api/v1/segments/status", [this](const httplib::Request &req, httplib::Response &res) {
+    auto segmentStatusHandler = [this](acc::AccHttpRequestContext &ctx) -> int32_t {
         if (restApiFacade_ == nullptr) {
-            ReplyJsonError200(res, kErrorInternalServer);
-            return;
+            return ReplyJsonError200(ctx, kErrorInternalServer);
         }
 
         std::string segmentId;
-        if (!GetRequiredParam(req, "segment", segmentId, res)) {
-            return;
+        if (!GetRequiredParam(ctx, "segment", segmentId)) {
+            return acc::ACC_OK;
         }
 
         nlohmann::json result;
         const Result ret = restApiFacade_->BuildSegmentStatus(segmentId, result);
         if (ret != MMC_OK) {
             const std::string message = ret == MMC_UNMATCHED_KEY ? kErrorSegmentNotFound : kErrorInternalServer;
-            ReplyJsonError200(res, message);
-            return;
+            return ReplyJsonError200(ctx, message);
         }
-        ReplyJsonOk(res, result);
-    });
+        return ReplyJsonOk(ctx, result);
+    };
+    server_->RegisterHttpHandler(acc::AccHttpMethod::GET, "/api/v1/segments/status", segmentStatusHandler);
 
-    server_.Get("/api/v1/capacity/usage", [this](const httplib::Request &, httplib::Response &res) {
+    auto capacityUsageHandler = [this](acc::AccHttpRequestContext &ctx) -> int32_t {
         if (restApiFacade_ == nullptr) {
-            ReplyJsonError200(res, kErrorInternalServer);
-            return;
+            return ReplyJsonError200(ctx, kErrorInternalServer);
         }
 
         nlohmann::json result;
         const Result ret = restApiFacade_->BuildCapacityUsage(result);
         if (ret != MMC_OK) {
-            ReplyJsonError200(res, kErrorInternalServer);
-            return;
+            return ReplyJsonError200(ctx, kErrorInternalServer);
         }
-        ReplyJsonOk(res, result);
-    });
+        return ReplyJsonOk(ctx, result);
+    };
+    server_->RegisterHttpHandler(acc::AccHttpMethod::GET, "/api/v1/capacity/usage", capacityUsageHandler);
 
-    server_.Get("/api/v1/capacity/segment_remaining", [this](const httplib::Request &, httplib::Response &res) {
+    auto segmentRemainingHandler = [this](acc::AccHttpRequestContext &ctx) -> int32_t {
         if (restApiFacade_ == nullptr) {
-            ReplyJsonError200(res, kErrorInternalServer);
-            return;
+            return ReplyJsonError200(ctx, kErrorInternalServer);
         }
 
         nlohmann::json result;
         const Result ret = restApiFacade_->BuildSegmentRemaining(result);
         if (ret != MMC_OK) {
-            ReplyJsonError200(res, kErrorInternalServer);
-            return;
+            return ReplyJsonError200(ctx, kErrorInternalServer);
         }
-        ReplyJsonOk(res, result);
-    });
+        return ReplyJsonOk(ctx, result);
+    };
+    server_->RegisterHttpHandler(acc::AccHttpMethod::GET, "/api/v1/capacity/segment_remaining",
+                                 segmentRemainingHandler);
 }
 
 void MmcHttpServer::RegisterDrainJobEndpoints()
 {
-    auto notSupportedHandler = [](const httplib::Request &, httplib::Response &res) {
-        ReplyJsonError200(res, kErrorNotSupported);
+    auto notSupportedHandler = [](acc::AccHttpRequestContext &ctx) -> int32_t {
+        return ReplyJsonError200(ctx, kErrorNotSupported);
     };
-    server_.Post("/api/v1/drain_jobs", notSupportedHandler);
-    server_.Get("/api/v1/drain_jobs/query", notSupportedHandler);
-    server_.Post("/api/v1/drain_jobs/cancel", notSupportedHandler);
+    server_->RegisterHttpHandler(acc::AccHttpMethod::POST, "/api/v1/drain_jobs", notSupportedHandler);
+    server_->RegisterHttpHandler(acc::AccHttpMethod::GET, "/api/v1/drain_jobs/query", notSupportedHandler);
+    server_->RegisterHttpHandler(acc::AccHttpMethod::POST, "/api/v1/drain_jobs/cancel", notSupportedHandler);
 }
 
 void MmcHttpServer::RegisterMetricsEndpoint()
 {
-    server_.Get("/metrics", [this](const httplib::Request &, httplib::Response &res) {
+    auto metricsHandler = [this](acc::AccHttpRequestContext &ctx) -> int32_t {
         if (restApiFacade_ == nullptr) {
-            ReplyJsonError200(res, kErrorInternalServer);
-            return;
+            return ReplyJsonError200(ctx, kErrorInternalServer);
         }
 
         std::string result;
         const Result ret = restApiFacade_->BuildPrometheusMetrics(IsRunning(), result);
         if (ret != MMC_OK) {
-            ReplyJsonError200(res, kErrorInternalServer);
-            return;
+            return ReplyJsonError200(ctx, kErrorInternalServer);
         }
-        ReplyTextOk(res, result, kContentTypePrometheus);
-    });
+        return ReplyTextOk(ctx, result, kContentTypePrometheus);
+    };
+    server_->RegisterHttpHandler(acc::AccHttpMethod::GET, "/metrics", metricsHandler);
 
-    server_.Get("/metrics/summary", [this](const httplib::Request &, httplib::Response &res) {
+    auto metricsSummaryHandler = [this](acc::AccHttpRequestContext &ctx) -> int32_t {
         if (restApiFacade_ == nullptr) {
-            ReplyJsonError200(res, kErrorInternalServer);
-            return;
+            return ReplyJsonError200(ctx, kErrorInternalServer);
         }
 
         std::string result;
         const Result ret = restApiFacade_->BuildMetricsSummary(IsRunning(), result);
         if (ret != MMC_OK) {
-            ReplyJsonError200(res, kErrorInternalServer);
-            return;
+            return ReplyJsonError200(ctx, kErrorInternalServer);
         }
-        ReplyTextOk(res, result);
-    });
+        return ReplyTextOk(ctx, result);
+    };
+    server_->RegisterHttpHandler(acc::AccHttpMethod::GET, "/metrics/summary", metricsSummaryHandler);
 
-    server_.Get("/metrics/ptracer", [this](const httplib::Request &, httplib::Response &res) {
+    auto ptracerHandler = [this](acc::AccHttpRequestContext &ctx) -> int32_t {
         if (restApiFacade_ == nullptr) {
-            ReplyJsonError200(res, kErrorInternalServer);
-            return;
+            return ReplyJsonError200(ctx, kErrorInternalServer);
         }
 
         std::string result;
         const Result ret = restApiFacade_->GetPtracerText(result);
         if (ret != MMC_OK) {
-            ReplyJsonError200(res, kErrorInternalServer);
-            return;
+            return ReplyJsonError200(ctx, kErrorInternalServer);
         }
-        ReplyTextOk(res, result);
-    });
+        return ReplyTextOk(ctx, result);
+    };
+    server_->RegisterHttpHandler(acc::AccHttpMethod::GET, "/metrics/ptracer", ptracerHandler);
 
-    server_.Get("/api/v1/analysis/alloc_free_latency", [this](const httplib::Request &, httplib::Response &res) {
+    auto allocFreeLatencyHandler = [this](acc::AccHttpRequestContext &ctx) -> int32_t {
         if (restApiFacade_ == nullptr) {
-            ReplyJsonError200(res, kErrorInternalServer);
-            return;
+            return ReplyJsonError200(ctx, kErrorInternalServer);
         }
 
         std::string result;
         const Result ret = restApiFacade_->GetAllocFreeLatencyText(result);
         if (ret != MMC_OK) {
-            ReplyJsonError200(res, kErrorInternalServer);
-            return;
+            return ReplyJsonError200(ctx, kErrorInternalServer);
         }
-        ReplyTextOk(res, result);
-    });
+        return ReplyTextOk(ctx, result);
+    };
+    server_->RegisterHttpHandler(acc::AccHttpMethod::GET, "/api/v1/analysis/alloc_free_latency",
+                                 allocFreeLatencyHandler);
 }
 
 bool MmcHttpServer::Start()
@@ -498,12 +486,61 @@ bool MmcHttpServer::Start()
         return true;
     }
 
-    serverThread_ = std::thread([this]() { server_.listen(host_, port_); });
+    if (server_ == nullptr) {
+        MMC_LOG_ERROR("HTTP server is null");
+        return false;
+    }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(HTTP_INIT_WAIT_MILLISECONDS));
+    server_->RegisterLinkBrokenHandler([](const acc::AccTcpLinkComplexPtr &) -> int32_t { return acc::ACC_OK; });
+
+    if (!SetupTls()) {
+        return false;
+    }
+
+    acc::AccHttpServerOptions opts;
+    opts.enableListener = true;
+    opts.listenIp = host_;
+    opts.listenPort = port_;
+    opts.workerCount = kHttpWorkerCount;
+
+    const auto ret = server_->Start(opts, tlsOption_);
+    if (ret != acc::ACC_OK) {
+        MMC_LOG_ERROR("Failed to start HTTP server on " << host_ << ":" << port_);
+        return false;
+    }
+
     running_ = true;
     MMC_LOG_INFO("HTTP server started on " << host_ << ":" << port_);
+    return true;
+}
 
+bool MmcHttpServer::SetupTls()
+{
+    if (!tlsOption_.enableTls) {
+        return true;
+    }
+    if (sslLibPath_.empty()) {
+        MMC_LOG_ERROR("sslLibPath is empty when TLS is enabled");
+        return false;
+    }
+    const auto loadRet = server_->LoadDynamicLib(sslLibPath_);
+    if (loadRet != acc::ACC_OK) {
+        MMC_LOG_ERROR("Failed to load openssl dynamic library from " << sslLibPath_);
+        return false;
+    }
+    if (!tlsOption_.tlsPkPwd.empty()) {
+        if (decrypterLibPath_.empty()) {
+            MMC_LOG_WARN("No decrypter provided, using default decrypter handler");
+            server_->RegisterDecryptHandler(mf::MfTlsUtil::DefaultDecrypter);
+        } else {
+            const auto decrypter = mf::MfTlsUtil::LoadDecryptFunction(decrypterLibPath_.c_str());
+            if (decrypter == nullptr) {
+                MMC_LOG_ERROR("Failed to load customized decrypt function from " << decrypterLibPath_);
+                return false;
+            }
+            server_->RegisterDecryptHandler(decrypter);
+        }
+    }
     return true;
 }
 
@@ -513,10 +550,7 @@ void MmcHttpServer::Stop()
         return;
     }
 
-    server_.stop();
-    if (serverThread_.joinable()) {
-        serverThread_.join();
-    }
+    server_->Stop();
     running_ = false;
     MMC_LOG_INFO("HTTP server stopped");
 }

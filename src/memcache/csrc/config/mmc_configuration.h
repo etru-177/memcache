@@ -107,6 +107,7 @@ public:
     void GetAccTlsConfig(mmc_tls_config &tlsConfig);
     void GetHcomTlsConfig(mmc_tls_config &tlsConfig);
     void GetConfigStoreTlsConfig(mmc_tls_config &tlsConfig);
+    void GetMetricsTlsConfig(mmc_tls_config &tlsConfig);
 
     static int ValidateTLSConfig(const mmc_tls_config &tlsConfig);
 
@@ -239,6 +240,21 @@ public:
         AddIntConf(OCK_MMC_KV_EVENTS_QUEUE_CAPACITY, VNoCheck::Create(), 0);
         AddBoolConf(OCK_MMC_KV_EVENTS_HASH_AS_INT, VStrEnum::Create(OCK_MMC_KV_EVENTS_HASH_AS_INT.first, BOOL_ENUM_STR),
                     0);
+        AddBoolConf(OCK_MMC_METRICS_TLS_ENABLE, VStrEnum::Create(OCK_MMC_METRICS_TLS_ENABLE.first, BOOL_ENUM_STR), 0);
+        AddStrConf(OCK_MMC_METRICS_TLS_CA_PATH, VStrLength::Create(OCK_MMC_METRICS_TLS_CA_PATH.first, TLS_PATH_MAX_LEN),
+                   0);
+        AddStrConf(OCK_MMC_METRICS_TLS_CRL_PATH,
+                   VStrLength::Create(OCK_MMC_METRICS_TLS_CRL_PATH.first, TLS_PATH_MAX_LEN), 0);
+        AddStrConf(OCK_MMC_METRICS_TLS_CERT_PATH,
+                   VStrLength::Create(OCK_MMC_METRICS_TLS_CERT_PATH.first, TLS_PATH_MAX_LEN), 0);
+        AddStrConf(OCK_MMC_METRICS_TLS_KEY_PATH,
+                   VStrLength::Create(OCK_MMC_METRICS_TLS_KEY_PATH.first, TLS_PATH_MAX_LEN), 0);
+        AddStrConf(OCK_MMC_METRICS_TLS_KEY_PASS_PATH,
+                   VStrLength::Create(OCK_MMC_METRICS_TLS_KEY_PASS_PATH.first, TLS_PATH_MAX_LEN), 0);
+        AddStrConf(OCK_MMC_METRICS_TLS_PACKAGE_PATH,
+                   VStrLength::Create(OCK_MMC_METRICS_TLS_PACKAGE_PATH.first, TLS_PATH_MAX_LEN), 0);
+        AddStrConf(OCK_MMC_METRICS_TLS_DECRYPTER_PATH,
+                   VStrLength::Create(OCK_MMC_METRICS_TLS_DECRYPTER_PATH.first, TLS_PATH_MAX_LEN), 0);
     }
 
     void GetMetaServiceConfig(mmc_meta_service_config_t &config)
@@ -273,6 +289,7 @@ public:
         config.kvEvents.blockSize = static_cast<uint32_t>(GetInt(ConfConstant::OCK_MMC_KV_EVENTS_BLOCK_SIZE));
         config.kvEvents.queueCapacity = static_cast<uint32_t>(GetInt(ConfConstant::OCK_MMC_KV_EVENTS_QUEUE_CAPACITY));
         config.kvEvents.hashAsInt = GetBool(ConfConstant::OCK_MMC_KV_EVENTS_HASH_AS_INT);
+        GetMetricsTlsConfig(config.metricsTlsConfig);
     }
 };
 

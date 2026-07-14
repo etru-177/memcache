@@ -13,20 +13,29 @@
 #ifndef MEM_HTTP_SERVER_H
 #define MEM_HTTP_SERVER_H
 
-#include <thread>
 #include <atomic>
 
-#include "httplib.h"
+#include "acc_http_server.h"
+#include "acc_http_request_context.h"
 
 #include "mmc_rest_api_facade.h"
 
 namespace ock {
 namespace mmc {
 
+struct MmcHttpServerTlsConfig {
+    acc::AccTlsOption tlsOption;
+    std::string sslLibPath;
+    std::string decrypterLibPath;
+};
+
 class MmcHttpServer {
 public:
-    MmcHttpServer(const std::string &host, const uint16_t port, const MmcRestApiFacadePtr &restApiFacade)
-        : host_(host), port_(port), restApiFacade_(restApiFacade)
+    MmcHttpServer(const std::string &host, const uint16_t port, const MmcRestApiFacadePtr &restApiFacade,
+                  const MmcHttpServerTlsConfig &tlsConfig = {})
+        : host_(host), port_(port), restApiFacade_(restApiFacade), server_(acc::AccHttpServer::Create()),
+          tlsOption_(tlsConfig.tlsOption), sslLibPath_(tlsConfig.sslLibPath),
+          decrypterLibPath_(tlsConfig.decrypterLibPath)
     {
         RegisterUrls();
     }
@@ -52,13 +61,16 @@ private:
     void RegisterSegmentManagementEndpoints();
     void RegisterDrainJobEndpoints();
     void RegisterMetricsEndpoint();
+    bool SetupTls();
 
     std::atomic<bool> running_{false};
     std::string host_;
     uint16_t port_;
     MmcRestApiFacadePtr restApiFacade_;
-    httplib::Server server_{};
-    std::thread serverThread_;
+    acc::AccHttpServerPtr server_;
+    acc::AccTlsOption tlsOption_;
+    std::string sslLibPath_;
+    std::string decrypterLibPath_;
 };
 
 } // namespace mmc

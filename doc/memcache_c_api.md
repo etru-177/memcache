@@ -465,6 +465,7 @@ int32_t mmc_set_log_level(int level);
 - `evictThresholdLow`: 低水位驱逐阈值
 - `accTlsConfig`: 元数据服务TLS配置
 - `configStoreTlsConfig`: config store的TLS配置
+- `metricsTlsConfig`: metrics HTTP 服务的 mTLS 配置
 
 ### mmc_local_service_config_t
 本地服务配置结构体，包含以下字段：

@@ -41,8 +41,8 @@ namespace ock {
 namespace mmc {
 static volatile sig_atomic_t g_processExitRequested = 0;
 static volatile sig_atomic_t g_receivedExitSignal = 0;
-const std::string PROTOCOL_HTTP = "http://";
 constexpr std::chrono::milliseconds PROCESS_EXIT_POLL_INTERVAL{100u};
+constexpr size_t kProtocolSuffixLen = 3; // "://"
 
 int MmcMetaServiceProcess::MainForExecutable()
 {
@@ -226,6 +226,10 @@ int MmcMetaServiceProcess::ValidateConfig() const
         std::cerr << "Invalid tls config." << std::endl;
         return -1;
     }
+    if (MetaServiceConfig::ValidateTLSConfig(config_.metricsTlsConfig) != MMC_OK) {
+        std::cerr << "Invalid metrics tls config." << std::endl;
+        return -1;
+    }
     if (MetaServiceConfig::ValidateLogPathConfig(config_.logPath) != MMC_OK) {
         std::cerr << "Invalid log path, please check 'ock.mmc.log_path' " << std::endl;
         return -1;
@@ -289,19 +293,18 @@ int MmcMetaServiceProcess::InitLogger(const mmc_meta_service_config_t &options)
 
 int MmcMetaServiceProcess::ExtractIpPortFromUrl(const std::string &url, std::string &ip, uint16_t &port)
 {
-    std::string hostPortStr = url;
+    std::string hostPortStr;
     const size_t protocolPos = url.find("://");
-    /* config protocol header */
     if (protocolPos != std::string::npos) {
-        const size_t httpPos = url.find(PROTOCOL_HTTP);
-        /* config protocol header, but not http, return error code */
-        if (httpPos == std::string::npos) {
-            MMC_LOG_ERROR("http URL: protol " << PROTOCOL_HTTP << " not found.");
+        const std::string scheme = url.substr(0, protocolPos);
+        if (scheme != "http" && scheme != "https") {
+            MMC_LOG_ERROR("http URL: unsupported protocol " << scheme);
             return MMC_INVALID_PARAM;
         }
-        hostPortStr = url.substr(PROTOCOL_HTTP.length());
+        hostPortStr = url.substr(protocolPos + kProtocolSuffixLen);
     } else {
         MMC_LOG_WARN("metrics URL: protocol not found, use http.");
+        hostPortStr = url;
     }
 
     /* verify ip and port using IpAddressParserMgr to support both IPv4 and IPv6 */
@@ -321,32 +324,57 @@ int MmcMetaServiceProcess::ExtractIpPortFromUrl(const std::string &url, std::str
     return MMC_OK;
 }
 
-int MmcMetaServiceProcess::StartHttpServer()
+int MmcMetaServiceProcess::ValidateMetaServiceReady() const
 {
     MMC_VALIDATE_RETURN(metaService_ != nullptr, "metaService not been initialized", MMC_ERROR);
     auto metaMgrProxyPtr = metaService_->GetMetaMgrProxy();
     MMC_VALIDATE_RETURN(metaMgrProxyPtr != nullptr, "metaMgrProxy is nullptr", MMC_ERROR);
     auto metaManagerPtr = metaMgrProxyPtr->GetMetaManager();
     MMC_VALIDATE_RETURN(metaManagerPtr != nullptr, "metaManager is nullptr", MMC_ERROR);
+    return MMC_OK;
+}
 
-    std::string host;
-    uint16_t port;
+int MmcMetaServiceProcess::ResolveAndValidateHttpUrl(std::string &host, uint16_t &port) const
+{
     auto ret = ExtractIpPortFromUrl(config_.httpURL, host, port);
     if (ret != MMC_OK) {
         MMC_LOG_ERROR("Extract ip and port from http URL: " << config_.httpURL << " failed");
         return ret;
     }
 
-    if (host != "127.0.0.1") {
-        MMC_LOG_ERROR("HTTP server bind address must be 127.0.0.1, got: " << host);
+    if (config_.metricsTlsConfig.tlsEnable && strstr(config_.httpURL, "https://") == nullptr) {
+        MMC_LOG_ERROR("Metrics URL must use https:// when mTLS is enabled, got: " << config_.httpURL);
         return MMC_INVALID_PARAM;
     }
-
-    MMC_LOG_INFO("Starting HTTP server on " << host << ":" << port);
-    if (leaderElection_ == nullptr) {
-        MMC_LOG_INFO("HA snapshot provider will return default state because leader election is not initialized");
+    if (!config_.metricsTlsConfig.tlsEnable && strstr(config_.httpURL, "https://") != nullptr) {
+        MMC_LOG_ERROR("Metrics URL uses https:// but mTLS is not enabled");
+        return MMC_INVALID_PARAM;
     }
+    return MMC_OK;
+}
 
+acc::AccTlsOption MmcMetaServiceProcess::BuildMetricsTlsOption(const mmc_meta_service_config_t &config)
+{
+    acc::AccTlsOption opt{};
+    opt.enableTls = config.metricsTlsConfig.tlsEnable;
+    if (opt.enableTls) {
+        opt.tlsTopPath = "/";
+        opt.tlsCaPath = "/";
+        opt.tlsCaFile.insert(config.metricsTlsConfig.caPath);
+        opt.tlsCrlPath = "/";
+        const std::string crlFile = config.metricsTlsConfig.crlPath;
+        if (!crlFile.empty()) {
+            opt.tlsCrlFile.insert(crlFile);
+        }
+        opt.tlsCert = config.metricsTlsConfig.certPath;
+        opt.tlsPk = config.metricsTlsConfig.keyPath;
+        opt.tlsPkPwd = config.metricsTlsConfig.keyPassPath;
+    }
+    return opt;
+}
+
+int MmcMetaServiceProcess::CreateAndStartHttpServer(const std::string &host, uint16_t port)
+{
     try {
         const auto haSnapshotProvider = [this]() {
             RestHaSnapshot snapshot;
@@ -365,15 +393,44 @@ int MmcMetaServiceProcess::StartHttpServer()
             return snapshot;
         };
         MmcRestApiFacadePtr restApiFacade =
-            MmcMakeRef<MmcRestApiFacade>(metaService_, metaMgrProxyPtr, haSnapshotProvider);
+            MmcMakeRef<MmcRestApiFacade>(metaService_, metaService_->GetMetaMgrProxy(), haSnapshotProvider);
         MMC_VALIDATE_RETURN(restApiFacade != nullptr, "rest api facade is nullptr", MMC_ERROR);
-        httpServer_ = new MmcHttpServer(host, port, restApiFacade);
-        httpServer_->Start();
+
+        const MmcHttpServerTlsConfig tlsConfig{BuildMetricsTlsOption(config_), config_.metricsTlsConfig.packagePath,
+                                               config_.metricsTlsConfig.decrypterLibPath};
+
+        httpServer_ = new MmcHttpServer(host, port, restApiFacade, tlsConfig);
+        if (!httpServer_->Start()) {
+            MMC_LOG_ERROR("Failed to start HTTP server on " << host << ":" << port);
+            return MMC_ERROR;
+        }
         return MMC_OK;
     } catch (const std::exception &e) {
         MMC_LOG_ERROR("Failed to start HTTP server: " << e.what());
         return MMC_ERROR;
     }
+}
+
+int MmcMetaServiceProcess::StartHttpServer()
+{
+    auto ret = ValidateMetaServiceReady();
+    if (ret != MMC_OK) {
+        return ret;
+    }
+
+    std::string host;
+    uint16_t port;
+    ret = ResolveAndValidateHttpUrl(host, port);
+    if (ret != MMC_OK) {
+        return ret;
+    }
+
+    MMC_LOG_INFO("Starting HTTP server on " << host << ":" << port);
+    if (leaderElection_ == nullptr) {
+        MMC_LOG_INFO("HA snapshot provider will return default state because leader election is not initialized");
+    }
+
+    return CreateAndStartHttpServer(host, port);
 }
 
 void MmcMetaServiceProcess::Exit()

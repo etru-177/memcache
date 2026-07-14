@@ -25,8 +25,8 @@
 #include <vector>
 
 #include "gtest/gtest.h"
-#include "httplib.h"
 #include "nlohmann/json.hpp"
+#include "mock_mmc_http_client.h"
 
 #include "mmc_blob_allocator.h"
 #include "mmc_meta_common.h"
@@ -66,6 +66,7 @@ constexpr pid_t kHttpPidModuloBase = 1000;
 constexpr int kHttpCandidatePortAttemptStride = 3;
 constexpr int kHttpDefaultSocketProtocol = 0;
 constexpr uint16_t kHttpInvalidPort = 0;
+constexpr int kHttpStatusOk = 200;
 constexpr in_port_t kHttpEphemeralPort = 0;
 constexpr int kHttpDiscoveryPortOffset = 0;
 constexpr int kHttpConfigStorePortOffset = 1;
@@ -98,7 +99,7 @@ public:
 protected:
     static uint16_t GetFreePort();
     static void CopyUrl(const std::string &url, char *dest);
-    static std::shared_ptr<httplib::Response> WaitForResponse(httplib::Client &client, const std::string &path);
+    static std::shared_ptr<MmcHttpResponse> WaitForResponse(MockMmcHttpClient &client, const std::string &path);
 
     void StartService();
     void MountSegments();
@@ -151,13 +152,13 @@ void MmcMetaServiceHttpTest::CopyUrl(const std::string &url, char *dest)
     dest[url.size()] = '\0';
 }
 
-std::shared_ptr<httplib::Response> MmcMetaServiceHttpTest::WaitForResponse(httplib::Client &client,
-                                                                           const std::string &path)
+std::shared_ptr<MmcHttpResponse> MmcMetaServiceHttpTest::WaitForResponse(MockMmcHttpClient &client,
+                                                                         const std::string &path)
 {
     for (int i = 0; i < kHttpWaitRetryCount; ++i) {
-        auto response = client.Get(path.c_str());
-        if (response && response->status == httplib::OK_200) {
-            return std::make_shared<httplib::Response>(*response);
+        auto response = client.Get(path);
+        if (response && response->status == kHttpStatusOk) {
+            return response;
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(kHttpWaitIntervalMs));
     }
@@ -250,7 +251,7 @@ void MmcMetaServiceHttpTest::StartHttpServer()
         httpServer_ = std::make_unique<MmcHttpServer>(kHttpLocalHost, httpPort_, restApiFacade_);
         ASSERT_TRUE(httpServer_->Start());
 
-        httplib::Client client(kHttpLocalHost, httpPort_);
+        MockMmcHttpClient client(kHttpLocalHost, httpPort_);
         if (WaitForResponse(client, "/health") != nullptr) {
             return;
         }
@@ -283,11 +284,11 @@ void MmcMetaServiceHttpTest::TearDown()
 
 TEST_F(MmcMetaServiceHttpTest, RoutesContract)
 {
-    httplib::Client client(kHttpLocalHost, httpPort_);
+    MockMmcHttpClient client(kHttpLocalHost, httpPort_);
 
     auto healthResponse = WaitForResponse(client, "/health");
     ASSERT_NE(healthResponse, nullptr);
-    ASSERT_EQ(healthResponse->status, httplib::OK_200);
+    ASSERT_EQ(healthResponse->status, kHttpStatusOk);
     auto healthJson = nlohmann::json::parse(healthResponse->body);
     EXPECT_EQ(healthJson.at("status"), "ok");
     EXPECT_EQ(healthJson.at("role"), "unknown");
@@ -307,8 +308,7 @@ TEST_F(MmcMetaServiceHttpTest, RoutesContract)
     auto leaderJson = nlohmann::json::parse(leaderResponse->body);
     EXPECT_FALSE(leaderJson.at("present").get<bool>());
 
-    auto putResponse =
-        client.Put((std::string("/metadata?key=") + kHttpMetaKey).c_str(), kHttpMetadataValue, "text/plain");
+    auto putResponse = client.Put(std::string("/metadata?key=") + kHttpMetaKey, kHttpMetadataValue, "text/plain");
     ASSERT_NE(putResponse, nullptr);
     EXPECT_EQ(putResponse->body, "metadata updated");
 
@@ -398,7 +398,7 @@ TEST_F(MmcMetaServiceHttpTest, RoutesContract)
 
     PrepareAllocatedKey();
 
-    auto removeKeyResponse = client.Delete((std::string("/key?key=") + kHttpAllocKey).c_str());
+    auto removeKeyResponse = client.Delete(std::string("/key?key=") + kHttpAllocKey);
     ASSERT_NE(removeKeyResponse, nullptr);
     auto removeKeyJson = nlohmann::json::parse(removeKeyResponse->body);
     EXPECT_TRUE(removeKeyJson.at("success").get<bool>());
@@ -416,7 +416,7 @@ TEST_F(MmcMetaServiceHttpTest, RoutesContract)
     EXPECT_FALSE(drainJobJson.at("success").get<bool>());
     EXPECT_EQ(drainJobJson.at("error_message"), "Not supported");
 
-    auto deleteMetadataResponse = client.Delete((std::string("/metadata?key=") + kHttpMetaKey).c_str());
+    auto deleteMetadataResponse = client.Delete(std::string("/metadata?key=") + kHttpMetaKey);
     ASSERT_NE(deleteMetadataResponse, nullptr);
     EXPECT_EQ(deleteMetadataResponse->body, "metadata deleted");
 
@@ -429,7 +429,7 @@ TEST_F(MmcMetaServiceHttpTest, RoutesContract)
 
 TEST_F(MmcMetaServiceHttpTest, MetricsContract)
 {
-    httplib::Client client(kHttpLocalHost, httpPort_);
+    MockMmcHttpClient client(kHttpLocalHost, httpPort_);
 
     auto metricsResponse = WaitForResponse(client, "/metrics");
     ASSERT_NE(metricsResponse, nullptr);
@@ -535,7 +535,7 @@ TEST_F(MmcMetaServiceHttpTest, BusinessCountersIgnoreInternalEndpoints)
     constexpr uint64_t batchRequestDelta = 1;
     constexpr uint64_t getAllKeysRequestDelta = 1;
 
-    httplib::Client client(kHttpLocalHost, httpPort_);
+    MockMmcHttpClient client(kHttpLocalHost, httpPort_);
     MmcMetaMetricSnapshot beforeSnapshot = MmcMetaMetricManager::GetInstance().GetSnapshot();
 
     auto queryKeyResponse = WaitForResponse(client, std::string("/query_key?key=") + kHttpAllocKey);
@@ -603,12 +603,12 @@ TEST_F(MmcMetaServiceHttpTest, BusinessCountersIgnoreInternalEndpoints)
 
 TEST_F(MmcMetaServiceHttpTest, BatchQueryKeysIgnoresTrailingComma)
 {
-    httplib::Client client(kHttpLocalHost, httpPort_);
+    MockMmcHttpClient client(kHttpLocalHost, httpPort_);
 
     // Trailing comma: "http-contract-key," should resolve to exactly one key, not two.
     auto response = WaitForResponse(client, std::string("/batch_query_keys?keys=") + kHttpAllocKey + ",");
     ASSERT_NE(response, nullptr);
-    ASSERT_EQ(response->status, httplib::OK_200);
+    ASSERT_EQ(response->status, kHttpStatusOk);
     auto json = nlohmann::json::parse(response->body);
     EXPECT_TRUE(json.at("success").get<bool>());
     ASSERT_EQ(json.at("data").size(), kHttpExpectedBlobCountSize)

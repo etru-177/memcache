@@ -3,7 +3,8 @@
 本文档定义 MemCache Hybrid REST 接口的目标契约；如某接口当前未实现，会在对应条目标注状态。
 
 - 默认 HTTP 地址来自配置项 `ock.mmc.meta_service.metrics_url`
-- 默认值：`http://127.0.0.1:8000`
+- 默认值：`http://127.0.0.1:8000`；host 支持任意 IP 或域名
+- 支持通过 `ock.mmc.metrics.tls.*` 配置项独立开启 mTLS
 - 成功响应的 `Content-Type` 由各接口单独约定
 - 业务错误也返回 `HTTP 200`；客户端需通过响应体中的 `success` 字段判断是否成功
 - 错误返回统一使用 JSON 格式；`error_message` 会随具体错误场景变化

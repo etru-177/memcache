@@ -69,6 +69,7 @@ typedef struct {
     uint64_t leaseTtlMs;
     mmc_tls_config accTlsConfig;
     mmc_tls_config configStoreTlsConfig;
+    mmc_tls_config metricsTlsConfig;
     uint32_t metricsReportIntervalSeconds;
     /* KV cache event publisher (opt-in, default disabled). */
     mmc_kv_events_config_t kvEvents;
