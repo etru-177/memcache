@@ -98,4 +98,15 @@ repos:
           - "--style=file"
           - "--verbose"
           - "-i"
-        exclude: ^build/|(^|/)(third_party|3rdparty)/
+        exclude: ^build/|test/third_party/
+  # -------------------------- Gitleaks 二进制扫描 --------------------------
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+        args:
+          - git
+          - --verbose
+          - --redact
+          - --config=pre-commit/.gitleaks.toml
+        stages: [pre-commit]
