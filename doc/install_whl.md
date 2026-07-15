@@ -114,9 +114,9 @@ Required-by:
 ```
 这里安装的位置在/usr/local/lib/python3.11/site-packages，则配置文件位于/usr/local/lib/python3.11/site-packages/memcache_hybrid/config
 
- 👆 NOTE：1.0.x版本安装目录下不带配置文件，需要从[代码仓](https://gitcode.com/Ascend/memcache/tree/v1.0.0/config)获取
+ 👆 NOTE：1.0.x版本安装目录下不带配置文件，需要从[代码仓](https://gitcode.com/Ascend/memcache/tree/v1.0.0/config)获取。1.2.X及以上版本 whl 包已默认编译带上 ubsio 盘管理功能，config 目录下包含 mmc-meta.conf、mmc-local.conf 和 ubsio.conf
 
-软件运行时，两个配置文件mmc-meta.conf（用于设置MetaService参数）和 mmc-local.conf（用于设置LocalService参数）可以位于任意目录
+软件运行时，配置文件 mmc-meta.conf（用于设置MetaService参数）、mmc-local.conf（用于设置LocalService参数）和 ubsio.conf（UBSIO/SSD 盘管理配置）可以位于任意目录
 
 **建议将这两个配置文件复制到其他目录（比如/usr/local）再进行修改，防止重新安装后被覆盖**
 
@@ -127,6 +127,8 @@ Required-by:
 通过环境变量来设置配置文件的路径
 ```bash
 # 两个配置文件可以放在任意路径，这里以默认安装路径为例，请修改为实际路径
+# whl 包已默认编译带上 ubsio 盘管理功能，如启用 SSD 需修改配置文件并设置此环境变量，详见 SSD 使用文档
+export UBSIO_CONFIG_PATH=/usr/local/lib/python3.11/site-packages/memcache_hybrid/config/ubsio.conf
 export MMC_META_CONFIG_PATH=/usr/local/lib/python3.11/site-packages/memcache_hybrid/config/mmc-meta.conf
 export MMC_LOCAL_CONFIG_PATH=/usr/local/lib/python3.11/site-packages/memcache_hybrid/config/mmc-local.conf
 ```
