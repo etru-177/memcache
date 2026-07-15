@@ -105,6 +105,7 @@ Result MmcMetaService::Start(const mmc_meta_service_config_t &options)
         callbacks.removed = [this](const std::string &key, uint32_t rank, uint16_t mediaType) {
             kvEvents_.OnMetaRemoved(key, rank, mediaType);
         };
+        callbacks.cleared = [this](uint32_t rank, uint16_t mediaType) { kvEvents_.OnMetaCleared(rank, mediaType); };
         metaManager->SetChangeCallbacks(callbacks);
     }
     kvEvents_.SetPublishActive(!options.haEnable);
@@ -217,17 +218,9 @@ Result MmcMetaService::ClearResource(uint32_t rank)
 
 void MmcMetaService::SetPublishActive(bool active)
 {
-    std::vector<uint32_t> ranks;
-    {
-        std::lock_guard<std::mutex> guard(mutex_);
-        const bool activated = active && !kvEventsPublishActive_;
-        kvEvents_.SetPublishActive(active);
-        kvEventsPublishActive_ = active;
-        if (activated) {
-            ranks = CollectRanks(rankMediaTypeMap_);
-        }
-    }
-    PublishClearedForRanks(ranks);
+    std::lock_guard<std::mutex> guard(mutex_);
+    kvEvents_.SetPublishActive(active);
+    kvEventsPublishActive_ = active;
 }
 
 bool MmcMetaService::KvEventsEnabled() const

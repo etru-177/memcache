@@ -113,7 +113,7 @@ void MmcKvEventRuntime::PublishCleared(uint32_t rank)
 #ifdef MMC_ENABLE_KV_EVENTS
     if (impl_ != nullptr && impl_->publisher != nullptr) {
         const std::string backendId = impl_->backendIdResolver ? impl_->backendIdResolver(rank) : std::string();
-        impl_->publisher->PublishCleared(backendId);
+        impl_->publisher->PublishCleared(std::string(), backendId);
     }
 #else
     (void)rank;
@@ -161,6 +161,19 @@ void MmcKvEventRuntime::OnMetaRemoved(const std::string &key, uint32_t rank, uin
     }
 #else
     (void)key;
+    (void)rank;
+    (void)mediaType;
+#endif
+}
+
+void MmcKvEventRuntime::OnMetaCleared(uint32_t rank, uint16_t mediaType)
+{
+#ifdef MMC_ENABLE_KV_EVENTS
+    if (impl_ != nullptr && impl_->publisher != nullptr) {
+        const std::string backendId = impl_->backendIdResolver ? impl_->backendIdResolver(rank) : std::string();
+        impl_->publisher->PublishCleared(KvEventMediumName(mediaType), backendId);
+    }
+#else
     (void)rank;
     (void)mediaType;
 #endif

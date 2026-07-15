@@ -175,7 +175,7 @@ TEST(MmcKvEventPublisherTest, InactiveDropsAllEvents)
         publisher.SetActive(false); // 模拟非 leader
         publisher.PublishStored("0x2a", "hbm", "10.0.0.1");
         publisher.PublishRemoved("0x2a", "hbm", "10.0.0.1");
-        publisher.PublishCleared("10.0.0.1");
+        publisher.PublishCleared(std::string(), "10.0.0.1");
     }
     EXPECT_TRUE(Snapshot(rec).empty());
 }
@@ -205,7 +205,7 @@ TEST(MmcKvEventPublisherTest, BasicStoredRemovedDeliveredOnDrain)
         ASSERT_TRUE(publisher.Enabled());
         publisher.PublishStored("0x2a", "hbm", "10.0.0.1");
         publisher.PublishRemoved("0x2a", "hbm", "10.0.0.1");
-        publisher.PublishCleared("10.0.0.1");
+        publisher.PublishCleared(std::string(), "10.0.0.1");
     } // 析构触发 drain + join
 
     auto events = Snapshot(rec);
@@ -339,7 +339,7 @@ TEST(MmcKvEventPublisherTest, ClearedMarksSnapshotRequired)
     KvEventStats stats;
     {
         KvEventPublisher publisher(MakeConfig(), std::make_unique<RecordingTransport>(rec));
-        publisher.PublishCleared("10.0.0.1");
+        publisher.PublishCleared(std::string(), "10.0.0.1");
         stats = publisher.GetStats();
     }
 

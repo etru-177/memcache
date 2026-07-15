@@ -1258,27 +1258,6 @@ Result MmcMetaManager::Unmount(const MmcLocation &loc)
         std::unique_lock<std::mutex> guard(objMeta->Mutex());
         auto blobs = objMeta->FreeBlobs(key, globalAllocator_, filter, false, false);
         const bool shouldErase = (objMeta->NumBlobs() == 0);
-        std::vector<std::pair<uint32_t, uint16_t>> removedBlobs;
-        {
-            std::lock_guard<std::mutex> cbLock(changeCallbacks_.mutex);
-            if (changeCallbacks_.removed) {
-                removedBlobs.reserve(blobs.size());
-                for (const auto &blob : blobs) {
-                    if (blob != nullptr) {
-                        removedBlobs.emplace_back(blob->Rank(), blob->Type());
-                    }
-                }
-            }
-        }
-        guard.unlock();
-        {
-            std::lock_guard<std::mutex> cbLock(changeCallbacks_.mutex);
-            if (changeCallbacks_.removed) {
-                for (const auto &removedBlob : removedBlobs) {
-                    changeCallbacks_.removed(key, removedBlob.first, removedBlob.second);
-                }
-            }
-        }
         for (auto &blob : blobs) {
             UnregisterGvaPendingWriteBlob(blob);
         }
@@ -1286,6 +1265,12 @@ Result MmcMetaManager::Unmount(const MmcLocation &loc)
     };
 
     metaContainer_->EraseIf(matchFunc);
+    {
+        std::lock_guard<std::mutex> cbLock(changeCallbacks_.mutex);
+        if (changeCallbacks_.cleared) {
+            changeCallbacks_.cleared(loc.rank_, loc.mediaType_);
+        }
+    }
 
     ret = globalAllocator_->Unmount(loc);
     if (ret == MMC_OK) {

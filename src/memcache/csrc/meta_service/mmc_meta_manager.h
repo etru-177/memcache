@@ -41,10 +41,12 @@ constexpr uint16_t REWARM_WATERMARK_MAX = 95U;
 
 struct MmcMetaChangeCallbacks {
     using Callback = std::function<void(const std::string &key, uint32_t rank, uint16_t mediaType)>;
+    using ClearedCallback = std::function<void(uint32_t rank, uint16_t mediaType)>;
 
     mutable std::mutex mutex;
     Callback stored;
     Callback removed;
+    ClearedCallback cleared;
 };
 
 struct MmcMemMetaDesc {
@@ -344,6 +346,7 @@ public:
         std::lock_guard<std::mutex> lock(changeCallbacks_.mutex);
         changeCallbacks_.stored = callbacks.stored;
         changeCallbacks_.removed = callbacks.removed;
+        changeCallbacks_.cleared = callbacks.cleared;
     }
 
     // UBS IO metadata event handlers

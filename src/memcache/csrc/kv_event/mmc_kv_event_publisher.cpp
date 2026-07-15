@@ -108,12 +108,12 @@ void KvEventPublisher::PublishRemoved(const std::string &objectKey, const std::s
     Enqueue(PendingEvent{KvEventType::REMOVED, objectKey, medium, backendId});
 }
 
-void KvEventPublisher::PublishCleared(const std::string &backendId)
+void KvEventPublisher::PublishCleared(const std::string &medium, const std::string &backendId)
 {
     if (!IsAcceptingEvents()) {
         return;
     }
-    Enqueue(PendingEvent{KvEventType::CLEARED, std::string(), std::string(), backendId});
+    Enqueue(PendingEvent{KvEventType::CLEARED, std::string(), medium, backendId});
 }
 
 KvEventStats KvEventPublisher::GetStats() const

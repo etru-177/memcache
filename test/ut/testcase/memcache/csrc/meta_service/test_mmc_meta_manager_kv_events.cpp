@@ -47,6 +47,9 @@ public:
         callbacks.removed = [this](const std::string &key, uint32_t rank, uint16_t mediaType) {
             Record("removed", key, rank, mediaType);
         };
+        callbacks.cleared = [this](uint32_t rank, uint16_t mediaType) {
+            Record("cleared", std::string(), rank, mediaType);
+        };
     }
 
     void Record(const std::string &type, const std::string &key, uint32_t rank, uint16_t mediaType)

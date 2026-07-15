@@ -87,7 +87,7 @@ public:
 
     void PublishStored(const std::string &objectKey, const std::string &medium, const std::string &backendId);
     void PublishRemoved(const std::string &objectKey, const std::string &medium, const std::string &backendId);
-    void PublishCleared(const std::string &backendId);
+    void PublishCleared(const std::string &medium, const std::string &backendId);
 
     void SetActive(bool active);
     KvEventStats GetStats() const;

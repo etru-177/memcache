@@ -136,7 +136,7 @@ TEST(MmcKvEventRuntimeConversionTest, PublishClearedResolvesBackendId)
     {
         KvEventPublisher publisher(MakeConfig(), std::make_unique<RecordingTransport>(rec));
         std::function<std::string(uint32_t)> resolver = [](uint32_t rank) { return "backend-" + std::to_string(rank); };
-        publisher.PublishCleared(resolver(5));
+        publisher.PublishCleared(std::string(), resolver(5));
     }
 
     std::lock_guard<std::mutex> lock(rec->mutex);

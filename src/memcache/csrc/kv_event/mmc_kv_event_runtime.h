@@ -38,6 +38,7 @@ public:
     void SetPublishActive(bool active);
     void OnMetaStored(const std::string &key, uint32_t rank, uint16_t mediaType);
     void OnMetaRemoved(const std::string &key, uint32_t rank, uint16_t mediaType);
+    void OnMetaCleared(uint32_t rank, uint16_t mediaType);
     bool Enabled() const;
     kv_event::KvEventStats GetStats() const;
 
