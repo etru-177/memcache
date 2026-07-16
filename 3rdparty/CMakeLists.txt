@@ -59,6 +59,7 @@ if (MMC_ENABLE_KV_EVENTS)
                 -G "${_MMC_ZMQ_GENERATOR}"
                 -DCMAKE_BUILD_TYPE=${_MMC_ZMQ_BUILD_TYPE}
                 -DCMAKE_INSTALL_PREFIX=${_MMC_ZMQ_INSTALL_DIR}
+                -DCMAKE_POLICY_VERSION_MINIMUM=3.5
                 -DCMAKE_POSITION_INDEPENDENT_CODE=ON
                 -DBUILD_SHARED=OFF
                 -DBUILD_STATIC=ON
