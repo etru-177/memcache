@@ -53,18 +53,19 @@ if (("${BUILD_CPP_EXAMPLE}" STREQUAL "") OR ("${BUILD_CPP_EXAMPLE}" STREQUAL "OF
 
     # 创建可执行文件
     add_executable(memcache_cpp_test memcache_cpp_test.cpp)
+
+    # Only link libmf_memcache.so directly; its dependencies (libmf_smem.so,
+    # libmf_hybm_core.so, libhcom.so, etc.) are loaded dynamically via dlopen
+    # and must NOT be pre-linked — doing so causes constructors to run in the
+    # wrong context, leading to SIGABRT / SIGSEGV under host_shm.
     foreach (SO ${ALL_SO})
-        MESSAGE(STATUS "${SO}")
         get_filename_component(FILENAME ${SO} NAME)
-        get_filename_component(FILEDIR ${SO} DIRECTORY)
-
-        string(FIND "${FILENAME}" "python" FILENAME_MATCH)
-        if (NOT FILENAME_MATCH EQUAL -1)
-            continue()
+        if ("${FILENAME}" MATCHES "^libmf_memcache")
+            get_filename_component(FILEDIR ${SO} DIRECTORY)
+            target_link_directories(memcache_cpp_test PUBLIC ${FILEDIR})
+            target_link_libraries(memcache_cpp_test PUBLIC ${FILENAME})
+            break()
         endif ()
-
-        target_link_directories(memcache_cpp_test PUBLIC ${FILEDIR})
-        target_link_libraries(memcache_cpp_test PUBLIC ${FILENAME})
     endforeach ()
     # 查找 Python 开发库
     find_package(Python3 REQUIRED COMPONENTS Development)
