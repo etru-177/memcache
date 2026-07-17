@@ -63,9 +63,9 @@ if (BUILD_UBSIO)
     file(COPY ${UBSIO_SO_FILES} DESTINATION ${UBSIO_OUTPUT_DIR}/lib)
     message(STATUS "ubs-io lib installed to ${UBSIO_OUTPUT_DIR}/lib")
 
-    # install bio.conf, rename to ubsio.conf
+    # install ubsio.conf
     file(MAKE_DIRECTORY ${UBSIO_OUTPUT_DIR}/conf)
-    file(COPY_FILE ${ubs-io_SOURCE_DIR}/ubsio-boostio/configs/bio.conf
+    file(COPY_FILE ${ubs-io_SOURCE_DIR}/ubsio-boostio/configs/ubsio.conf
          ${UBSIO_OUTPUT_DIR}/conf/ubsio.conf)
     message(STATUS "ubs-io config installed to ${UBSIO_OUTPUT_DIR}/conf")
 endif ()

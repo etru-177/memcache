@@ -18,3 +18,4 @@ __pycache__
 *.whl
 *.egg-info
 .DS_Store
+.claude/settings.local.json
