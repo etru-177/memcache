@@ -27,6 +27,11 @@
 #include "mmc_types.h"
 #include "mmc_last_error.h"
 #include "smem_bm_def.h"
+
+#ifndef SMEM_BM_FLAG_DRAM_BEST_EFFORT
+#define SMEM_BM_FLAG_DRAM_BEST_EFFORT (1U << 10)
+#endif
+
 #include "mmc.h"
 #include "common/mmc_functions.h"
 #include "common/mmc_ip_validator.h"
@@ -365,6 +370,8 @@ public:
             0);
         AddBoolConf(OCK_MMC_LOCAL_SERVICE_STORAGE_ENABLED,
                     VStrEnum::Create(OCK_MMC_LOCAL_SERVICE_STORAGE_ENABLED.first, BOOL_ENUM_STR), 0);
+        AddBoolConf(OCK_MMC_LOCAL_SERVICE_DRAM_BEST_EFFORT,
+                    VStrEnum::Create(OCK_MMC_LOCAL_SERVICE_DRAM_BEST_EFFORT.first, BOOL_ENUM_STR), 0);
         AddIntConf(OCK_MMC_CLIENT_AGGREGATE_NUM,
                    VIntRange::Create(OCK_MMC_CLIENT_AGGREGATE_NUM.first, 1, MAX_AGGREGATE_NUM), 0);
         AddStrConf(OCK_MMC_CLIENT_BATCH_CHUNK_SIZE, VNoCheck::Create(), 0);
@@ -388,6 +395,9 @@ public:
         config.localHBMSize = GetUInt64(ConfConstant::OKC_MMC_LOCAL_SERVICE_HBM_SIZE.first, 0);
         config.localMaxHBMSize = GetUInt64(ConfConstant::OKC_MMC_LOCAL_SERVICE_MAX_HBM_SIZE.first, config.localHBMSize);
         config.storageEnabled = GetBool(ConfConstant::OCK_MMC_LOCAL_SERVICE_STORAGE_ENABLED);
+        if (GetBool(ConfConstant::OCK_MMC_LOCAL_SERVICE_DRAM_BEST_EFFORT)) {
+            config.flags |= SMEM_BM_FLAG_DRAM_BEST_EFFORT;
+        }
         auto protocol = std::string(config.dataOpType);
         std::string logLevelStr = GetString(ConfConstant::OCK_MMC_LOG_LEVEL);
         StringToUpper(logLevelStr);

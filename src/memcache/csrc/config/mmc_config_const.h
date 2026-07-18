@@ -106,6 +106,8 @@ constexpr auto OCK_MMC_REWARM_DRAM_WATERMARK =
     std::make_pair("ock.mmc.rewarm.dram_watermark", DEFAULT_REWARM_WATERMARK_VAL);
 constexpr auto OCK_MMC_PREFETCH_ENABLED = std::make_pair("ock.mmc.storage.prefetch.enabled", false);
 constexpr auto OCK_MMC_LOCAL_SERVICE_STORAGE_ENABLED = std::make_pair("ock.mmc.local_service.storage.enabled", false);
+constexpr auto OCK_MMC_LOCAL_SERVICE_DRAM_BEST_EFFORT =
+    std::make_pair("ock.mmc.local_service.dram.best_effort.enabled", false);
 } // namespace ConfConstant
 
 constexpr int MIN_LOG_ROTATION_FILE_SIZE = 1;

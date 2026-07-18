@@ -424,3 +424,30 @@ TEST_F(TestMmcConfiguration, SetupWithBoundaryValuesTest)
     ASSERT_EQ(clientConfigMax.GetInt(ConfConstant::OCK_MMC_CLIENT_AGGREGATE_NUM), MAX_AGGREGATE_NUM);
     ASSERT_EQ(clientConfigMax.GetInt(ConfConstant::OKC_MMC_LOCAL_SERVICE_WORLD_SIZE), MAX_WORLD_SIZE);
 }
+
+TEST_F(TestMmcConfiguration, DramBestEffortDefaultDisabledTest)
+{
+    ClientConfig clientConfig;
+    auto config = CreateLocalConfigWithCurrentDefaults();
+    const auto ret = clientConfig.Setup(&config);
+    ASSERT_TRUE(ret);
+
+    mmc_local_service_config_t localServiceConfig{};
+    clientConfig.GetLocalServiceConfig(localServiceConfig);
+    ASSERT_EQ(localServiceConfig.flags & SMEM_BM_FLAG_DRAM_BEST_EFFORT, 0U);
+}
+
+TEST_F(TestMmcConfiguration, DramBestEffortEnabledTest)
+{
+    ClientConfig clientConfig;
+    auto config = CreateLocalConfigWithCurrentDefaults();
+    auto ret = clientConfig.Setup(&config);
+    ASSERT_TRUE(ret);
+
+    const auto key = std::string(ConfConstant::OCK_MMC_LOCAL_SERVICE_DRAM_BEST_EFFORT.first);
+    clientConfig.Set(key, true);
+
+    mmc_local_service_config_t localServiceConfig{};
+    clientConfig.GetLocalServiceConfig(localServiceConfig);
+    ASSERT_NE(localServiceConfig.flags & SMEM_BM_FLAG_DRAM_BEST_EFFORT, 0U);
+}
