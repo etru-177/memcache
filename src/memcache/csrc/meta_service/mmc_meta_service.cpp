@@ -92,6 +92,20 @@ Result MmcMetaService::Start(const mmc_meta_service_config_t &options)
         ock::smem::StoreFactory::CreateStoreByUrl(options_.configStoreURL, ock::smem::ConfigStoreModel::CSM_SERVER);
     MMC_VALIDATE_RETURN(confStore_ != nullptr, "Failed to start config store server", MMC_ERROR);
 
+    // 注册心跳超时回调：mf 的 AccStoreServer 检测到 rank 心跳超时后，
+    // 通过 GetRankIdByLinkId 映射到 rankId，触发 ClearResource 踢出集群
+    confStore_->RegisterServerBrokenHandler([this](uint32_t linkId, ock::smem::StoreBackendPtr) {
+        uint32_t rankId = confStore_->GetRankIdByLinkId(linkId);
+        if (rankId != UINT32_MAX) {
+            MMC_LOG_WARN("HeartBeat timeout for rank=" << rankId << ", linkId=" << linkId << ", clearing resource");
+            (void)ClearResource(rankId);
+        } else {
+            MMC_LOG_DEBUG("HeartBeat timeout for unknown linkId=" << linkId);
+        }
+        return MMC_OK;
+    });
+    MMC_LOG_INFO("Config store server started, broken handler registered");
+
     MmcMetaManager *metaManager = nullptr;
     if (metaMgrProxy_ != nullptr && metaMgrProxy_->GetMetaManager() != nullptr) {
         metaManager = metaMgrProxy_->GetMetaManager().Get();
