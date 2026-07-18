@@ -42,27 +42,12 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(current_dir)
 
 lib_dir = os.path.join(current_dir, "lib")
-# Load .so dependencies in dependency order (derived from ldd).
-# ubsio/bio libs are present only when BUILD_UBSIO=ON.
-lib_list = [
-    "liburing.so",  # statically linked, no intra-pkg deps
-    "libboundscheck.so",  # no intra-pkg deps
-    "libhtracer.so",  # no intra-pkg deps
-    "libbio_common.so",  # no intra-pkg deps
-    "libbio_interceptor_server.so",  # no intra-pkg deps
-    "libbio_security.so",  # no intra-pkg deps
-    "libbio_underfs.so",  # no intra-pkg deps
-    "libbio_sdk.so",  # needs: htracer, bio_common, bio_interceptor_server, bio_security
-    "libbio_server.so",  # needs: htracer, bio_common, bio_security, liburing
-    "libock_iofwd_proxy.so",  # needs: bio_common, htracer
-    "libock_interceptor.so",  # needs: libboundscheck (system)
-    "libsdk_diagnose.so",  # needs: bio_sdk, bio_security, htracer, bio_common, bio_interceptor_server
-    "libserver_diagnose.so",  # needs: bio_server, bio_security, htracer, bio_common, liburing
-    "libubsio_kvc.so",  # no intra-pkg deps (only system libs)
-    "libcli_agent.so",  # no intra-pkg deps
-    "libmf_memcache.so",  # no intra-pkg deps
+# Preload with absolute paths so that subsequent dlopen can resolve without LD_LIBRARY_PATH.
+_preload_list = [
+    "libmf_memcache.so",
+    "libubsio_kvc.so",
 ]
-for lib_name in lib_list:
+for lib_name in _preload_list:
     so_path = os.path.join(lib_dir, lib_name)
     if os.path.exists(so_path):
         ctypes.CDLL(so_path)
