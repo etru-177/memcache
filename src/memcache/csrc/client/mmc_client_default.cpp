@@ -1318,6 +1318,11 @@ Result MmcClientDefault::BatchWriteFinish(const std::vector<std::string> &keys,
         Result findRet = gvaBlobTracker_.FindBlobByKey(keys[i], info);
         if (findRet == MMC_OK && info.IsReadable()) {
             outResults[i] = MMC_OK;
+            if (writeResults[i] == MMC_OK) {
+                gvaBlobTracker_.MarkWriteSuccess(keys[i]);
+            } else {
+                gvaBlobTracker_.RemoveByKey(keys[i]);
+            }
             continue;
         }
         if (findRet == MMC_OK) {

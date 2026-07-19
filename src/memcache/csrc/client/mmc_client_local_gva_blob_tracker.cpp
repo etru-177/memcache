@@ -216,10 +216,9 @@ void LocalGvaBlobTracker::CollectExpired(std::vector<LocalGvaBlobInfo> &infos)
         info.operateId = (*blobInfo)->operateId;
         info.leaseDeadlineMs = (*blobInfo)->leaseDeadlineMs;
 
-        if (!info.IsReadable() || !info.IsLeaseExpired(nowMs)) {
-            continue;
+        if (info.IsReadable() && info.IsLeaseExpired(nowMs)) {
+            infos.push_back(info);
         }
-        infos.push_back(info);
     }
 }
 
