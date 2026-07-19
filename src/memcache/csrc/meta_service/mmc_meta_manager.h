@@ -25,7 +25,6 @@
 #include "mmc_mem_obj_meta.h"
 #include "mmc_meta_container.h"
 #include "mmc_meta_backup_mgr.h"
-#include "mmc_meta_gva_index.h"
 #include "mmc_meta_net_server.h"
 #include "mmc_thread_pool.h"
 
@@ -195,8 +194,6 @@ public:
      */
     Result UpdateState(const std::string &key, const MmcLocation &loc, const BlobActionResult &actRet,
                        uint64_t operateId);
-
-    Result UpdateBlobState(const uint64_t gva, const uint64_t size, const BlobActionResult &actRet);
 
     /**
      * @brief remove the meta object
@@ -453,11 +450,6 @@ private:
     Result ApplyRewarm(const std::string &key, RewarmEntry &entry, MmcMemBlobPtr &dstBlob, const RewarmCtx &ctx,
                        MmcMemMetaDesc &objMeta);
 
-    Result RegisterGvaPendingWriteBlob(const std::string &key, uint64_t operateId, const MmcMemObjMetaPtr &objMeta,
-                                       const MmcMemBlobPtr &blob);
-
-    void UnregisterGvaPendingWriteBlob(const MmcMemBlobPtr &blob);
-
 private:
     std::mutex mutex_;
     bool started_ = false;
@@ -480,8 +472,6 @@ private:
     MmcThreadPoolPtr rewarmThreadPool_;
     std::unordered_set<uint32_t> ssdEnabledRanks_;
     mutable std::mutex ssdMutex_;
-
-    MmcMetaGvaIndex gvaIndex_;
 };
 using MmcMetaManagerPtr = MmcRef<MmcMetaManager>;
 } // namespace mmc

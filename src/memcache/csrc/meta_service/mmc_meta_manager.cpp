@@ -86,28 +86,6 @@ void FillSingleBlobQueryInfo(const MmcMemObjMetaPtr &objMeta, const MmcMemBlobPt
 }
 } // namespace
 
-Result MmcMetaManager::RegisterGvaPendingWriteBlob(const std::string &key, uint64_t operateId,
-                                                   const MmcMemObjMetaPtr &objMeta, const MmcMemBlobPtr &blob)
-{
-    if (objMeta == nullptr || blob == nullptr) {
-        MMC_LOG_ERROR("RegisterGvaPendingWriteBlob invalid param, key:" << key << ", operateId:" << operateId
-                                                                        << ", objMeta:" << objMeta.Get()
-                                                                        << ", blob:" << blob.Get());
-        return MMC_INVALID_PARAM;
-    }
-
-    return gvaIndex_.RegisterPendingWrite(key, operateId, objMeta, blob);
-}
-
-void MmcMetaManager::UnregisterGvaPendingWriteBlob(const MmcMemBlobPtr &blob)
-{
-    if (blob == nullptr) {
-        return;
-    }
-
-    gvaIndex_.UnregisterPendingWrite(blob);
-}
-
 Result MmcMetaManager::Get(const std::string &key, uint64_t operateId, MmcBlobFilterPtr filterPtr,
                            MmcMemMetaDesc &objMeta)
 {
@@ -774,16 +752,6 @@ Result MmcMetaManager::Alloc(const std::string &key, const AllocOptions &allocOp
         objMeta.size_ = tempMetaObj->Size();
         tempMetaObj->GetBlobsDesc(objMeta.blobs_);
         objMeta.numBlobs_ = objMeta.blobs_.size();
-        // GVA_MALLOC场景，需要将对象的GVA信息记录下来，用于后续更新GVA信息
-        // 但是重复key不需要重复记录了
-        if ((allocOpt.flags_ & ALLOC_FLAGS_GVA_MALLOC_MASK) && ret != MMC_DUPLICATED_OBJECT) {
-            for (auto &blob : blobs) {
-                if (RegisterGvaPendingWriteBlob(key, operateId, tempMetaObj, blob) != MMC_OK) {
-                    MMC_LOG_ERROR("Add gva2updateMap failed, gva:" << blob->Gva() << ", size:" << blob->Size()
-                                                                   << ", key:" << key << ", operateId:" << operateId);
-                }
-            }
-        }
 
         if ((allocOpt.flags_ & ALLOC_FLAGS_GVA_MALLOC_MASK)) {
             ret = MMC_OK;
@@ -815,7 +783,7 @@ Result MmcMetaManager::UpdateState(const std::string &key, const MmcLocation &lo
     Result result = MMC_OK;
     ret = metaContainer_->Get(key, metaObj);
     if (ret != MMC_OK || metaObj == nullptr) {
-        MMC_LOG_ERROR("UpdateState: Cannot find " << key << " memObjMeta! ret:" << ret
+        MMC_LOG_DEBUG("UpdateState: Cannot find " << key << " memObjMeta! ret:" << ret
                                                   << ", action:" << static_cast<uint32_t>(actRet) << ", loc=" << loc);
         return MMC_UNMATCHED_KEY;
     }
@@ -865,81 +833,6 @@ Result MmcMetaManager::UpdateState(const std::string &key, const MmcLocation &lo
     return result;
 }
 
-Result MmcMetaManager::UpdateBlobState(const uint64_t gva, const uint64_t size, const BlobActionResult &actRet)
-{
-    MmcMetaGvaIndex::PendingWriteInfo infoCopy;
-    bool filled = false;
-    if (!gvaIndex_.UpdatePendingWrite(gva, size, actRet == MMC_WRITE_FAIL, infoCopy, filled)) {
-        MMC_LOG_DEBUG("query pending gva failed, gva:" << gva << ", size:" << size);
-        return MMC_OK;
-    }
-
-    auto key = infoCopy.key;
-    uint32_t opRankId = GetRankIdByOperateId(infoCopy.operateId);
-    uint32_t opSeq = GetSequenceByOperateId(infoCopy.operateId);
-    MmcMemObjMetaPtr metaObj = infoCopy.objMeta;
-    MmcMemBlobPtr blobPtr = infoCopy.blob;
-
-    if (blobPtr == nullptr) {
-        MMC_LOG_DEBUG("UpdateBlobState got null blob from pending write info, gva:" << gva << ", size:" << size
-                                                                                    << ", action:" << actRet);
-        return MMC_OK;
-    }
-
-    Result ret;
-    if (actRet == MMC_WRITE_FAIL) {
-        ret = Remove(key);
-        if (ret != MMC_OK) {
-            MMC_LOG_ERROR("UpdateBlobState: Failed remove key " << key << ", ret: " << ret);
-        }
-        return ret;
-    }
-
-    if (!filled) {
-        return MMC_OK;
-    }
-
-    // when update state, do not update the lru
-    if (metaObj == nullptr) {
-        ret = metaContainer_->Get(key, metaObj);
-    } else {
-        ret = MMC_OK;
-    }
-    if (ret != MMC_OK || metaObj == nullptr) {
-        MMC_LOG_ERROR("UpdateState: Cannot find " << key << " memObjMeta! ret:" << ret << ", action:" << actRet
-                                                  << ", gva:" << gva << ", size:" << size);
-        return MMC_UNMATCHED_KEY;
-    }
-
-    std::unique_lock<std::mutex> metaGuard(metaObj->Mutex());
-    ret = blobPtr->UpdateState(key, opRankId, opSeq, actRet);
-    uint32_t storedRank = 0;
-    uint16_t storedMedia = 0;
-    bool emitStored = false;
-    if (ret == MMC_OK && actRet == MMC_WRITE_OK && blobPtr != nullptr) {
-        std::lock_guard<std::mutex> cbLock(changeCallbacks_.mutex);
-        if (changeCallbacks_.stored) {
-            storedRank = blobPtr->Rank();
-            storedMedia = blobPtr->Type();
-            emitStored = true;
-        }
-    }
-    metaGuard.unlock(); // 必须释放锁，否则在 Remove 调用中会死锁
-    if (ret != MMC_OK) {
-        MMC_LOG_ERROR("failed to update gva:" << gva << ", size: " << size << ", key:" << key << " with " << actRet
-                                              << ", ret:" << ret);
-    } else if (emitStored) {
-        {
-            std::lock_guard<std::mutex> cbLock(changeCallbacks_.mutex);
-            if (changeCallbacks_.stored) {
-                changeCallbacks_.stored(key, storedRank, storedMedia);
-            }
-        }
-    }
-
-    return ret;
-}
-
 void MmcMetaManager::PushRemoveList(const std::string &key, const MmcMemObjMetaPtr &meta,
                                     const MmcBlobFilterPtr &filter, bool triggerSsdPreFree)
 {
@@ -948,9 +841,7 @@ void MmcMetaManager::PushRemoveList(const std::string &key, const MmcMemObjMetaP
             MmcBlobFilterPtr filterL, bool triggerSsdPreFreeL) {
             std::unique_lock<std::mutex> guard(metaL->Mutex());
             auto blobs = metaL->FreeBlobs(keyL, allocator, filterL, true, triggerSsdPreFreeL);
-            for (auto &blob : blobs) {
-                UnregisterGvaPendingWriteBlob(blob);
-            }
+
             {
                 std::lock_guard<std::mutex> cbLock(changeCallbacks_.mutex);
                 if (changeCallbacks_.removed) {
@@ -971,9 +862,6 @@ void MmcMetaManager::PushRemoveList(const std::string &key, const MmcMemObjMetaP
     if (!future.valid()) {
         // already locked when call, no need lock again
         blobs = meta->FreeBlobs(key, globalAllocator_, filter, true, triggerSsdPreFree);
-        for (auto &blob : blobs) {
-            UnregisterGvaPendingWriteBlob(blob);
-        }
         {
             std::lock_guard<std::mutex> cbLock(changeCallbacks_.mutex);
             if (changeCallbacks_.removed) {
@@ -1135,11 +1023,6 @@ Result MmcMetaManager::Mount(const MmcLocation &loc, const MmcLocalMemlInitInfo 
         MMC_LOG_ERROR("allocator mount failed, loc rank: " << loc.rank_ << " mediaType_: " << loc.mediaType_);
         return ret;
     }
-    ret = gvaIndex_.RegisterSegment(loc, localMemInitInfo);
-    if (ret != MMC_OK) {
-        MMC_LOG_ERROR("register segment failed, loc rank: " << loc.rank_ << " mediaType_: " << loc.mediaType_);
-        return ret;
-    }
     if (storageEnabled) {
         std::lock_guard<std::mutex> guard(ssdMutex_);
         ssdEnabledRanks_.insert(loc.rank_);
@@ -1147,14 +1030,10 @@ Result MmcMetaManager::Mount(const MmcLocation &loc, const MmcLocalMemlInitInfo 
     }
     if (blobList.empty()) {
         ret = globalAllocator_->Start(loc);
-        if (ret != MMC_OK) {
-            gvaIndex_.UnregisterSegment(loc);
-        }
         return ret;
     }
     ret = globalAllocator_->BuildFromBlobs(loc, blobList);
     if (ret != MMC_OK) {
-        gvaIndex_.UnregisterSegment(loc);
         MMC_LOG_ERROR("build from blobs failed, loc rank: " << loc.rank_ << " mediaType_: " << loc.mediaType_);
         return ret;
     }
@@ -1162,7 +1041,6 @@ Result MmcMetaManager::Mount(const MmcLocation &loc, const MmcLocalMemlInitInfo 
     if (!blobList.empty()) {
         ret = RebuildMeta(blobList);
         if (ret != MMC_OK) {
-            gvaIndex_.UnregisterSegment(loc);
             MMC_LOG_ERROR("rebuild meta failed, loc rank: " << loc.rank_ << " mediaType_: " << loc.mediaType_);
             return ret;
         }
@@ -1258,9 +1136,6 @@ Result MmcMetaManager::Unmount(const MmcLocation &loc)
         std::unique_lock<std::mutex> guard(objMeta->Mutex());
         auto blobs = objMeta->FreeBlobs(key, globalAllocator_, filter, false, false);
         const bool shouldErase = (objMeta->NumBlobs() == 0);
-        for (auto &blob : blobs) {
-            UnregisterGvaPendingWriteBlob(blob);
-        }
         return shouldErase;
     };
 
@@ -1274,7 +1149,6 @@ Result MmcMetaManager::Unmount(const MmcLocation &loc)
 
     ret = globalAllocator_->Unmount(loc);
     if (ret == MMC_OK) {
-        gvaIndex_.UnregisterSegment(loc);
         std::lock_guard<std::mutex> guard(ssdMutex_);
         ssdEnabledRanks_.erase(loc.rank_);
     }
@@ -1292,7 +1166,7 @@ Result MmcMetaManager::Query(const std::string &key, uint64_t operateId, uint32_
     (void)flags;
     MmcMemObjMetaPtr objMeta;
     if (metaContainer_->Get(key, objMeta) != MMC_OK || objMeta == nullptr) {
-        MMC_LOG_WARN("Cannot find MmcMemObjMeta with key : " << key);
+        MMC_LOG_DEBUG("Cannot find MmcMemObjMeta with key : " << key);
         return MMC_UNMATCHED_KEY;
     }
 
@@ -1322,7 +1196,7 @@ Result MmcMetaManager::AddLease(const std::string &key, uint64_t operateId, uint
     const uint64_t actualLeaseTtlMs = leaseTtlMs == 0 ? defaultTtlMs_ : leaseTtlMs;
     MmcMemObjMetaPtr objMeta;
     if (metaContainer_->Get(key, objMeta) != MMC_OK || objMeta == nullptr) {
-        MMC_LOG_WARN("Cannot find MmcMemObjMeta with key : " << key);
+        MMC_LOG_DEBUG("Cannot find MmcMemObjMeta with key : " << key);
         return MMC_UNMATCHED_KEY;
     }
 
@@ -1352,7 +1226,7 @@ Result MmcMetaManager::RemoveLease(const std::string &key, uint64_t operateId)
 {
     MmcMemObjMetaPtr objMeta;
     if (metaContainer_->Get(key, objMeta) != MMC_OK || objMeta == nullptr) {
-        MMC_LOG_WARN("Cannot find MmcMemObjMeta with key : " << key);
+        MMC_LOG_DEBUG("Cannot find MmcMemObjMeta with key : " << key);
         return MMC_UNMATCHED_KEY;
     }
 
@@ -1559,9 +1433,6 @@ bool MmcMetaManager::HandleMoveBlobExistingDst(const std::string &key, const Mmc
     }
     guard.unlock();
 
-    for (auto &blob : blobs) {
-        UnregisterGvaPendingWriteBlob(blob);
-    }
     metaContainer_->InsertLru(key, dst.mediaType_);
     return true;
 }
@@ -1635,9 +1506,7 @@ Result MmcMetaManager::MoveBlob(const std::string &key, const MmcLocation &src, 
             MMC_LOG_WARN("key: " << key << " copy blob failed, ret " << ret);
             auto blobs = objMeta->FreeBlobs(key, globalAllocator_, filter);
             guard.unlock();
-            for (auto &blob : blobs) {
-                UnregisterGvaPendingWriteBlob(blob);
-            }
+
             TP_TRACE_END(TP_MMC_META_MOVEBLOB, ret);
             return ret;
         }
@@ -1646,9 +1515,6 @@ Result MmcMetaManager::MoveBlob(const std::string &key, const MmcLocation &src, 
         MMC_LOG_INFO("move " << key << " from " << src << " to " << dstSameRank << " " << srcInfo.blobDesc << ", "
                              << objMeta);
         guard.unlock();
-        for (auto &blob : blobs) {
-            UnregisterGvaPendingWriteBlob(blob);
-        }
         {
             std::lock_guard<std::mutex> cbLock(changeCallbacks_.mutex);
             if (changeCallbacks_.removed) {

@@ -142,6 +142,9 @@ public:
     int BatchCopy(std::vector<void *> &gvas, std::vector<void *> &buffers, std::vector<size_t> &sizes,
                   const int32_t direct = 3) override;
 
+    std::vector<int> BatchWriteFinish(const std::vector<std::string> &keys,
+                                      const std::vector<int32_t> &writeResults) override;
+
     // bellow only python api use
     mmc_buffer Get(const std::string &key);
 

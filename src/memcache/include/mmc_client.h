@@ -148,6 +148,23 @@ int32_t mmcc_batch_malloc(const char **keys, uint32_t keys_count, const size_t *
 int32_t mmcc_batch_copy(const uint64_t *gvas, void **buffers, const size_t *sizes, uint32_t count, int32_t direct);
 
 /**
+ * @brief Notify meta service that the writes for the given keys are finished
+ *
+ * Caller must invoke this after writing data via mmcc_batch_copy (write direction) so that
+ * the corresponding blobs transition from ALLOCATED to READABLE. Keys whose writeResult is 0
+ * (MMC_OK) are marked READABLE; non-zero writeResult triggers MMC_WRITE_FAIL and the blob is
+ * removed from meta service. Re-invoking on an already-finished key is idempotent.
+ *
+ * @param keys             [in] keys of data, the length of key is less than 256
+ * @param keys_count       [in] Count of keys
+ * @param writeResults     [in] Write result per key, 0 means OK and non-zero means FAIL
+ * @param outResults       [out] Meta service update result per key
+ * @return 0 if the batch RPC succeeds
+ */
+int32_t mmcc_batch_write_finish(const char **keys, uint32_t keys_count, const int32_t *writeResults,
+                                int32_t *outResults);
+
+/**
  * @brief Remove the object with key from Distributed Memory Cache
  * This data operation supports both sync and async
  *

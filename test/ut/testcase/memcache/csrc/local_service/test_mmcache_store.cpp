@@ -385,27 +385,16 @@ TEST_F(TestMmcacheStore, BatchMalloc)
 
     ret = store->BatchCopy(gvas, buffer1, sizes, 0);
     EXPECT_EQ(ret, 0);
+    // New behavior: BatchCopy write no longer flips blob state to READABLE.
+    // Writing to the same blob again is allowed (still ALLOCATED).
     ret = store->BatchCopy(gvas, buffer1, sizes, 0);
-    EXPECT_EQ(ret, MMC_UNMATCHED_STATE);
-    ret = store->BatchCopy(gvas, buffer2, sizes, 1);
-    EXPECT_EQ(ret, MMC_UNMATCHED_STATE);
-    auto infos = store->BatchGetKeyInfo(keys);
-    EXPECT_EQ(infos.size(), keys.size());
-    auto leaseResults = store->BatchAddLease(keys);
-    EXPECT_EQ(leaseResults, std::vector<int>(keys.size(), MMC_OK));
-    ret = store->BatchCopy(gvas, buffer2, sizes, 1);
     EXPECT_EQ(ret, 0);
-    for (auto i = 0; i < sizes.size(); ++i) {
-        ret = memcmp(buffer1[i], buffer2[i], sizes[i]);
-    }
-    auto removeLeaseRet = store->BatchRemoveLease(keys);
-    EXPECT_EQ(removeLeaseRet, MMC_OK);
-    leaseResults = store->BatchAddLease(keys);
-    EXPECT_EQ(leaseResults, std::vector<int>(keys.size(), MMC_OK));
-    std::this_thread::sleep_for(std::chrono::milliseconds(200));
-    ret = store->BatchCopy(gvas, buffer2, sizes, 1);
-    EXPECT_EQ(ret, MMC_LEASE_EXPIRED);
-    store->BatchRemoveLease(keys);
+    // Caller must explicitly notify write finish.
+    std::vector<int32_t> writeOkResults(keys.size(), MMC_OK);
+    auto finishResults = store->BatchWriteFinish(keys, writeOkResults);
+    EXPECT_EQ(finishResults, std::vector<int>(keys.size(), MMC_OK));
+    ret = store->BatchCopy(gvas, buffer1, sizes, 0);
+    EXPECT_EQ(ret, 0);
 
     store->BatchRemove(keys);
     store->TearDown();
@@ -878,15 +867,10 @@ TEST_F(TestMmcacheStore, BatchMallocLeaseCleanUp)
 
     ret = store->BatchCopy(gvas, buffer1, sizes, 0);
     EXPECT_EQ(ret, 0);
-
-    auto infos = store->BatchGetKeyInfo(keys);
-    EXPECT_EQ(infos.size(), keys.size());
-    auto leaseResults = store->BatchAddLease(keys);
-    EXPECT_EQ(leaseResults, std::vector<int>(keys.size(), MMC_OK));
-
-    std::this_thread::sleep_for(std::chrono::seconds(4));
-    ret = store->BatchCopy(gvas, buffer2, sizes, 1);
-    EXPECT_EQ(ret, MMC_UNMATCHED_KEY);
+    // Caller must explicitly notify write finish to flip blob state to READABLE.
+    std::vector<int32_t> writeOkResults(keys.size(), MMC_OK);
+    auto finishResults = store->BatchWriteFinish(keys, writeOkResults);
+    EXPECT_EQ(finishResults, std::vector<int>(keys.size(), MMC_OK));
 
     store->BatchRemove(keys);
     store->TearDown();
@@ -894,5 +878,299 @@ TEST_F(TestMmcacheStore, BatchMallocLeaseCleanUp)
     for (size_t i = 0; i < sizes.size(); ++i) {
         free(buffer1[i]);
         free(buffer2[i]);
+    }
+}
+
+TEST_F(TestMmcacheStore, BatchWriteFinishBasic)
+{
+    std::string metaUrl = kMmcacheStoreMetaUrl;
+    std::string bmUrl = kMmcacheStoreConfigStoreUrl;
+
+    mmc_meta_service_config_t metaServiceConfig{};
+    metaServiceConfig.logLevel = INFO_LEVEL;
+    metaServiceConfig.logRotationFileSize = 2UL * 1024UL * 1024UL;
+    metaServiceConfig.logRotationFileCount = 20UL;
+    metaServiceConfig.accTlsConfig.tlsEnable = false;
+    metaServiceConfig.evictThresholdHigh = 80UL;
+    metaServiceConfig.evictThresholdLow = 60UL;
+    metaServiceConfig.haEnable = false;
+    metaServiceConfig.leaseTtlMs = 100;
+    UrlStringToChar(metaUrl, metaServiceConfig.discoveryURL);
+    UrlStringToChar(bmUrl, metaServiceConfig.configStoreURL);
+    mmc_meta_service_t meta_service = mmcs_meta_service_start(&metaServiceConfig);
+    ASSERT_TRUE(meta_service != nullptr);
+    mmc_set_extern_logger([](int level, const char *msg) { std::cerr << msg << std::endl; });
+    mmc_set_log_level(1);
+
+    std::shared_ptr<ObjectStore> store = ObjectStore::CreateObjectStore();
+    auto ret = GenerateLocalConf(confPath_);
+    ASSERT_EQ(ret, 0);
+    MMC_LOCAL_CONF_PATH = confPath_;
+    ret = store->Init(0);
+    ASSERT_EQ(ret, 0);
+
+    std::vector<std::string> keys{"bwf_key1", "bwf_key2", "bwf_key3"};
+    uint64_t bufferTestSize2M = 1024UL * 1024UL * 2ULL;
+    std::vector<uint64_t> sizes(keys.size(), bufferTestSize2M);
+    uint16_t media = 1;
+
+    auto gva_vec = store->BatchMalloc(keys, sizes, media);
+    for (auto gva : gva_vec) {
+        EXPECT_NE(gva, 0);
+    }
+
+    std::vector<void *> buffer1, buffer2, gvas;
+    for (size_t i = 0; i < sizes.size(); ++i) {
+        auto ptr1 = malloc(sizes[i]);
+        memset(ptr1, static_cast<int>(i + 1), sizes[i]);
+        auto ptr2 = malloc(sizes[i]);
+        memset(ptr2, 0, sizes[i]);
+        buffer1.push_back(ptr1);
+        buffer2.push_back(ptr2);
+        gvas.push_back(reinterpret_cast<void *>(gva_vec[i]));
+    }
+
+    ret = store->BatchCopy(gvas, buffer1, sizes, 0);
+    EXPECT_EQ(ret, 0);
+
+    std::vector<int32_t> writeOkResults(keys.size(), MMC_OK);
+    auto finishResults = store->BatchWriteFinish(keys, writeOkResults);
+    EXPECT_EQ(finishResults, std::vector<int>(keys.size(), MMC_OK));
+
+    ret = store->BatchGetKeyInfo(keys).size();
+    EXPECT_EQ(ret, keys.size());
+
+    store->BatchRemove(keys);
+    store->TearDown();
+    mmcs_meta_service_stop(meta_service);
+    for (size_t i = 0; i < sizes.size(); ++i) {
+        free(buffer1[i]);
+        free(buffer2[i]);
+    }
+}
+
+TEST_F(TestMmcacheStore, BatchWriteFinishFailRemovesBlob)
+{
+    std::string metaUrl = kMmcacheStoreMetaUrl;
+    std::string bmUrl = kMmcacheStoreConfigStoreUrl;
+
+    mmc_meta_service_config_t metaServiceConfig{};
+    metaServiceConfig.logLevel = INFO_LEVEL;
+    metaServiceConfig.accTlsConfig.tlsEnable = false;
+    metaServiceConfig.evictThresholdHigh = 80UL;
+    metaServiceConfig.evictThresholdLow = 60UL;
+    metaServiceConfig.haEnable = false;
+    metaServiceConfig.leaseTtlMs = 100;
+    UrlStringToChar(metaUrl, metaServiceConfig.discoveryURL);
+    UrlStringToChar(bmUrl, metaServiceConfig.configStoreURL);
+    mmc_meta_service_t meta_service = mmcs_meta_service_start(&metaServiceConfig);
+    ASSERT_TRUE(meta_service != nullptr);
+    mmc_set_extern_logger([](int level, const char *msg) { std::cerr << msg << std::endl; });
+    mmc_set_log_level(1);
+
+    std::shared_ptr<ObjectStore> store = ObjectStore::CreateObjectStore();
+    auto ret = GenerateLocalConf(confPath_);
+    ASSERT_EQ(ret, 0);
+    MMC_LOCAL_CONF_PATH = confPath_;
+    ret = store->Init(0);
+    ASSERT_EQ(ret, 0);
+
+    std::vector<std::string> keys{"fail_key1", "fail_key2"};
+    uint64_t bufferTestSize2M = 1024UL * 1024UL * 2ULL;
+    std::vector<uint64_t> sizes(keys.size(), bufferTestSize2M);
+    uint16_t media = 1;
+
+    auto gva_vec = store->BatchMalloc(keys, sizes, media);
+    for (auto gva : gva_vec) {
+        EXPECT_NE(gva, 0);
+    }
+
+    std::vector<void *> buffer1, gvas;
+    for (size_t i = 0; i < sizes.size(); ++i) {
+        auto ptr1 = malloc(sizes[i]);
+        memset(ptr1, static_cast<int>(i + 1), sizes[i]);
+        buffer1.push_back(ptr1);
+        gvas.push_back(reinterpret_cast<void *>(gva_vec[i]));
+    }
+
+    ret = store->BatchCopy(gvas, buffer1, sizes, 0);
+    EXPECT_EQ(ret, 0);
+
+    std::vector<int32_t> failResults = {MMC_OK, 1};
+    auto finishResults = store->BatchWriteFinish(keys, failResults);
+    EXPECT_EQ(finishResults.size(), keys.size());
+
+    store->BatchRemove(keys);
+    store->TearDown();
+    mmcs_meta_service_stop(meta_service);
+    for (size_t i = 0; i < sizes.size(); ++i) {
+        free(buffer1[i]);
+    }
+}
+
+TEST_F(TestMmcacheStore, BatchWriteFinishUnknownKey)
+{
+    std::string metaUrl = kMmcacheStoreMetaUrl;
+    std::string bmUrl = kMmcacheStoreConfigStoreUrl;
+
+    mmc_meta_service_config_t metaServiceConfig{};
+    metaServiceConfig.logLevel = INFO_LEVEL;
+    metaServiceConfig.accTlsConfig.tlsEnable = false;
+    metaServiceConfig.evictThresholdHigh = 80UL;
+    metaServiceConfig.evictThresholdLow = 60UL;
+    metaServiceConfig.haEnable = false;
+    metaServiceConfig.leaseTtlMs = 100;
+    UrlStringToChar(metaUrl, metaServiceConfig.discoveryURL);
+    UrlStringToChar(bmUrl, metaServiceConfig.configStoreURL);
+    mmc_meta_service_t meta_service = mmcs_meta_service_start(&metaServiceConfig);
+    ASSERT_TRUE(meta_service != nullptr);
+    mmc_set_extern_logger([](int level, const char *msg) { std::cerr << msg << std::endl; });
+    mmc_set_log_level(1);
+
+    std::shared_ptr<ObjectStore> store = ObjectStore::CreateObjectStore();
+    auto ret = GenerateLocalConf(confPath_);
+    ASSERT_EQ(ret, 0);
+    MMC_LOCAL_CONF_PATH = confPath_;
+    ret = store->Init(0);
+    ASSERT_EQ(ret, 0);
+
+    std::vector<std::string> keys{"nonexistent_key_12345"};
+    std::vector<int32_t> writeOkResults{MMC_OK};
+    auto finishResults = store->BatchWriteFinish(keys, writeOkResults);
+    ASSERT_EQ(finishResults.size(), keys.size());
+
+    store->TearDown();
+    mmcs_meta_service_stop(meta_service);
+}
+
+TEST_F(TestMmcacheStore, BatchWriteFinishLeaseExpiryCleanup)
+{
+    std::string metaUrl = kMmcacheStoreMetaUrl;
+    std::string bmUrl = kMmcacheStoreConfigStoreUrl;
+
+    mmc_meta_service_config_t metaServiceConfig{};
+    metaServiceConfig.logLevel = INFO_LEVEL;
+    metaServiceConfig.logRotationFileSize = 2UL * 1024UL * 1024UL;
+    metaServiceConfig.logRotationFileCount = 20UL;
+    metaServiceConfig.accTlsConfig.tlsEnable = false;
+    metaServiceConfig.evictThresholdHigh = 80UL;
+    metaServiceConfig.evictThresholdLow = 60UL;
+    metaServiceConfig.haEnable = false;
+    metaServiceConfig.leaseTtlMs = 50;
+    UrlStringToChar(metaUrl, metaServiceConfig.discoveryURL);
+    UrlStringToChar(bmUrl, metaServiceConfig.configStoreURL);
+    mmc_meta_service_t meta_service = mmcs_meta_service_start(&metaServiceConfig);
+    ASSERT_TRUE(meta_service != nullptr);
+    mmc_set_extern_logger([](int level, const char *msg) { std::cerr << msg << std::endl; });
+    mmc_set_log_level(1);
+
+    std::shared_ptr<ObjectStore> store = ObjectStore::CreateObjectStore();
+    auto ret = GenerateLocalConf(confPath_);
+    ASSERT_EQ(ret, 0);
+    MMC_LOCAL_CONF_PATH = confPath_;
+    ret = store->Init(0);
+    ASSERT_EQ(ret, 0);
+
+    std::vector<std::string> keys{"lease_key1", "lease_key2"};
+    uint64_t bufferTestSize2M = 1024UL * 1024UL * 2ULL;
+    std::vector<uint64_t> sizes(keys.size(), bufferTestSize2M);
+    uint16_t media = 1;
+
+    auto gva_vec = store->BatchMalloc(keys, sizes, media);
+    for (auto gva : gva_vec) {
+        EXPECT_NE(gva, 0);
+    }
+
+    std::vector<void *> buffer1, gvas;
+    for (size_t i = 0; i < sizes.size(); ++i) {
+        auto ptr1 = malloc(sizes[i]);
+        memset(ptr1, static_cast<int>(i + 1), sizes[i]);
+        buffer1.push_back(ptr1);
+        gvas.push_back(reinterpret_cast<void *>(gva_vec[i]));
+    }
+
+    ret = store->BatchCopy(gvas, buffer1, sizes, 0);
+    EXPECT_EQ(ret, 0);
+
+    std::vector<int32_t> writeOkResults(keys.size(), MMC_OK);
+    auto finishResults = store->BatchWriteFinish(keys, writeOkResults);
+    EXPECT_EQ(finishResults, std::vector<int>(keys.size(), MMC_OK));
+
+    auto leaseResults = store->BatchAddLease(keys, 50);
+    EXPECT_EQ(leaseResults.size(), keys.size());
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+    store->BatchRemove(keys);
+    store->TearDown();
+    mmcs_meta_service_stop(meta_service);
+    for (size_t i = 0; i < sizes.size(); ++i) {
+        free(buffer1[i]);
+    }
+}
+
+TEST_F(TestMmcacheStore, BatchCopySkipsReadableBlob)
+{
+    std::string metaUrl = kMmcacheStoreMetaUrl;
+    std::string bmUrl = kMmcacheStoreConfigStoreUrl;
+
+    mmc_meta_service_config_t metaServiceConfig{};
+    metaServiceConfig.logLevel = INFO_LEVEL;
+    metaServiceConfig.accTlsConfig.tlsEnable = false;
+    metaServiceConfig.evictThresholdHigh = 80UL;
+    metaServiceConfig.evictThresholdLow = 60UL;
+    metaServiceConfig.haEnable = false;
+    metaServiceConfig.leaseTtlMs = 100;
+    UrlStringToChar(metaUrl, metaServiceConfig.discoveryURL);
+    UrlStringToChar(bmUrl, metaServiceConfig.configStoreURL);
+    mmc_meta_service_t meta_service = mmcs_meta_service_start(&metaServiceConfig);
+    ASSERT_TRUE(meta_service != nullptr);
+    mmc_set_extern_logger([](int level, const char *msg) { std::cerr << msg << std::endl; });
+    mmc_set_log_level(1);
+
+    std::shared_ptr<ObjectStore> store = ObjectStore::CreateObjectStore();
+    auto ret = GenerateLocalConf(confPath_);
+    ASSERT_EQ(ret, 0);
+    MMC_LOCAL_CONF_PATH = confPath_;
+    ret = store->Init(0);
+    ASSERT_EQ(ret, 0);
+
+    std::vector<std::string> keys{"skip_key1", "skip_key2"};
+    uint64_t bufferTestSize2M = 1024UL * 1024UL * 2ULL;
+    std::vector<uint64_t> sizes(keys.size(), bufferTestSize2M);
+    uint16_t media = 1;
+
+    auto gva_vec = store->BatchMalloc(keys, sizes, media);
+    for (auto gva : gva_vec) {
+        EXPECT_NE(gva, 0);
+    }
+
+    std::vector<void *> buffer1, gvas;
+    for (size_t i = 0; i < sizes.size(); ++i) {
+        auto ptr1 = malloc(sizes[i]);
+        memset(ptr1, static_cast<int>(i + 1), sizes[i]);
+        buffer1.push_back(ptr1);
+        gvas.push_back(reinterpret_cast<void *>(gva_vec[i]));
+    }
+
+    ret = store->BatchCopy(gvas, buffer1, sizes, 0);
+    EXPECT_EQ(ret, 0);
+
+    std::vector<int32_t> writeOkResults(keys.size(), MMC_OK);
+    auto finishResults = store->BatchWriteFinish(keys, writeOkResults);
+    EXPECT_EQ(finishResults, std::vector<int>(keys.size(), MMC_OK));
+
+    auto leaseResults = store->BatchAddLease(keys);
+    EXPECT_EQ(leaseResults, std::vector<int>(keys.size(), MMC_OK));
+
+    ret = store->BatchCopy(gvas, buffer1, sizes, 0);
+    EXPECT_EQ(ret, 0);
+
+    store->BatchRemoveLease(keys);
+    store->BatchRemove(keys);
+    store->TearDown();
+    mmcs_meta_service_stop(meta_service);
+    for (size_t i = 0; i < sizes.size(); ++i) {
+        free(buffer1[i]);
     }
 }

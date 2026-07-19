@@ -300,7 +300,7 @@ int32_t mmcc_batch_malloc(const char **keys, uint32_t keys_count, const size_t *
 int32_t mmcc_batch_copy(const uint64_t *gvas, void **buffers, const size_t *sizes,
                         uint32_t count, int32_t direct);
 ```
-**功能**: 批量在 GVA 地址和本地 buffer 之间进行数据拷贝。
+**功能**: 批量在 GVA 地址和本地 buffer 之间进行数据拷贝。注意：写方向（如 `SMEMB_COPY_L2G`/`SMEMB_COPY_H2G`）只拷贝数据，**不会**将 GVA 对应的 blob 状态翻转为 READABLE；调用方必须再调用 `mmcc_batch_write_finish` 显式通知写完成。
 
 **参数**:
 
@@ -313,6 +313,24 @@ int32_t mmcc_batch_copy(const uint64_t *gvas, void **buffers, const size_t *size
 **返回值**:
 - `0`: 成功
 - 其他: 失败
+
+#### mmcc_batch_write_finish
+```c
+int32_t mmcc_batch_write_finish(const char **keys, uint32_t keys_count,
+                                const int32_t *writeResults, int32_t *outResults);
+```
+**功能**: 显式通知 meta service 给定 key 的写入已完成。调用方在 `mmcc_batch_copy` 写方向完成后必须调用此接口，meta service 才会将对应 blob 从 `ALLOCATED` 翻转为 `READABLE`，此后其他进程才能通过 `mmcc_query` / `mmcc_batch_copy` 读方向读到数据。对于已处于 `READABLE` 的 key，再次调用为幂等并直接返回成功；对未分配过的 key 返回 `MMC_UNMATCHED_KEY`。
+
+**参数**:
+
+- `keys`: 已写入完成的键列表，每个键长度小于 256 个字节
+- `keys_count`: 键的数量
+- `writeResults`: 与 `keys` 等长的每键写入结果，`0` 表示成功（对应 `MMC_WRITE_OK`，blob 翻为 `READABLE`），非 `0` 表示失败（对应 `MMC_WRITE_FAIL`，meta service 会移除该 blob）
+- `outResults`: 与 `keys` 等长的输出数组，每个元素为 meta service 对该键的实际更新结果
+
+**返回值**:
+- `0`: 批量 RPC 调用本身成功
+- 其他: RPC 调用失败（此时 `outResults` 中对应位置为错误码）
 
 #### mmcc_batch_remove
 ```c

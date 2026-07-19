@@ -739,7 +739,8 @@ TEST_F(TestMmcMetaManager, GvaWriteOk_BecomesReadable)
     ASSERT_EQ(objMeta.NumBlobs(), 1);
 
     const auto &blob = objMeta.blobs_[0];
-    ret = metaMng->UpdateBlobState(blob.gva_, blob.size_, MMC_WRITE_OK);
+    MmcLocation blobLoc{blob.rank_, static_cast<MediaType>(blob.mediaType_)};
+    ret = metaMng->UpdateState("gva_key_2", blobLoc, MMC_WRITE_OK, opId1);
     ASSERT_EQ(ret, MMC_OK);
 
     bool matched = false;
@@ -799,42 +800,6 @@ TEST_F(TestMmcMetaManager, AddRemoveLease_WorksForRegularReadableSingleBlob)
     metaMng->Stop();
 }
 
-TEST_F(TestMmcMetaManager, GvaPartialWrite_StillNotReadable)
-{
-    MmcLocation loc{0, MEDIA_DRAM};
-    MmcLocalMemlInitInfo locInfo{0, 1000000};
-    uint64_t defaultTtl = 2000;
-    uint64_t opId1 = 1;
-    uint64_t opId2 = 2;
-    auto metaMng = MmcMakeRef<MmcMetaManager>(defaultTtl, 70U, 60U, REWARM_DRAM_WATERMARK);
-    ASSERT_TRUE(metaMng != nullptr);
-    ASSERT_EQ(metaMng->Start(), MMC_OK);
-    std::vector<std::pair<std::string, MmcMemBlobDesc>> blobMap;
-    ASSERT_EQ(metaMng->Mount(loc, locInfo, blobMap, false), MMC_OK);
-
-    AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, ALLOC_FLAGS_GVA_MALLOC_MASK};
-
-    MmcMemMetaDesc objMeta;
-    Result ret = metaMng->Alloc("gva_key_3", allocReq, opId1, objMeta);
-    ASSERT_EQ(ret, MMC_OK);
-    ASSERT_EQ(objMeta.NumBlobs(), 1);
-
-    const auto &blob = objMeta.blobs_[0];
-    uint64_t partialSize = blob.size_ / 2;
-    ret = metaMng->UpdateBlobState(blob.gva_, partialSize, MMC_WRITE_OK);
-    ASSERT_EQ(ret, MMC_OK);
-
-    MemObjQueryInfo queryInfo;
-    ret = QueryKey(metaMng, "gva_key_3", opId2, queryInfo);
-    ASSERT_EQ(ret, MMC_OK);
-    ASSERT_TRUE(queryInfo.valid_);
-    ASSERT_EQ(queryInfo.numBlobs_, 1);
-    ASSERT_EQ(queryInfo.blobs_[0].state_, ALLOCATED);
-
-    metaMng->Remove("gva_key_3");
-    metaMng->Stop();
-}
-
 TEST_F(TestMmcMetaManager, GvaRemoveAfterReadable_CleansIndex)
 {
     MmcLocation loc{0, MEDIA_DRAM};
@@ -856,7 +821,8 @@ TEST_F(TestMmcMetaManager, GvaRemoveAfterReadable_CleansIndex)
     ASSERT_EQ(objMeta.NumBlobs(), 1);
 
     const auto &blob = objMeta.blobs_[0];
-    ASSERT_EQ(metaMng->UpdateBlobState(blob.gva_, blob.size_, MMC_WRITE_OK), MMC_OK);
+    MmcLocation blobLoc4{blob.rank_, static_cast<MediaType>(blob.mediaType_)};
+    ASSERT_EQ(metaMng->UpdateState("gva_key_4", blobLoc4, MMC_WRITE_OK, opId1), MMC_OK);
     ASSERT_EQ(metaMng->Remove("gva_key_4"), MMC_OK);
     ASSERT_EQ(metaMng->ExistKey("gva_key_4"), MMC_UNMATCHED_KEY);
 
@@ -898,7 +864,8 @@ TEST_F(TestMmcMetaManager, GvaWriteFail_RemovesKey)
     ASSERT_EQ(objMeta.NumBlobs(), 1);
 
     const auto &blob = objMeta.blobs_[0];
-    ret = metaMng->UpdateBlobState(blob.gva_, blob.size_, MMC_WRITE_FAIL);
+    MmcLocation blobLoc5{blob.rank_, static_cast<MediaType>(blob.mediaType_)};
+    ret = metaMng->UpdateState("gva_key_5", blobLoc5, MMC_WRITE_FAIL, opId1);
     ASSERT_EQ(ret, MMC_OK);
     ASSERT_EQ(metaMng->ExistKey("gva_key_5"), MMC_UNMATCHED_KEY);
 
@@ -940,7 +907,8 @@ TEST_F(TestMmcMetaManager, GvaUnmount_CleansSegmentIndex)
     ASSERT_EQ(objMeta.NumBlobs(), 1);
 
     const auto &blob = objMeta.blobs_[0];
-    ASSERT_EQ(metaMng->UpdateBlobState(blob.gva_, blob.size_, MMC_WRITE_OK), MMC_OK);
+    MmcLocation blobLoc6{blob.rank_, static_cast<MediaType>(blob.mediaType_)};
+    ASSERT_EQ(metaMng->UpdateState("gva_key_6", blobLoc6, MMC_WRITE_OK, opId1), MMC_OK);
 
     ASSERT_EQ(metaMng->Unmount(loc), MMC_OK);
 

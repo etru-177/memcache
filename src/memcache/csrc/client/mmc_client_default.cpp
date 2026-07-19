@@ -506,7 +506,7 @@ Result MmcClientDefault::BatchGet(const std::vector<std::string> &keys, const st
     return MMC_OK;
 }
 
-Result MmcClientDefault::Remove(const char *key, uint32_t flags) const
+Result MmcClientDefault::Remove(const char *key, uint32_t flags)
 {
     MMC_VALIDATE_RETURN(metaNetClient_ != nullptr, "MetaNetClient is null", MMC_CLIENT_NOT_INIT);
 
@@ -514,11 +514,14 @@ Result MmcClientDefault::Remove(const char *key, uint32_t flags) const
     Response response;
     MMC_RETURN_ERROR(metaNetClient_->SyncCall(request, response, rpcRetryTimeOut_),
                      "client " << name_ << " remove " << key << " failed");
+    if (response.ret_ == MMC_OK) {
+        gvaBlobTracker_.RemoveByKey(std::string(key));
+    }
     return response.ret_;
 }
 
 Result MmcClientDefault::BatchRemove(const std::vector<std::string> &keys, std::vector<Result> &remove_results,
-                                     uint32_t flags) const
+                                     uint32_t flags)
 {
     MMC_VALIDATE_RETURN(metaNetClient_ != nullptr, "MetaNetClient is null", MMC_CLIENT_NOT_INIT);
 
@@ -536,10 +539,15 @@ Result MmcClientDefault::BatchRemove(const std::vector<std::string> &keys, std::
     }
 
     remove_results = response.results_;
+    for (size_t i = 0; i < keys.size(); ++i) {
+        if (remove_results[i] == MMC_OK) {
+            gvaBlobTracker_.RemoveByKey(keys[i]);
+        }
+    }
     return MMC_OK;
 }
 
-Result MmcClientDefault::RemoveAll(uint32_t flags) const
+Result MmcClientDefault::RemoveAll(uint32_t flags)
 {
     MMC_VALIDATE_RETURN(metaNetClient_ != nullptr, "MetaNetClient is null", MMC_CLIENT_NOT_INIT);
 
@@ -549,6 +557,7 @@ Result MmcClientDefault::RemoveAll(uint32_t flags) const
     MMC_RETURN_ERROR(metaNetClient_->SyncCall(request, response, rpcRetryTimeOut_),
                      "client " << name_ << " RemoveAll failed");
 
+    gvaBlobTracker_.Clear();
     return MMC_OK;
 }
 
@@ -690,9 +699,9 @@ Result MmcClientDefault::BatchAddLease(const std::vector<std::string> &keys, uin
     std::vector<uint64_t> operateIds;
     operateIds.reserve(keys.size());
     for (const auto &key : keys) {
-        LocalGvaBlobInfoPtr info{};
+        LocalGvaBlobInfo info{};
         Result findRet = gvaBlobTracker_.FindReadLeaseByKey(key, info);
-        operateIds.push_back(findRet == MMC_OK && info != nullptr ? info->operateId : newOperateId);
+        operateIds.push_back(findRet == MMC_OK ? info.operateId : newOperateId);
     }
     BatchUpdateLeaseRequest request{keys, operateIds, leaseTtlMs};
     BatchUpdateLeaseResponse response;
@@ -752,14 +761,14 @@ Result MmcClientDefault::BatchRemoveLease(const std::vector<std::string> &keys)
     std::vector<uint64_t> operateIds;
     operateIds.reserve(keys.size());
     for (size_t i = 0; i < keys.size(); ++i) {
-        LocalGvaBlobInfoPtr info{};
+        LocalGvaBlobInfo info{};
         Result findRet = gvaBlobTracker_.FindReadLeaseByKey(keys[i], info);
         if (findRet != MMC_OK) {
             MMC_LOG_ERROR("client " << name_ << " batch remove lease find local gva info failed, key:" << keys[i]
                                     << ", ret:" << findRet);
             return findRet;
         }
-        operateIds.push_back(info->operateId);
+        operateIds.push_back(info.operateId);
     }
 
     BatchUpdateLeaseRequest request{keys, operateIds, 0, 1};
@@ -903,31 +912,6 @@ void MmcClientDefault::AsyncUpdateLease(BatchUpdateLeaseRequest &request)
     }
 }
 
-Result MmcClientDefault::SyncUpdateBlobByGva(BatchUpdateBlobRequest &updateRequest)
-{
-    TP_TRACE_BEGIN(TP_MMC_LOCAL_BATCH_UPDATE_BLOB);
-    BatchUpdateResponse updateResponse;
-    Result updateResult = metaNetClient_->SyncCall(updateRequest, updateResponse, rpcRetryTimeOut_);
-    TP_TRACE_END(TP_MMC_LOCAL_BATCH_UPDATE_BLOB, updateResult);
-    if (updateResult != MMC_OK || updateResponse.results_.size() != updateRequest.gvas_.size()) {
-        MMC_LOG_ERROR("client " << name_ << " batch get update failed:" << updateResult << ", gva size:"
-                                << updateRequest.gvas_.size() << ", ret size:" << updateResponse.results_.size());
-        return updateResult != MMC_OK ? updateResult : MMC_ERROR;
-    }
-
-    Result finalResult = MMC_OK;
-    for (size_t i = 0; i < updateRequest.gvas_.size() && i < updateRequest.gvas_.size(); ++i) {
-        if (updateResponse.results_[i] != MMC_OK) {
-            MMC_LOG_ERROR("client " << name_ << " batch put update for gva " << updateRequest.gvas_[i]
-                                    << " failed:" << updateResponse.results_[i]);
-            if (finalResult == MMC_OK) {
-                finalResult = updateResponse.results_[i];
-            }
-        }
-    }
-    return finalResult;
-}
-
 Result MmcClientDefault::RegisterPeriodicTask(const std::string &taskName, uint32_t intervalSeconds,
                                               MmcPeriodicTask::Task task)
 {
@@ -954,7 +938,7 @@ Result MmcClientDefault::RegisterPeriodicTask(const std::string &taskName, uint3
 void MmcClientDefault::ProcessExpiredReadLeases()
 {
     const uint64_t nowMs = NowMs();
-    std::vector<LocalGvaBlobInfoPtr> claimedInfos;
+    std::vector<LocalGvaBlobInfo> claimedInfos;
     gvaBlobTracker_.CollectExpiredReadFinishClaims(nowMs, claimedInfos);
     if (claimedInfos.empty()) {
         return;
@@ -1173,7 +1157,7 @@ Result MmcClientDefault::BatchMalloc(const std::vector<std::string> &keys, const
         }
 
         gvas[i] = blobs[0].gva_;
-        Result trackRet = gvaBlobTracker_.RegisterFromBatchAlloc(key, blobs[0]);
+        Result trackRet = gvaBlobTracker_.RegisterFromBatchAlloc(key, blobs[0], operateId);
         if (trackRet != MMC_OK) {
             MMC_LOG_ERROR("Register batch alloc gva info failed for key " << key << ", ret:" << trackRet);
         }
@@ -1181,7 +1165,7 @@ Result MmcClientDefault::BatchMalloc(const std::vector<std::string> &keys, const
     return MMC_OK;
 }
 
-void MmcClientDefault::BuildReadFinishRequestsByOperateId(const std::vector<LocalGvaBlobInfoPtr> &claimedInfos,
+void MmcClientDefault::BuildReadFinishRequestsByOperateId(const std::vector<LocalGvaBlobInfo> &claimedInfos,
                                                           std::vector<BatchUpdateRequest> &requests)
 {
     requests.clear();
@@ -1189,24 +1173,24 @@ void MmcClientDefault::BuildReadFinishRequestsByOperateId(const std::vector<Loca
     for (const auto &claimedInfo : claimedInfos) {
         size_t groupIndex = requests.size();
         for (size_t i = 0; i < requests.size(); ++i) {
-            if (requests[i].operateId_ == claimedInfo->operateId) {
+            if (requests[i].operateId_ == claimedInfo.operateId) {
                 groupIndex = i;
                 break;
             }
         }
         if (groupIndex == requests.size()) {
             requests.emplace_back();
-            requests.back().operateId_ = claimedInfo->operateId;
+            requests.back().operateId_ = claimedInfo.operateId;
         }
 
         requests[groupIndex].actionResults_.push_back(MMC_READ_FINISH);
-        requests[groupIndex].keys_.push_back(claimedInfo->key);
-        requests[groupIndex].ranks_.push_back(claimedInfo->blob.rank_);
-        requests[groupIndex].mediaTypes_.push_back(claimedInfo->blob.mediaType_);
+        requests[groupIndex].keys_.push_back(claimedInfo.key);
+        requests[groupIndex].ranks_.push_back(claimedInfo.blob.rank_);
+        requests[groupIndex].mediaTypes_.push_back(claimedInfo.blob.mediaType_);
     }
 }
 
-Result MmcClientDefault::NotifyReadFinishClaims(const std::vector<LocalGvaBlobInfoPtr> &claimedInfos)
+Result MmcClientDefault::NotifyReadFinishClaims(const std::vector<LocalGvaBlobInfo> &claimedInfos)
 {
     if (claimedInfos.empty()) {
         return MMC_OK;
@@ -1219,7 +1203,7 @@ Result MmcClientDefault::NotifyReadFinishClaims(const std::vector<LocalGvaBlobIn
         AsyncUpdateState(request);
     }
     for (const auto &info : claimedInfos) {
-        gvaBlobTracker_.Remove(info->blob.gva_);
+        gvaBlobTracker_.Remove(info.blob.gva_);
     }
     return MMC_OK;
 }
@@ -1227,37 +1211,41 @@ Result MmcClientDefault::NotifyReadFinishClaims(const std::vector<LocalGvaBlobIn
 Result MmcClientDefault::BatchCopyWritePath(std::vector<void *> &gvas, std::vector<void *> &buffers,
                                             std::vector<size_t> &sizes, int32_t direct)
 {
-    std::vector<LocalGvaBlobInfoPtr> writeInfos;
-    writeInfos.reserve(gvas.size());
+    std::vector<void *> toGvas{};
+    std::vector<void *> toBuffers{};
+    std::vector<size_t> toSizes{};
+
     for (size_t i = 0; i < gvas.size(); ++i) {
-        LocalGvaBlobInfoPtr info{};
+        LocalGvaBlobInfo info{};
         Result findRet = gvaBlobTracker_.FindWritable(reinterpret_cast<uint64_t>(gvas[i]), sizes[i], info);
+        if (findRet == MMC_WRITE_READABLE_BLOB) {
+            continue;
+        }
         if (findRet != MMC_OK) {
             MMC_LOG_ERROR("client " << name_ << " batch copy write prepare local gva info failed, gva:"
                                     << reinterpret_cast<uint64_t>(gvas[i]) << ", size:" << sizes[i]
                                     << ", ret:" << findRet);
             return findRet;
         }
-        writeInfos.push_back(info);
+        toGvas.push_back(gvas[i]);
+        toBuffers.push_back(buffers[i]);
+        toSizes.push_back(sizes[i]);
     }
-
-    Result putResult = BatchDataOperation(gvas, buffers, sizes, direct);
-    std::vector<BlobActionResult> actions(sizes.size(), (putResult == MMC_OK ? MMC_WRITE_OK : MMC_WRITE_FAIL));
-    Result updateRet = NotifyUpdateBlobByGva(gvas, sizes, actions);
-    Result trackRet = gvaBlobTracker_.FinalizeWriteTracking(gvas, sizes, writeInfos, putResult, updateRet);
-    if (trackRet != MMC_OK) {
-        return trackRet;
+    if (toGvas.empty()) {
+        return MMC_OK;
     }
-    return putResult != MMC_OK ? putResult : updateRet;
+    MMC_LOG_DEBUG("client " << name_ << " batch copy write path, count=" << gvas.size() << ", direct=" << direct
+                            << ", state flip deferred to BatchWriteFinish");
+    return BatchDataOperation(toGvas, toBuffers, toSizes, direct);
 }
 
 Result MmcClientDefault::BatchCopyReadPath(std::vector<void *> &gvas, std::vector<void *> &buffers,
                                            std::vector<size_t> &sizes, int32_t direct)
 {
-    std::vector<LocalGvaBlobInfoPtr> readInfos;
+    std::vector<LocalGvaBlobInfo> readInfos;
     readInfos.reserve(gvas.size());
     for (size_t i = 0; i < gvas.size(); ++i) {
-        LocalGvaBlobInfoPtr info{};
+        LocalGvaBlobInfo info{};
         Result findRet = gvaBlobTracker_.FindReadable(reinterpret_cast<uint64_t>(gvas[i]), sizes[i], info);
         if (findRet != MMC_OK) {
             MMC_LOG_ERROR("client " << name_ << " batch copy read prepare local gva info failed, gva:"
@@ -1275,7 +1263,7 @@ Result MmcClientDefault::BatchCopyReadPath(std::vector<void *> &gvas, std::vecto
 
     const uint64_t nowMs = NowMs();
     for (const auto &info : readInfos) {
-        if (info != nullptr && info->IsLeaseExpired(nowMs)) {
+        if (info.IsLeaseExpired(nowMs)) {
             MMC_LOG_ERROR("client " << name_ << " batch copy read lease expired.");
             return MMC_LEASE_EXPIRED;
         }
@@ -1306,23 +1294,60 @@ Result MmcClientDefault::BatchCopy(std::vector<void *> &gvas, std::vector<void *
     return MMC_ERROR;
 }
 
-Result MmcClientDefault::NotifyUpdateBlobByGva(const std::vector<void *> &gvas, const std::vector<size_t> &sizes,
-                                               const std::vector<BlobActionResult> &actions)
+Result MmcClientDefault::BatchWriteFinish(const std::vector<std::string> &keys,
+                                          const std::vector<int32_t> &writeResults, std::vector<int32_t> &outResults)
 {
-    MMC_VALIDATE_RETURN(gvas.size() == sizes.size() && gvas.size() == actions.size(),
-                        "Invalid batch update blob input size", MMC_INVALID_PARAM);
-    BatchUpdateBlobRequest updateGva{};
-    updateGva.gvas_.reserve(gvas.size());
+    MMC_VALIDATE_RETURN(bmProxy_ != nullptr, "BmProxy is null", MMC_CLIENT_NOT_INIT);
+    MMC_VALIDATE_RETURN(metaNetClient_ != nullptr, "MetaNetClient is null", MMC_CLIENT_NOT_INIT);
+    MMC_VALIDATE_RETURN(!keys.empty(), "keys is empty", MMC_INVALID_PARAM);
+    MMC_VALIDATE_RETURN(keys.size() == writeResults.size(),
+                        "keys size (" << keys.size() << ") != writeResults size (" << writeResults.size() << ")",
+                        MMC_INVALID_PARAM);
 
-    for (auto gva : gvas) {
-        updateGva.gvas_.push_back(reinterpret_cast<uint64_t>(gva));
+    outResults.assign(keys.size(), MMC_INVALID_PARAM);
+
+    BatchUpdateRequest updateRequest{};
+    updateRequest.keys_ = keys;
+    updateRequest.ranks_.resize(keys.size(), 0);
+    updateRequest.mediaTypes_.resize(keys.size(), static_cast<uint16_t>(MEDIA_DRAM));
+    updateRequest.actionResults_.resize(keys.size());
+    for (size_t i = 0; i < keys.size(); ++i) {
+        LocalGvaBlobInfo info{};
+        Result findRet = gvaBlobTracker_.FindBlobByKey(keys[i], info);
+        if (findRet == MMC_OK) {
+            updateRequest.ranks_[i] = info.blob.rank_;
+            updateRequest.mediaTypes_[i] = info.blob.mediaType_;
+            if (i == 0) {
+                updateRequest.operateId_ = info.operateId;
+            }
+        }
+        updateRequest.actionResults_[i] = (writeResults[i] == MMC_OK) ? MMC_WRITE_OK : MMC_WRITE_FAIL;
     }
 
-    updateGva.sizes_ = sizes;
-    updateGva.actionResults_ = actions;
+    MMC_LOG_DEBUG("client " << name_ << " batch write finish: keysCnt=" << keys.size());
 
-    // 写需要同步更新，异步更新会出现立即读查询blob不可读的情况
-    return SyncUpdateBlobByGva(updateGva);
+    TP_TRACE_BEGIN(TP_MMC_LOCAL_BATCH_UPDATE);
+    BatchUpdateResponse updateResponse;
+    Result updateResult = metaNetClient_->SyncCall(updateRequest, updateResponse, rpcRetryTimeOut_);
+    TP_TRACE_END(TP_MMC_LOCAL_BATCH_UPDATE, updateResult);
+    for (size_t i = 0; i < keys.size(); ++i) {
+        if (writeResults[i] == MMC_OK) {
+            gvaBlobTracker_.MarkWriteSuccess(keys[i]);
+        } else {
+            gvaBlobTracker_.RemoveByKey(keys[i]);
+        }
+    }
+    if (updateResult != MMC_OK || updateResponse.results_.size() != keys.size()) {
+        MMC_LOG_ERROR("client " << name_ << " batch write finish failed:" << updateResult << ", keysCnt:" << keys.size()
+                                << ", retSize:" << updateResponse.results_.size());
+        return MMC_ERROR;
+    }
+
+    for (size_t i = 0; i < keys.size(); ++i) {
+        outResults[i] = updateResponse.results_[i];
+    }
+    MMC_LOG_DEBUG("client " << name_ << " batch write finish done: keysCnt=" << keys.size());
+    return MMC_OK;
 }
 
 Result MmcClientDefault::BatchDataOperation(std::vector<void *> &gvas, std::vector<void *> &buffers,

@@ -60,11 +60,11 @@ public:
     Result BatchGet(const std::vector<std::string> &keys, const std::vector<MmcBufferArray> &bufArrs, uint32_t flags,
                     std::vector<int> &batchResult);
 
-    Result Remove(const char *key, uint32_t flags) const;
+    Result Remove(const char *key, uint32_t flags);
 
-    Result BatchRemove(const std::vector<std::string> &keys, std::vector<Result> &remove_results, uint32_t flags) const;
+    Result BatchRemove(const std::vector<std::string> &keys, std::vector<Result> &remove_results, uint32_t flags);
 
-    Result RemoveAll(uint32_t flags) const;
+    Result RemoveAll(uint32_t flags);
 
     Result IsExist(const std::string &key, uint32_t flags) const;
 
@@ -84,6 +84,9 @@ public:
 
     Result BatchCopy(std::vector<void *> &gvas, std::vector<void *> &buffers, std::vector<size_t> &sizes,
                      const int32_t direct);
+
+    Result BatchWriteFinish(const std::vector<std::string> &keys, const std::vector<int32_t> &writeResults,
+                            std::vector<int32_t> &outResults);
 
     Result RegisterBuffer(uint64_t addr, uint64_t size);
 
@@ -148,7 +151,6 @@ private:
     void AsyncUpdateState(BatchUpdateRequest &updateRequest);
     void SyncUpdateLease(BatchUpdateLeaseRequest &request);
     void AsyncUpdateLease(BatchUpdateLeaseRequest &request);
-    Result SyncUpdateBlobByGva(BatchUpdateBlobRequest &updateRequest);
     std::future<int32_t> SubmitPutTask(BatchCopyDesc &copyDesc, MediaType mediaType, bool asyncExec);
     std::future<int32_t> SubmitGetTask(BatchCopyDesc &copyDesc, MediaType mediaType, bool asyncExec);
     Result BatchDataOperation(std::vector<void *> &gvas, std::vector<void *> &buffers, std::vector<size_t> &sizes,
@@ -157,15 +159,13 @@ private:
                               int32_t direct);
     Result BatchCopyReadPath(std::vector<void *> &gvas, std::vector<void *> &buffers, std::vector<size_t> &sizes,
                              int32_t direct);
-    Result NotifyUpdateBlobByGva(const std::vector<void *> &gvas, const std::vector<size_t> &sizes,
-                                 const std::vector<BlobActionResult> &actions);
     Result RegisterPeriodicTask(const std::string &taskName, uint32_t intervalSeconds, MmcPeriodicTask::Task task);
     void ProcessExpiredReadLeases();
     Result ExecuteConcurrently(const std::vector<void *> &gvas, const std::vector<void *> &buffers,
                                const std::vector<size_t> &sizes, bool isPut, MediaType mediaType, size_t chunkSize);
-    void BuildReadFinishRequestsByOperateId(const std::vector<LocalGvaBlobInfoPtr> &claimedInfos,
+    void BuildReadFinishRequestsByOperateId(const std::vector<LocalGvaBlobInfo> &claimedInfos,
                                             std::vector<BatchUpdateRequest> &requests);
-    Result NotifyReadFinishClaims(const std::vector<LocalGvaBlobInfoPtr> &claimedInfos);
+    Result NotifyReadFinishClaims(const std::vector<LocalGvaBlobInfo> &claimedInfos);
 
     // UBS IO相关数据结构，保留供后续 SSD→DRAM 回暖使用
     struct UbsIoBatchGetData {

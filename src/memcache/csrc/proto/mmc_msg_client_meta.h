@@ -184,36 +184,6 @@ struct BatchGetRequest : MsgBase {
     }
 };
 
-struct BatchUpdateBlobRequest : MsgBase {
-    std::vector<uint64_t> gvas_{};
-    std::vector<uint64_t> sizes_{};
-    std::vector<BlobActionResult> actionResults_;
-
-    BatchUpdateBlobRequest() : MsgBase{0, ML_BATCH_UPDATE_BLOB_REQ, 0} {}
-
-    Result Serialize(NetMsgPacker &packer) const override
-    {
-        packer.Serialize(msgVer);
-        packer.Serialize(msgId);
-        packer.Serialize(destRankId);
-        packer.Serialize(gvas_);
-        packer.Serialize(sizes_);
-        packer.Serialize(actionResults_);
-        return MMC_OK;
-    }
-
-    Result Deserialize(NetMsgUnpacker &packer) override
-    {
-        packer.Deserialize(msgVer);
-        packer.Deserialize(msgId);
-        packer.Deserialize(destRankId);
-        packer.Deserialize(gvas_);
-        packer.Deserialize(sizes_);
-        packer.Deserialize(actionResults_);
-        return MMC_OK;
-    }
-};
-
 struct BatchUpdateRequest : MsgBase {
     std::vector<BlobActionResult> actionResults_;
     std::vector<std::string> keys_;

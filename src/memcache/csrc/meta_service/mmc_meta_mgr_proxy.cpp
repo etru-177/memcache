@@ -168,33 +168,6 @@ Result MmcMetaMgrProxy::BatchUpdateState(const BatchUpdateRequest &req, BatchUpd
     return MMC_OK;
 }
 
-Result MmcMetaMgrProxy::BatchUpdateBlobState(const BatchUpdateBlobRequest &req, BatchUpdateResponse &resp)
-{
-    const size_t gvaCount = req.gvas_.size();
-    if (gvaCount != req.sizes_.size() || gvaCount != req.actionResults_.size()) {
-        MMC_LOG_ERROR("Input vectors size mismatch {gvaNum:" << req.gvas_.size() << ", sizeNum:" << req.sizes_.size()
-                                                             << ", retNum:" << req.actionResults_.size() << "}");
-        return MMC_ERROR;
-    }
-
-    for (size_t i = 0; i < gvaCount; ++i) {
-        if (req.actionResults_[i] != MMC_WRITE_OK && req.actionResults_[i] != MMC_WRITE_FAIL) {
-            MMC_LOG_ERROR("unsupported gva action " << req.actionResults_[i] << ", gva:" << req.gvas_[i]
-                                                    << ", size:" << req.sizes_[i]);
-            resp.results_.push_back(MMC_INVALID_PARAM);
-            continue;
-        }
-
-        Result ret = metaMangerPtr_->UpdateBlobState(req.gvas_[i], req.sizes_[i], req.actionResults_[i]);
-        if (ret != MMC_OK) {
-            MMC_LOG_ERROR("update for gva: " << req.gvas_[i] << ", size:" << req.sizes_[i]
-                                             << ", action:" << req.actionResults_[i] << " failed, error: " << ret);
-        }
-        resp.results_.push_back(ret);
-    }
-    return MMC_OK;
-}
-
 Result MmcMetaMgrProxy::BatchUpdateLease(const BatchUpdateLeaseRequest &req, BatchUpdateLeaseResponse &resp)
 {
     resp.ret_ = MMC_OK;

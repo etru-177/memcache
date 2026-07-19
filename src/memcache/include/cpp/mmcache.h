@@ -363,6 +363,20 @@ public:
      */
     virtual int BatchCopy(std::vector<void *> &gvas, std::vector<void *> &buffers, std::vector<size_t> &sizes,
                           const int32_t direct = 3) = 0;
+
+    /**
+     * @brief Notify meta service that the writes for the given keys are finished
+     *
+     * Caller must invoke this after writing data via BatchCopy (write direction) so that the
+     * corresponding blobs transition from ALLOCATED to READABLE. Re-invoking on an already-finished
+     * key is idempotent.
+     * @param keys Vector of keys whose writes are finished
+     * @param writeResults Per-key write result, 0 means OK (MMC_WRITE_OK) and non-zero means FAIL
+     *                     (MMC_WRITE_FAIL, meta service removes the blob)
+     * @return Vector of meta service update result per key, 0 if success
+     */
+    virtual std::vector<int> BatchWriteFinish(const std::vector<std::string> &keys,
+                                              const std::vector<int32_t> &writeResults) = 0;
 };
 
 } // namespace mmc

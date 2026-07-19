@@ -72,8 +72,6 @@ private:
 
     Result HandleBatchUpdateLease(const NetContextPtr &context);
 
-    Result HandleBatchUpdateBlob(const NetContextPtr &context);
-
     Result HandleUbsIoMetaDelete(const NetContextPtr &context);
 
 private:

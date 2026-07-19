@@ -284,6 +284,54 @@ MMC_API int32_t mmcc_batch_copy(const uint64_t *gvas, void **buffers, const size
     return MmcClientDefault::GetInstance()->BatchCopy(gvaVector, bufferVector, sizeVector, direct);
 }
 
+MMC_API int32_t mmcc_batch_write_finish(const char **keys, uint32_t keys_count, const int32_t *writeResults,
+                                        int32_t *outResults)
+{
+    MMC_VALIDATE_RETURN(MmcClientDefault::GetInstance() != nullptr, "client is not initialize", MMC_CLIENT_NOT_INIT);
+    MMC_VALIDATE_RETURN(keys != nullptr, "invalid param, keys is null", MMC_INVALID_PARAM);
+    MMC_VALIDATE_RETURN(keys_count != 0, "invalid param, keys_count: " << keys_count, MMC_INVALID_PARAM);
+    MMC_VALIDATE_RETURN(writeResults != nullptr, "invalid param, writeResults is null", MMC_INVALID_PARAM);
+    MMC_VALIDATE_RETURN(outResults != nullptr, "invalid param, outResults is null", MMC_INVALID_PARAM);
+
+    MMC_LOG_DEBUG("mmcc_batch_write_finish enter, keys_count=" << keys_count);
+
+    std::vector<std::string> keysVector;
+    std::vector<int32_t> writeResultsVector;
+    std::vector<size_t> validIndices;
+    keysVector.reserve(keys_count);
+    writeResultsVector.reserve(keys_count);
+    validIndices.reserve(keys_count);
+    for (size_t i = 0; i < keys_count; ++i) {
+        outResults[i] = MMC_INVALID_PARAM;
+        Result keyRet = ValidateBatchKey(keys[i], i);
+        if (keyRet != MMC_OK) {
+            outResults[i] = keyRet;
+            continue;
+        }
+        keysVector.emplace_back(keys[i]);
+        writeResultsVector.emplace_back(writeResults[i]);
+        validIndices.emplace_back(i);
+    }
+    if (keysVector.empty()) {
+        return MMC_INVALID_PARAM;
+    }
+
+    std::vector<int32_t> finishResults;
+    Result ret = MmcClientDefault::GetInstance()->BatchWriteFinish(keysVector, writeResultsVector, finishResults);
+    if (finishResults.size() != keysVector.size()) {
+        MMC_LOG_ERROR("invalid batch write finish results' size (" << finishResults.size() << "), should be "
+                                                                   << keysVector.size());
+        for (auto index : validIndices) {
+            outResults[index] = ret == MMC_OK ? MMC_ERROR : ret;
+        }
+        return ret == MMC_OK ? MMC_ERROR : ret;
+    }
+    for (size_t i = 0; i < finishResults.size(); ++i) {
+        outResults[validIndices[i]] = finishResults[i];
+    }
+    return ret;
+}
+
 MMC_API int32_t mmcc_remove(const char *key, uint32_t flags)
 {
     MMC_VALIDATE_RETURN(MmcClientDefault::GetInstance() != nullptr, "client is not initialize", MMC_CLIENT_NOT_INIT);

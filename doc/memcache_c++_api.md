@@ -350,7 +350,7 @@ virtual std::vector<uintptr_t> BatchMalloc(const std::vector<std::string> &keys,
 virtual int BatchCopy(std::vector<void *> &gvas, std::vector<void *> &buffers, std::vector<size_t> &sizes,
                           const int32_t direct = 3) = 0;
 ```
-**功能**: 批量在 GVA 地址与本地缓冲区之间执行数据拷贝。
+**功能**: 批量在 GVA 地址与本地缓冲区之间执行数据拷贝。注意：写方向（如 `SMEMB_COPY_L2G`/`SMEMB_COPY_H2G`）只拷贝数据，**不会**将 GVA 对应的 blob 状态翻转为 READABLE；调用方必须再调用 `MmcacheStore::BatchWriteFinish` 显式通知写完成，blob 才会进入可读状态。
 
 **参数**:
 - `gvas`: GVA 地址列表
@@ -362,8 +362,22 @@ virtual int BatchCopy(std::vector<void *> &gvas, std::vector<void *> &buffers, s
 - `0`: 成功
 - 其他: 失败
 
+#### BatchWriteFinish
+```c++
+virtual std::vector<int> BatchWriteFinish(const std::vector<std::string> &keys,
+                                         const std::vector<int32_t> &writeResults) = 0;
+```
+**功能**: 显式通知 meta service 给定 key 的写入已完成。调用方在 `BatchCopy` 写方向完成后必须调用此接口，meta service 才会将对应 blob 从 `ALLOCATED` 翻转为 `READABLE`，此后其他进程才能通过 `BatchGetKeyInfo` / `BatchCopy` 读方向读到数据。对于已处于 `READABLE` 的 key，再次调用为幂等并直接返回成功；对未分配过的 key 返回 `MMC_UNMATCHED_KEY`。
+
+**参数**:
+- `keys`: 已写入完成的键列表，每个键长度小于 256 个字节
+- `writeResults`: 与 `keys` 等长的每键写入结果，`0` 表示成功（对应 `MMC_WRITE_OK`，blob 翻为 `READABLE`），非 `0` 表示失败（对应 `MMC_WRITE_FAIL`，meta service 会移除该 blob）
+
+**返回值**:
+- `std::vector<int>`: 与 `keys` 等长，每个元素为 meta service 对该键的实际更新结果；`0` 表示成功
+
 > 典型 GVA 跨进程读取流程：
-> - 写进程：`BatchMalloc -> BatchCopy`（写入），完成数据写入并使 GVA 进入可读状态。
+> - 写进程：`BatchMalloc -> BatchCopy`（写入数据）-> `BatchWriteFinish` 显式通知写完成，blob 翻为 READABLE。
 > - 读进程：`BatchGetKeyInfo(keys, 0)` 获取 GVA -> `BatchAddLease(...)` 增加读租约并准备 GVA 读取状态 ->
 >   `BatchCopy`（读取）-> `BatchRemoveLease(...)` 显式释放读租约。
 

@@ -25,53 +25,35 @@ namespace mmc {
 struct LocalGvaBlobInfo : public MmcReferable {
     std::string key{};
     MmcMemBlobDesc blob{};
-    bool readable{false};
     uint64_t operateId{0};
     uint64_t leaseDeadlineMs{0};
-    bool readStartSent{false};
-    std::atomic<bool> readFinishInFlight{false};
-    std::atomic<bool> removed{false};
-    std::map<uint64_t, uint64_t> holes{};
-    mutable std::mutex mutex{};
 
     bool IsWritable() const;
     bool IsReadable() const;
     bool IsLeaseExpired(uint64_t nowMs) const;
-    Result ConsumePendingHole(uint64_t gva, uint64_t size, size_t &remainingHoleCount);
-    bool TryClaimReadFinish();
 };
 using LocalGvaBlobInfoPtr = MmcRef<LocalGvaBlobInfo>;
 
 class LocalGvaBlobTracker {
 public:
     void SetName(const std::string &name);
-    Result RegisterFromBatchAlloc(const std::string &key, const MmcMemBlobDesc &blob);
+    Result RegisterFromBatchAlloc(const std::string &key, const MmcMemBlobDesc &blob, uint64_t operateId);
     Result UpdateFromQuery(const std::string &key, const MmcMemBlobDesc &blob, uint64_t operateId,
                            uint64_t leaseDeadlineMs);
-    Result FindReadLeaseByKey(const std::string &key, LocalGvaBlobInfoPtr &info);
-    Result FindWritable(uint64_t gva, uint64_t size, LocalGvaBlobInfoPtr &info);
-    Result FindReadable(uint64_t gva, uint64_t size, LocalGvaBlobInfoPtr &info);
-    Result FinalizeWriteTracking(const std::vector<void *> &gvas, const std::vector<size_t> &sizes,
-                                 const std::vector<LocalGvaBlobInfoPtr> &writeInfos, Result putResult,
-                                 Result updateRet);
-    void CollectExpiredReadFinishClaims(uint64_t nowMs, std::vector<LocalGvaBlobInfoPtr> &claimedInfos);
-    Result ConsumeReadRangesAndCollectClaims(const std::vector<void *> &gvas, const std::vector<size_t> &sizes,
-                                             const std::vector<LocalGvaBlobInfoPtr> &readInfos, bool &hasLeaseExpired,
-                                             std::vector<LocalGvaBlobInfoPtr> &claimedInfos);
-    void MarkWriteSuccess(uint64_t blobStartGva);
-    void CollectExpired(std::vector<LocalGvaBlobInfoPtr> &infos);
+    Result FindReadLeaseByKey(const std::string &key, LocalGvaBlobInfo &info);
+    Result FindBlobByKey(const std::string &key, LocalGvaBlobInfo &info);
+    Result FindWritable(uint64_t gva, uint64_t size, LocalGvaBlobInfo &info);
+    Result FindReadable(uint64_t gva, uint64_t size, LocalGvaBlobInfo &info);
+    void CollectExpiredReadFinishClaims(uint64_t nowMs, std::vector<LocalGvaBlobInfo> &claimedInfos);
+    void CollectExpired(std::vector<LocalGvaBlobInfo> &infos);
+    void MarkWriteSuccess(const std::string &key);
     void Remove(uint64_t blobStartGva);
     void RemoveByKey(const std::string &key);
     void Clear();
 
 private:
-    static void ResetReadHoles(LocalGvaBlobInfo &info);
-    void RemoveBlobLocked(uint64_t blobStartGva);
-    Result UpsertBlobLocked(const LocalGvaBlobInfoPtr &info);
-
     std::mutex mutex_{};
     std::string name_{};
-    std::unordered_map<uint64_t, LocalGvaBlobInfoPtr> blobsByStart_{};
     std::unordered_map<std::string, uint64_t> blobStartByKey_{};
     MmcIntervalMap<LocalGvaBlobInfoPtr> intervals_{};
 };

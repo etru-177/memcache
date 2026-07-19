@@ -821,7 +821,7 @@ gvas = store.batch_alloc(keys, sizes, media=1)
 result = store.batch_copy(gva_ptrs, buffer_ptrs, sizes, direct=SMEMB_COPY_G2L)
 ```
 
-**功能**: 批量在 GVA 地址与本地缓冲区之间执行数据拷贝
+**功能**: 批量在 GVA 地址与本地缓冲区之间执行数据拷贝。注意：写方向（`SMEMB_COPY_L2G`/`SMEMB_COPY_H2G`）只拷贝数据，**不会**将 GVA 对应的 blob 状态翻转为 READABLE；调用方必须再调用 `batch_write_finish` 显式通知写完成。
 
 **参数**:
 
@@ -845,7 +845,7 @@ result = store.batch_copy(gva_ptrs, buffer_ptrs, sizes, direct=SMEMB_COPY_G2L)
 result = store.batch_copy_layers(gva_ptrs, buffer_ptrs, sizes, direct=SMEMB_COPY_G2L)
 ```
 
-**功能**: 以分层数据的形式批量在 GVA 地址与本地缓冲区之间执行拷贝
+**功能**: 以分层数据的形式批量在 GVA 地址与本地缓冲区之间执行拷贝。与 `batch_copy` 一致，写方向只拷贝数据，不翻转 blob 状态；写完后需调用 `batch_write_finish`。
 
 **参数**:
 
@@ -859,8 +859,25 @@ result = store.batch_copy_layers(gva_ptrs, buffer_ptrs, sizes, direct=SMEMB_COPY
 - `0`: 成功
 - 其他: 失败
 
+#### batch_write_finish
+
+```python
+results = store.batch_write_finish(keys, res)
+```
+
+**功能**: 显式通知 meta service 给定 key 的写入已完成。调用方在 `batch_copy` / `batch_copy_layers` 写方向完成后必须调用此接口，meta service 才会将对应 blob 从 `ALLOCATED` 翻转为 `READABLE`，此后其他进程才能通过 `batch_get_key_info` / `batch_copy` 读方向读到数据。对于已处于 `READABLE` 的 key，再次调用为幂等并直接返回成功；对未分配过的 key 返回 `MMC_UNMATCHED_KEY`。
+
+**参数**:
+
+- `keys`: 已写入完成的 key 列表
+- `res`: 与 `keys` 等长的每 key 写入结果，`0` 表示成功（对应 `MMC_WRITE_OK`，blob 翻为 `READABLE`），非 `0` 表示失败（对应 `MMC_WRITE_FAIL`，meta service 会移除该 blob）
+
+**返回值**:
+
+- `List[int]`: 与 `keys` 等长，每个元素为 meta service 对该 key 的实际更新结果；`0` 表示成功
+
 > 典型 GVA 跨进程读取流程：
-> - 写进程：`batch_alloc -> batch_copy`（写入），完成数据写入并使 GVA 进入可读状态。
+> - 写进程：`batch_alloc` -> `batch_copy` / `batch_copy_layers`（写入数据）-> `batch_write_finish` 显式通知写完成，blob 翻为 READABLE。
 > - 读进程：`batch_get_key_info(...)` 获取 GVA -> `batch_add_lease(...)` 增加读租约并准备 GVA 读取状态 ->
 >   `batch_copy` / `batch_copy_layers`（读取）-> `batch_remove_lease(...)` 显式释放读租约。
 

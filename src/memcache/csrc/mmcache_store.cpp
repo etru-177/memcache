@@ -1032,5 +1032,29 @@ int MmcacheStore::BatchCopy(std::vector<void *> &gvas, std::vector<void *> &buff
     return ret;
 }
 
+std::vector<int> MmcacheStore::BatchWriteFinish(const std::vector<std::string> &keys,
+                                                const std::vector<int32_t> &writeResults)
+{
+    if (keys.empty()) {
+        MMC_LOG_ERROR("Invalid batch write finish input, key size:" << keys.size());
+        return {};
+    }
+    if (keys.size() != writeResults.size()) {
+        MMC_LOG_ERROR("Input vector sizes mismatch: keys=" << keys.size() << ", writeResults=" << writeResults.size());
+        return std::vector<int>(keys.size(), MMC_INVALID_PARAM);
+    }
+    MMC_LOG_DEBUG("BatchWriteFinish enter, keys=" << keys.size());
+    std::vector<int> outResults(keys.size(), MMC_INVALID_PARAM);
+    std::vector<const char *> keyArray(keys.size());
+    for (size_t i = 0; i < keys.size(); ++i) {
+        keyArray[i] = keys[i].c_str();
+    }
+    TP_TRACE_BEGIN(TP_MMC_PY_BATCH_WRITE_FINISH);
+    Result ret = mmcc_batch_write_finish(keyArray.data(), keys.size(), writeResults.data(), outResults.data());
+    TP_TRACE_END(TP_MMC_PY_BATCH_WRITE_FINISH, ret);
+    (void)ret;
+    return outResults;
+}
+
 } // namespace mmc
 } // namespace ock

@@ -908,6 +908,18 @@ PYBIND11_MODULE(_pymmc, m)
             },
             py::arg("gva_ptrs"), py::arg("buffer_ptrs"), py::arg("sizes"), py::arg("direct") = SMEMB_COPY_G2L)
         .def(
+            "batch_write_finish",
+            [](MmcacheStore &self, const std::vector<std::string> &keys, const std::vector<int32_t> &writeResults) {
+                if (keys.size() != writeResults.size()) {
+                    return std::vector<int>(keys.size(), -1);
+                }
+                py::gil_scoped_release release;
+                return self.BatchWriteFinish(keys, writeResults);
+            },
+            py::arg("keys"), py::arg("res"),
+            "Notify meta service that the writes for the given keys are finished. res is per-key "
+            "write result (0=OK, non-zero=FAIL). Returns per-key meta service update result.")
+        .def(
             "put",
             [](MmcacheStore &self, const std::string &key, const py::buffer &buf,
                const ReplicateConfig &replicateConfig) {
