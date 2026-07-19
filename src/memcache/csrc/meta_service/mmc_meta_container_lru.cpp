@@ -98,7 +98,7 @@ public:
         ock::mf::WriteGuard lockGuard(metaLock_);
         auto iter = metaMap_.find(key);
         if (iter == metaMap_.end()) {
-            MMC_LOG_INFO("Key " << key << " not found in MmcMetaContainer. ErrCode: " << MMC_UNMATCHED_KEY);
+            MMC_LOG_DEBUG("Key " << key << " not found in MmcMetaContainer. ErrCode: " << MMC_UNMATCHED_KEY);
             return MMC_UNMATCHED_KEY;
         }
         auto valueItem = iter->second;

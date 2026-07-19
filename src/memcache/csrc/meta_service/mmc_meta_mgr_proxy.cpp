@@ -149,7 +149,7 @@ Result MmcMetaMgrProxy::BatchUpdateState(const BatchUpdateRequest &req, BatchUpd
         metricManager.IncrementRequestCounter(RestMetricType::UPDATE_STATE, req.ranks_[i]);
         Result ret = metaMangerPtr_->UpdateState(req.keys_[i], loc, action, req.operateId_);
         IncrementResultCounter(metricManager, RestMetricType::UPDATE_STATE, ret, req.ranks_[i]);
-        if (ret != MMC_OK) {
+        if (ret != MMC_OK && ret != MMC_UNMATCHED_KEY) {
             MMC_LOG_ERROR("BatchUpdateState key[" << i << "]=" << req.keys_[i] << " failed, loc=" << loc
                                                   << ", action=" << static_cast<uint32_t>(action) << ", ret=" << ret);
         }

@@ -1307,24 +1307,36 @@ Result MmcClientDefault::BatchWriteFinish(const std::vector<std::string> &keys,
     outResults.assign(keys.size(), MMC_INVALID_PARAM);
 
     BatchUpdateRequest updateRequest{};
-    updateRequest.keys_ = keys;
-    updateRequest.ranks_.resize(keys.size(), 0);
-    updateRequest.mediaTypes_.resize(keys.size(), static_cast<uint16_t>(MEDIA_DRAM));
-    updateRequest.actionResults_.resize(keys.size());
+    std::vector<size_t> sentIdx;
+    updateRequest.keys_.reserve(keys.size());
+    updateRequest.ranks_.reserve(keys.size());
+    updateRequest.mediaTypes_.reserve(keys.size());
+    updateRequest.actionResults_.reserve(keys.size());
+    sentIdx.reserve(keys.size());
     for (size_t i = 0; i < keys.size(); ++i) {
         LocalGvaBlobInfo info{};
         Result findRet = gvaBlobTracker_.FindBlobByKey(keys[i], info);
+        if (findRet == MMC_OK && info.IsReadable()) {
+            outResults[i] = MMC_OK;
+            continue;
+        }
         if (findRet == MMC_OK) {
-            updateRequest.ranks_[i] = info.blob.rank_;
-            updateRequest.mediaTypes_[i] = info.blob.mediaType_;
-            if (i == 0) {
+            updateRequest.ranks_.push_back(info.blob.rank_);
+            updateRequest.mediaTypes_.push_back(info.blob.mediaType_);
+            if (updateRequest.keys_.empty()) {
                 updateRequest.operateId_ = info.operateId;
             }
         }
-        updateRequest.actionResults_[i] = (writeResults[i] == MMC_OK) ? MMC_WRITE_OK : MMC_WRITE_FAIL;
+        updateRequest.keys_.push_back(keys[i]);
+        updateRequest.actionResults_.push_back((writeResults[i] == MMC_OK) ? MMC_WRITE_OK : MMC_WRITE_FAIL);
+        sentIdx.push_back(i);
     }
 
-    MMC_LOG_DEBUG("client " << name_ << " batch write finish: keysCnt=" << keys.size());
+    if (updateRequest.keys_.empty()) {
+        MMC_LOG_DEBUG("client " << name_ << " batch write finish: all keys already readable");
+        return MMC_OK;
+    }
+    MMC_LOG_DEBUG("client " << name_ << " batch write finish: keysCnt=" << keys.size() << ", sent=" << sentIdx.size());
 
     TP_TRACE_BEGIN(TP_MMC_LOCAL_BATCH_UPDATE);
     BatchUpdateResponse updateResponse;
@@ -1337,14 +1349,14 @@ Result MmcClientDefault::BatchWriteFinish(const std::vector<std::string> &keys,
             gvaBlobTracker_.RemoveByKey(keys[i]);
         }
     }
-    if (updateResult != MMC_OK || updateResponse.results_.size() != keys.size()) {
-        MMC_LOG_ERROR("client " << name_ << " batch write finish failed:" << updateResult << ", keysCnt:" << keys.size()
-                                << ", retSize:" << updateResponse.results_.size());
+    if (updateResult != MMC_OK || updateResponse.results_.size() != sentIdx.size()) {
+        MMC_LOG_ERROR("client " << name_ << " batch write finish failed:" << updateResult << ", sent=" << sentIdx.size()
+                                << ", retSize=" << updateResponse.results_.size());
         return MMC_ERROR;
     }
-
-    for (size_t i = 0; i < keys.size(); ++i) {
-        outResults[i] = updateResponse.results_[i];
+    for (size_t i = 0; i < sentIdx.size(); ++i) {
+        size_t keyIdx = sentIdx[i];
+        outResults[keyIdx] = updateResponse.results_[i];
     }
     MMC_LOG_DEBUG("client " << name_ << " batch write finish done: keysCnt=" << keys.size());
     return MMC_OK;

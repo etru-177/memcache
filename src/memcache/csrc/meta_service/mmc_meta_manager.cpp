@@ -988,10 +988,10 @@ void MmcMetaManager::TriggerPrefetch(const std::string &key, const MmcMemObjMeta
 Result MmcMetaManager::Remove(const std::string &key)
 {
     MmcMemObjMetaPtr objMeta;
-    MMC_RETURN_ERROR(metaContainer_->Erase(key, objMeta), "remove: Fail to erase from container!");
-    if (objMeta == nullptr) {
-        MMC_LOG_ERROR("Erase returned null objMeta for key: " << key);
-        return MMC_ERROR;
+    auto ret = metaContainer_->Erase(key, objMeta);
+    if (ret != MMC_OK || objMeta == nullptr) {
+        MMC_LOG_DEBUG("Erase returned null objMeta for key: " << key);
+        return ret;
     }
     std::unique_lock<std::mutex> guard(objMeta->Mutex());
     PushRemoveList(key, objMeta, nullptr, true);
