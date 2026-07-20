@@ -71,7 +71,7 @@ add_compile_options(-Wcast-qual -Winvalid-pch -Wwrite-strings -Wsign-compare -Wf
 
 if (${CMAKE_BUILD_TYPE} MATCHES "RELEASE")
     #add_compile_options(-fvisibility=hidden -fvisibility-inlines-hidden)
-    add_compile_options(-fstack-protector-strong -Wstack-usage=16384 -Werror)
+    add_compile_options(-fstack-protector-strong -Wstack-usage=16384)
     add_compile_options(-Wl,-z,noexecstack -Wl,-z,relro -Wl,-z,now -fPIE -fPIC -ftrapv -s)
     add_compile_options(-D_FORTIFY_SOURCE=2 -O2)
     add_link_options(-Wl,-z,noexecstack,-z,relro,-z,now)
@@ -207,12 +207,20 @@ else ()
     message(STATUS "Not set CMAKE_PREFIX_PATH, and initialize to: ${CMAKE_PREFIX_PATH}")
 endif ()
 
+add_subdirectory(3rdparty)
+
+# Enable -Werror for project's own source/test directories only (after 3rdparty).
+# Third-party submodules (e.g. prometheus-cpp-lite) may have code that triggers
+# warnings like -Wfloat-equal; compiling them with -Werror would break the build.
+# memfabric_hybrid has its own -Werror in its CMakeLists.txt, so it is unaffected.
+if (${CMAKE_BUILD_TYPE} MATCHES "RELEASE")
+    add_compile_options(-Werror)
+endif ()
+
 include_directories(
         ${PROJECT_SMEM_SRC_BASE}/include/host
         ${PROJECT_UTIL_SRC_BASE}
 )
-
-add_subdirectory(3rdparty)
 
 # include ubs-io cmake after TARGET_INSTALL_DIR set
 include(cmake/config_ubsio.cmake)

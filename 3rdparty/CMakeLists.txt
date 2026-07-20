@@ -61,6 +61,7 @@ if (MMC_ENABLE_KV_EVENTS)
                 -DCMAKE_INSTALL_PREFIX=${_MMC_ZMQ_INSTALL_DIR}
                 -DCMAKE_POLICY_VERSION_MINIMUM=3.5
                 -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+                -DCMAKE_POLICY_VERSION_MINIMUM=3.5
                 -DBUILD_SHARED=OFF
                 -DBUILD_STATIC=ON
                 -DBUILD_TESTS=OFF
@@ -114,6 +115,17 @@ if (MMC_ENABLE_KV_EVENTS)
     set(MMC_KV_EVENTS_ZMQ_LIBRARY "${_MMC_ZMQ_STATIC_LIB}" CACHE INTERNAL "libzmq static library (3rdparty)")
     message(STATUS "kv_events 3rdparty: msgpack=${MMC_KV_EVENTS_MSGPACK_INCLUDE_DIR} zmq=${MMC_KV_EVENTS_ZMQ_LIBRARY}")
 endif ()
+
+####################################################################
+# Prometheus-cpp-lite (metrics)
+####################################################################
+set(_MMC_PROMETHEUS_SRC_DIR ${PROJECT_3RDPARTY_SRC_DIR}/prometheus-cpp-lite)
+if (NOT EXISTS "${_MMC_PROMETHEUS_SRC_DIR}/CMakeLists.txt")
+    message(FATAL_ERROR
+        "3rdparty prometheus-cpp-lite submodule not found at ${_MMC_PROMETHEUS_SRC_DIR}.\n"
+        "Run: git submodule update --init 3rdparty/prometheus-cpp-lite")
+endif ()
+add_subdirectory(prometheus-cpp-lite)
 
 ####################################################################
 # MemFabric_Hybrid

@@ -103,6 +103,7 @@ cmake \
     -DBUILD_PYTHON="${BUILD_PYTHON}" \
     -DENABLE_PTRACER="${ENABLE_PTRACER}" \
     -DBUILD_UBSIO="${BUILD_UBSIO}" \
+    -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
     -S . -B build/
 
 ${MAKE_CMD} install -j"${MMC_BUILD_JOBS}" -C build/
