@@ -67,7 +67,7 @@ void MMCMetaBackUpMgrDefault::SendBackup2Local()
             request.blobs_ = std::move(blobs);
             Result ret = metaNetServer_->SyncCall(rank, request, response, 60);
             if (ret != MMC_OK) {
-                MMC_LOG_ERROR("mmc meta back up failed, bm rank " << rank << ", keys: " << request.KeysString());
+                MMC_LOG_WARN("mmc meta unable to back up, bm rank " << rank << ", keys: " << request.KeysString());
             }
         }
     }

@@ -102,7 +102,7 @@ public:
         auto valueItem = iter->second;
         value = valueItem.value_;
         if (metaMap_.erase(key) == 0) {
-            MMC_LOG_ERROR("Fail to erase " << key << " from MmcMetaContainer map. ErrCode: " << MMC_ERROR);
+            MMC_LOG_ERROR("Failed to erase " << key << " from MmcMetaContainer map. ErrCode: " << MMC_ERROR);
             return MMC_ERROR;
         }
         if (valueItem.mediaType_ != MEDIA_NONE) {

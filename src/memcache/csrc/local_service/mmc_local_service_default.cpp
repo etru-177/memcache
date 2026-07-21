@@ -103,7 +103,7 @@ void MmcLocalServiceDefault::Stop()
 {
     std::lock_guard<std::mutex> guard(mutex_);
     if (!started_) {
-        MMC_LOG_WARN("MmcClientDefault has not been started" << ", rank: " << options_.rankId);
+        MMC_LOG_WARN("MmcLocalServiceDefault has not been started" << ", rank: " << options_.rankId);
         return;
     }
     DestroyBm();
@@ -116,8 +116,8 @@ void MmcLocalServiceDefault::Stop()
     }
     std::lock_guard<std::mutex> guardBlob(blobMutex_);
     blobMap_.clear();
-    MMC_LOG_INFO("Stop MmcClientDefault (" << name_ << ") server " << options_.discoveryURL
-                                           << ", rank: " << options_.rankId);
+    MMC_LOG_INFO("Stop MmcLocalServiceDefault (" << name_ << ") server " << options_.discoveryURL
+                                                 << ", rank: " << options_.rankId);
     started_ = false;
 }
 

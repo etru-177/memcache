@@ -272,7 +272,7 @@ std::vector<int> MmcacheStore::BatchRemove(const std::vector<std::string> &keys)
     results.resize(keys.size(), -1);
     const char **c_keys = new (std::nothrow) const char *[keys.size()];
     if (c_keys == nullptr) {
-        MMC_LOG_ERROR("Cannot malloc memory for keys!");
+        MMC_LOG_ERROR("Cannot malloc memory for keys! keys.size=" << keys.size());
         return results; // Return vector filled with error code
     }
     for (size_t i = 0; i < keys.size(); ++i) {
@@ -282,7 +282,7 @@ std::vector<int> MmcacheStore::BatchRemove(const std::vector<std::string> &keys)
     int32_t res = mmcc_batch_remove(c_keys, keys.size(), results.data(), 0);
     TP_TRACE_END(TP_MMC_PY_BATCH_REMOVE, res);
     if (res != 0) {
-        MMC_LOG_ERROR("remove_batch failed");
+        MMC_LOG_ERROR("remove_batch failed, res=" << res << ", keys.size=" << keys.size());
         std::fill(results.begin(), results.end(), res);
         delete[] c_keys;
         return results; // Return vector filled with error code
@@ -327,7 +327,7 @@ std::vector<int> MmcacheStore::BatchIsExist(const std::vector<std::string> &keys
     results.resize(keys.size(), -1);
     const char **c_keys = new (std::nothrow) const char *[keys.size()];
     if (c_keys == nullptr) {
-        MMC_LOG_ERROR("Cannot malloc memory for keys!");
+        MMC_LOG_ERROR("Cannot malloc memory for keys! keys.size=" << keys.size());
         return results; // Return vector filled with error code -1
     }
     for (size_t i = 0; i < keys.size(); ++i) {
@@ -393,7 +393,7 @@ std::vector<KeyInfo> MmcacheStore::BatchGetKeyInfo(const std::vector<std::string
 
     const char **ckeys = new (std::nothrow) const char *[size];
     if (ckeys == nullptr) {
-        MMC_LOG_ERROR("Cannot malloc memory for keys!");
+        MMC_LOG_ERROR("Cannot malloc memory for keys! keys.size=" << keys.size());
         return {};
     }
     for (uint32_t i = 0; i < size; ++i) {

@@ -58,7 +58,7 @@ Result MmcMemBlob::UpdateState(const std::string &key, uint32_t rankId, uint32_t
     if (oldState == ALLOCATED && ret == MMC_WRITE_OK) {
         auto bakRet = Backup(key);
         if (bakRet != MMC_OK) {
-            MMC_LOG_ERROR("backup failed " << bakRet << " for key:" << key);
+            MMC_LOG_WARN("unable to backup " << bakRet << " for key:" << key);
             // 备份失败是可以容忍的，不应该打断update流程
         }
     }

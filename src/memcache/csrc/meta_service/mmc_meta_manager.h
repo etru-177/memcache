@@ -144,8 +144,8 @@ public:
             threadPool_->Enqueue([this, key, desc]() {
                 Result ret = BlobDeleteRpc(key, desc);
                 if (ret != MMC_OK) {
-                    MMC_LOG_WARN("BlobDeleteRpc failed for key: " << key << ", rank: " << desc.rank_
-                                                                  << ", ret: " << ret);
+                    MMC_LOG_WARN("Unable to BlobDeleteRpc for key: " << key << ", rank: " << desc.rank_
+                                                                     << ", ret: " << ret);
                 }
             });
         };

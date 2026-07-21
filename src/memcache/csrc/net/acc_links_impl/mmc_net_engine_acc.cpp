@@ -331,7 +331,7 @@ Result NetEngineAcc::Call(uint32_t targetId, int16_t opCode, const char *reqData
     if (*respData == nullptr) {
         *respData = (char *)malloc(data->DataLen());
         if (*respData == nullptr) {
-            MMC_LOG_WARN("Failed to malloc resp date length:" << data->DataLen());
+            MMC_LOG_ERROR("Failed to malloc resp data length:" << data->DataLen());
             return MMC_MALLOC_FAILED;
         }
     }
@@ -579,7 +579,7 @@ Result NetEngineAcc::HandleAllRequests4Response(const TcpReqContext &context)
             out->DecreaseRef();
         }
 
-        MMC_LOG_WARN("Failed to get waiter from ctx store with seqNo " << context.SeqNo() << ", probably timeout");
+        MMC_LOG_WARN("Unable to get waiter from ctx store with seqNo " << context.SeqNo() << ", probably timeout");
         return MMC_OK;
     }
 

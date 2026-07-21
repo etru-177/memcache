@@ -1076,7 +1076,7 @@ Result MmcMetaManager::Mount(const std::vector<MmcLocation> &locs,
         }
     }
     if (ret != MMC_OK) {
-        MMC_LOG_INFO("Mount locs partially failed, unmounting mounted locs...");
+        MMC_LOG_WARN("Unable to mount locs partially, unmounting mounted locs...");
         for (; i > 0; i--) {
             auto unmountRet = Unmount(locs[i - 1]);
             if (unmountRet != MMC_OK) {
@@ -1645,8 +1645,8 @@ EvictResult MmcMetaManager::DispatchMoveBlob(const std::string &key, const MmcMe
                 } else {
                     MmcMetaMetricManager::GetInstance().IncrementEvictMemDeleteCounter(rankL);
                 }
-                MMC_LOG_WARN("key: " << keyL << " move blob from " << srcL << " to " << dstL << " failed: " << ret
-                                     << ", remove src blob");
+                MMC_LOG_WARN("key: " << keyL << " move blob from " << srcL << " to " << dstL
+                                     << " not successful: " << ret << ", remove src blob");
             } else if (dstL.mediaType_ == MEDIA_SSD) {
                 TP_TRACE_RECORD(TP_MMC_META_EVICT_SSD_WRITE, 0, 0);
             }
@@ -1654,7 +1654,7 @@ EvictResult MmcMetaManager::DispatchMoveBlob(const std::string &key, const MmcMe
         },
         key, src, dst, evictRank);
     if (!future.valid()) {
-        MMC_LOG_WARN("key: " << key << " move blob from " << src << " to " << dst << " failed");
+        MMC_LOG_WARN("key: " << key << " move blob from " << src << " to " << dst << " not successful");
         return EvictRemoveSrc(key, objMeta, srcFilter, evictRank, srcMediaType, dstMedium, false);
     }
     return EvictResult::MOVE_DOWN;
@@ -1797,7 +1797,7 @@ Result MmcMetaManager::RewarmBlob(const std::string &key, const MmcMemObjMetaPtr
 
     ret = newBlob->UpdateState(key, srcDesc.rank_, 0, MMC_WRITE_OK);
     if (ret != MMC_OK) {
-        MMC_LOG_WARN("UpdateState WRITE_OK failed for rewarm, key=" << key << ", ret=" << ret);
+        MMC_LOG_WARN("Unable to UpdateState WRITE_OK for rewarm, key=" << key << ", ret=" << ret);
         MmcBlobFilterPtr rbFilter = MmcMakeRef<MmcBlobFilter>(newBlob->GetDesc().rank_, dstMediaType, NONE);
         objMeta->FreeBlobs(key, globalAllocator_, rbFilter, false);
         return MMC_ERROR;

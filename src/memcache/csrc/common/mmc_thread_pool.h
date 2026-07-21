@@ -53,7 +53,7 @@ public:
         }
         int result = setpriority(PRIO_PROCESS, 0, nice_value);
         if (result != 0) {
-            MMC_LOG_WARN("Failed to set process nice to " << nice_value << " (errno=" << errno
+            MMC_LOG_WARN("Unable to set process nice to " << nice_value << " (reason=" << errno
                                                           << "): " << strerror(errno));
         }
     }

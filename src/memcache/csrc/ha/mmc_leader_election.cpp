@@ -132,7 +132,7 @@ void MmcMetaServiceLeaderElection::CheckLeaderStatus()
             UpdateHaSnapshotStateLocked(true, kHaStateServing, currentLeader);
         }
         if (!this->isLeader_) {
-            MMC_LOG_WARN("Pod " << this->podName_ << " became the leader");
+            MMC_LOG_INFO("Pod " << this->podName_ << " became the leader");
             this->isLeader_ = true;
             OnStartLeading();
         }
@@ -144,7 +144,7 @@ void MmcMetaServiceLeaderElection::CheckLeaderStatus()
                                             currentLeader != kNoLeaderName ? kHaStateStandby : kHaStateStarting,
                                             currentLeader != kNoLeaderName ? currentLeader : std::string());
             }
-            MMC_LOG_WARN("Pod " << this->podName_ << " became a backup");
+            MMC_LOG_INFO("Pod " << this->podName_ << " became a backup");
             this->isLeader_ = false;
             OnStopLeading();
         } else {
@@ -155,7 +155,7 @@ void MmcMetaServiceLeaderElection::CheckLeaderStatus()
                     std::lock_guard<std::mutex> guard(mutex_);
                     UpdateHaSnapshotStateLocked(true, kHaStateServing, podName_);
                 }
-                MMC_LOG_WARN("Pod " << this->podName_ << " became the leader");
+                MMC_LOG_INFO("Pod " << this->podName_ << " became the leader");
                 this->isLeader_ = true;
                 OnStartLeading();
             } else if (currentLeader != kNoLeaderName) {

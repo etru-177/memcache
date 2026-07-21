@@ -251,7 +251,7 @@ void MmcMetaService::Stop()
 {
     std::lock_guard<std::mutex> guard(mutex_);
     if (!started_) {
-        MMC_LOG_WARN("MmcClientDefault has not been started");
+        MMC_LOG_WARN("MmcMetaService has not been started");
         return;
     }
     StopPeriodicTask();
@@ -341,7 +341,7 @@ void MmcMetaService::StartMetricsReportTask()
         if (facade.BuildMetricsSummary(true, metricsSummary) == MMC_OK) {
             MMC_AUDIT_LOG("Metrics summary: " + metricsSummary);
         } else {
-            MMC_LOG_WARN("Failed to build periodic metrics summary");
+            MMC_LOG_WARN("Unable to build periodic metrics summary");
         }
     });
     if (!started) {
