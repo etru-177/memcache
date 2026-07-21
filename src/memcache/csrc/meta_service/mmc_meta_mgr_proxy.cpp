@@ -109,7 +109,7 @@ Result MmcMetaMgrProxy::BatchAlloc(const BatchAllocRequest &req, BatchAllocRespo
             resp.numBlobs_.push_back(objMeta.numBlobs_);
             resp.prots_.push_back(objMeta.prot_);
             resp.priorities_.push_back(objMeta.priority_);
-            resp.leases_.push_back(0);
+            resp.leases_.push_back(objMeta.blobs_.empty() ? 0 : objMeta.blobs_[0].leaseTimeoutTtlMs_);
             resp.blobs_[i] = objMeta.blobs_;
         }
         resp.results_[i] = ret;

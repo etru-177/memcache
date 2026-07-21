@@ -163,9 +163,6 @@ private:
     void ProcessExpiredReadLeases();
     Result ExecuteConcurrently(const std::vector<void *> &gvas, const std::vector<void *> &buffers,
                                const std::vector<size_t> &sizes, bool isPut, MediaType mediaType, size_t chunkSize);
-    void BuildReadFinishRequestsByOperateId(const std::vector<LocalGvaBlobInfo> &claimedInfos,
-                                            std::vector<BatchUpdateRequest> &requests);
-    Result NotifyReadFinishClaims(const std::vector<LocalGvaBlobInfo> &claimedInfos);
 
     // UBS IO相关数据结构，保留供后续 SSD→DRAM 回暖使用
     struct UbsIoBatchGetData {

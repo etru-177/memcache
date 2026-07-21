@@ -15,6 +15,7 @@
 #include <atomic>
 #include <mutex>
 #include <vector>
+#include <queue>
 
 #include "mmc_common_includes.h"
 #include "mmc_blob_common.h"
@@ -25,7 +26,7 @@ namespace mmc {
 struct LocalGvaBlobInfo : public MmcReferable {
     std::string key{};
     MmcMemBlobDesc blob{};
-    uint64_t operateId{0};
+    std::queue<uint64_t> operateQueue;
     uint64_t leaseDeadlineMs{0};
 
     bool IsWritable() const;
@@ -44,11 +45,11 @@ public:
     Result FindBlobByKey(const std::string &key, LocalGvaBlobInfo &info);
     Result FindWritable(uint64_t gva, uint64_t size, LocalGvaBlobInfo &info);
     Result FindReadable(uint64_t gva, uint64_t size, LocalGvaBlobInfo &info);
-    void CollectExpiredReadFinishClaims(uint64_t nowMs, std::vector<LocalGvaBlobInfo> &claimedInfos);
-    void CollectExpired(std::vector<LocalGvaBlobInfo> &infos);
     void MarkWriteSuccess(const std::string &key);
+    uint64_t ReleaseLease(const std::string &key);
     void Remove(uint64_t blobStartGva);
     void RemoveByKey(const std::string &key);
+    void RemoveExpired();
     void Clear();
 
 private:

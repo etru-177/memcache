@@ -37,25 +37,33 @@ Result LocalGvaBlobTracker::RegisterFromBatchAlloc(const std::string &key, const
         return MMC_INVALID_PARAM;
     }
 
+    std::lock_guard<std::mutex> guard(mutex_);
+    auto keyIt = blobStartByKey_.find(key);
+    if (keyIt != blobStartByKey_.end()) {
+        if (keyIt->second != blob.gva_) {
+            MMC_LOG_ERROR("unexpected! key:" << key << ", gva:" << keyIt->second << ", insert gva:" << blob.gva_);
+            return MMC_ERROR;
+        }
+        auto *blobInfo = intervals_.Query(keyIt->second);
+        if (blobInfo == nullptr || *blobInfo == nullptr) {
+            MMC_LOG_ERROR("unexpected! query info key:" << key << ", gva:" << keyIt->second);
+            return MMC_ERROR;
+        }
+        // 如果已经存在则更新leaseDeadlineMs
+        (*blobInfo)->operateQueue.push(operateId);
+        (*blobInfo)->leaseDeadlineMs = NowMs() + blob.leaseTimeoutTtlMs_;
+        return MMC_OK;
+    }
+
     LocalGvaBlobInfoPtr info = MmcMakeRef<LocalGvaBlobInfo>();
     MMC_VALIDATE_RETURN(info != nullptr, "failed to alloc LocalGvaBlobInfo", MMC_MALLOC_FAILED);
     info->key = key;
     info->blob = blob;
-    info->operateId = operateId;
-    info->leaseDeadlineMs = 0;
-    std::lock_guard<std::mutex> guard(mutex_);
-    auto keyIt = blobStartByKey_.find(info->key);
-    if (keyIt != blobStartByKey_.end()) {
-        if (keyIt->second != info->blob.gva_) {
-            MMC_LOG_ERROR("unexpected! key:" << info->key << ", gva:" << keyIt->second
-                                             << ", insert gva:" << info->blob.gva_);
-            return MMC_ERROR;
-        }
-        return MMC_OK;
-    }
+    info->operateQueue.push(operateId);
+    info->leaseDeadlineMs = NowMs() + blob.leaseTimeoutTtlMs_;
 
     if (!intervals_.Add(info->blob.gva_, info->blob.size_, info)) {
-        MMC_LOG_ERROR("failed to register gva interval, gva:" << info->blob.gva_ << ", size:" << info->blob.size_);
+        MMC_LOG_ERROR("unexpected! register gva interval, gva:" << info->blob.gva_ << ", size:" << info->blob.size_);
         return MMC_ERROR;
     }
     blobStartByKey_[info->key] = info->blob.gva_;
@@ -73,7 +81,7 @@ Result LocalGvaBlobTracker::UpdateFromQuery(const std::string &key, const MmcMem
     MMC_VALIDATE_RETURN(info != nullptr, "failed to alloc LocalGvaBlobInfo", MMC_MALLOC_FAILED);
     info->key = key;
     info->blob = blob;
-    info->operateId = operateId;
+    info->operateQueue.push(operateId);
     info->leaseDeadlineMs = leaseDeadlineMs;
     std::lock_guard<std::mutex> guard(mutex_);
     auto keyIt = blobStartByKey_.find(info->key);
@@ -92,6 +100,8 @@ Result LocalGvaBlobTracker::UpdateFromQuery(const std::string &key, const MmcMem
             MMC_LOG_ERROR("unexpected! read before write finish, key:" << info->key << ", gva:" << keyIt->second);
             return MMC_UNMATCHED_STATE;
         }
+        (*blobInfo)->leaseDeadlineMs = leaseDeadlineMs;
+        (*blobInfo)->operateQueue.push(operateId);
         return MMC_OK;
     }
 
@@ -147,7 +157,7 @@ Result LocalGvaBlobTracker::FindBlobByKey(const std::string &key, LocalGvaBlobIn
     }
     info.key = (*blobInfo)->key;
     info.blob = (*blobInfo)->blob;
-    info.operateId = (*blobInfo)->operateId;
+    info.operateQueue = (*blobInfo)->operateQueue;
     info.leaseDeadlineMs = (*blobInfo)->leaseDeadlineMs;
     return MMC_OK;
 }
@@ -162,12 +172,15 @@ Result LocalGvaBlobTracker::FindReadable(uint64_t gva, uint64_t size, LocalGvaBl
 
     info.key = (*blobInfo)->key;
     info.blob = (*blobInfo)->blob;
-    info.operateId = (*blobInfo)->operateId;
+    info.operateQueue = (*blobInfo)->operateQueue;
     info.leaseDeadlineMs = (*blobInfo)->leaseDeadlineMs;
     if (!info.IsReadable()) {
+        MMC_LOG_ERROR("read lease expired, key:" << info.key << ", gva:" << info.blob.gva_
+                                                 << ", state:" << info.blob.state_);
         return MMC_UNMATCHED_STATE;
     }
     if (info.IsLeaseExpired(NowMs())) {
+        MMC_LOG_ERROR("read lease expired, key:" << info.key << ", gva:" << info.blob.gva_);
         return MMC_LEASE_EXPIRED;
     }
     return MMC_OK;
@@ -183,7 +196,7 @@ Result LocalGvaBlobTracker::FindWritable(uint64_t gva, uint64_t size, LocalGvaBl
 
     info.key = (*blobInfo)->key;
     info.blob = (*blobInfo)->blob;
-    info.operateId = (*blobInfo)->operateId;
+    info.operateQueue = (*blobInfo)->operateQueue;
     info.leaseDeadlineMs = (*blobInfo)->leaseDeadlineMs;
     if (!info.IsWritable()) {
         if (info.IsReadable()) {
@@ -192,34 +205,37 @@ Result LocalGvaBlobTracker::FindWritable(uint64_t gva, uint64_t size, LocalGvaBl
         MMC_LOG_ERROR("unexpected! key:" << info.key << ", state:" << info.blob.state_ << ", gva:" << info.blob.gva_);
         return MMC_UNMATCHED_STATE;
     }
+    if (info.IsLeaseExpired(NowMs())) {
+        MMC_LOG_ERROR("write lease expired, key:" << info.key << ", gva:" << info.blob.gva_);
+        return MMC_LEASE_EXPIRED;
+    }
     return MMC_OK;
 }
-void LocalGvaBlobTracker::CollectExpiredReadFinishClaims(uint64_t nowMs, std::vector<LocalGvaBlobInfo> &claimedInfos)
-{
-    CollectExpired(claimedInfos);
-}
 
-void LocalGvaBlobTracker::CollectExpired(std::vector<LocalGvaBlobInfo> &infos)
+uint64_t LocalGvaBlobTracker::ReleaseLease(const std::string &key)
 {
-    infos.clear();
     std::lock_guard<std::mutex> guard(mutex_);
-    const uint64_t nowMs = NowMs();
-    for (auto &item : blobStartByKey_) {
-        auto *blobInfo = intervals_.Query(item.second);
-        if (blobInfo == nullptr || *blobInfo == nullptr) {
-            MMC_LOG_ERROR("unexpected! key:" << item.first << ", gva:" << item.second);
-            continue;
-        }
-        LocalGvaBlobInfo info{};
-        info.key = (*blobInfo)->key;
-        info.blob = (*blobInfo)->blob;
-        info.operateId = (*blobInfo)->operateId;
-        info.leaseDeadlineMs = (*blobInfo)->leaseDeadlineMs;
-
-        if (info.IsReadable() && info.IsLeaseExpired(nowMs)) {
-            infos.push_back(info);
-        }
+    auto keyIt = blobStartByKey_.find(key);
+    if (keyIt == blobStartByKey_.end()) {
+        MMC_LOG_WARN("release lease failed key:" << key << " blobStartByKey_ not find");
+        return UINT64_MAX;
     }
+
+    auto *blobInfo = intervals_.Query(keyIt->second);
+    if (blobInfo == nullptr || *blobInfo == nullptr) {
+        MMC_LOG_WARN("release lease failed key:" << key << " intervals_ not find");
+        return UINT64_MAX;
+    }
+
+    auto &info = *blobInfo;
+
+    if (info->operateQueue.empty()) {
+        MMC_LOG_WARN("release lease failed key:" << key << " operateQueue is empty");
+        return UINT64_MAX;
+    }
+    auto opId = info->operateQueue.front();
+    info->operateQueue.pop();
+    return opId;
 }
 
 void LocalGvaBlobTracker::MarkWriteSuccess(const std::string &key)
@@ -237,7 +253,26 @@ void LocalGvaBlobTracker::MarkWriteSuccess(const std::string &key)
 
     auto &info = *blobInfo;
     info->blob.state_ = READABLE;
-    info->leaseDeadlineMs = NowMs() + 10 * 1000UL;
+}
+
+void LocalGvaBlobTracker::RemoveExpired()
+{
+    std::lock_guard<std::mutex> guard(mutex_);
+    for (auto it = blobStartByKey_.begin(); it != blobStartByKey_.end();) {
+        auto *blobInfo = intervals_.Query(it->second);
+        if (blobInfo == nullptr || *blobInfo == nullptr) {
+            MMC_LOG_ERROR("unexpected! key:" << it->first << ", gva:" << it->second);
+            it = blobStartByKey_.erase(it);
+            continue;
+        }
+        LocalGvaBlobInfoPtr info = *blobInfo;
+        if (info->IsLeaseExpired(NowMs()) || info->operateQueue.empty()) {
+            (void)intervals_.RemoveAt(info->blob.gva_);
+            it = blobStartByKey_.erase(it);
+        } else {
+            ++it;
+        }
+    }
 }
 
 void LocalGvaBlobTracker::Remove(uint64_t blobStartGva)

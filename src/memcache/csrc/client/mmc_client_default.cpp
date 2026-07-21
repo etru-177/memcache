@@ -697,12 +697,7 @@ Result MmcClientDefault::BatchAddLease(const std::vector<std::string> &keys, uin
 
     const uint64_t newOperateId = GenerateOperateId(rankId_);
     std::vector<uint64_t> operateIds;
-    operateIds.reserve(keys.size());
-    for (const auto &key : keys) {
-        LocalGvaBlobInfo info{};
-        Result findRet = gvaBlobTracker_.FindReadLeaseByKey(key, info);
-        operateIds.push_back(findRet == MMC_OK ? info.operateId : newOperateId);
-    }
+    operateIds.resize(keys.size(), newOperateId);
     BatchUpdateLeaseRequest request{keys, operateIds, leaseTtlMs};
     BatchUpdateLeaseResponse response;
     Result rpcRet = metaNetClient_->SyncCall(request, response, rpcRetryTimeOut_);
@@ -757,25 +752,28 @@ Result MmcClientDefault::BatchRemoveLease(const std::vector<std::string> &keys)
         MMC_LOG_ERROR("client " << name_ << " batch remove lease invalid input, key size:" << keys.size());
         return MMC_INVALID_PARAM;
     }
-
-    std::vector<uint64_t> operateIds;
-    operateIds.reserve(keys.size());
+    uint64_t opId = 0;
     for (size_t i = 0; i < keys.size(); ++i) {
         LocalGvaBlobInfo info{};
         Result findRet = gvaBlobTracker_.FindReadLeaseByKey(keys[i], info);
         if (findRet != MMC_OK) {
-            MMC_LOG_ERROR("client " << name_ << " batch remove lease find local gva info failed, key:" << keys[i]
-                                    << ", ret:" << findRet);
-            return findRet;
+            MMC_LOG_WARN("client " << name_ << " batch remove lease find local gva info failed, key:" << keys[i]
+                                   << " because of lease timeout, ret:" << findRet);
+            return MMC_LEASE_EXPIRED;
         }
-        operateIds.push_back(info.operateId);
+        auto innerOpId = gvaBlobTracker_.ReleaseLease(keys[i]);
+        if (innerOpId == UINT64_MAX) {
+            MMC_LOG_WARN("key " << keys[i] << " inner operateId_:" << innerOpId << " opId:" << opId
+                                << " remove keys != alloc keys ");
+            continue;
+        }
+        opId = innerOpId;
     }
+    std::vector<uint64_t> operateIds;
+    operateIds.resize(keys.size(), opId);
 
     BatchUpdateLeaseRequest request{keys, operateIds, 0, 1};
     AsyncUpdateLease(request);
-    for (const auto &key : keys) {
-        gvaBlobTracker_.RemoveByKey(key);
-    }
     return MMC_OK;
 }
 
@@ -937,18 +935,7 @@ Result MmcClientDefault::RegisterPeriodicTask(const std::string &taskName, uint3
 
 void MmcClientDefault::ProcessExpiredReadLeases()
 {
-    const uint64_t nowMs = NowMs();
-    std::vector<LocalGvaBlobInfo> claimedInfos;
-    gvaBlobTracker_.CollectExpiredReadFinishClaims(nowMs, claimedInfos);
-    if (claimedInfos.empty()) {
-        return;
-    }
-
-    Result finishRet = NotifyReadFinishClaims(claimedInfos);
-    if (finishRet != MMC_OK) {
-        MMC_LOG_WARN("client " << name_ << " failed to cleanup expired read leases, ret:" << finishRet
-                               << ", count:" << claimedInfos.size());
-    }
+    gvaBlobTracker_.RemoveExpired();
 }
 
 Result MmcClientDefault::PrepareBlob(const MmcBufferArray &bufArr, const MmcMemBlobDesc &blob, MediaType &mediaType,
@@ -1165,49 +1152,6 @@ Result MmcClientDefault::BatchMalloc(const std::vector<std::string> &keys, const
     return MMC_OK;
 }
 
-void MmcClientDefault::BuildReadFinishRequestsByOperateId(const std::vector<LocalGvaBlobInfo> &claimedInfos,
-                                                          std::vector<BatchUpdateRequest> &requests)
-{
-    requests.clear();
-    requests.reserve(claimedInfos.size());
-    for (const auto &claimedInfo : claimedInfos) {
-        size_t groupIndex = requests.size();
-        for (size_t i = 0; i < requests.size(); ++i) {
-            if (requests[i].operateId_ == claimedInfo.operateId) {
-                groupIndex = i;
-                break;
-            }
-        }
-        if (groupIndex == requests.size()) {
-            requests.emplace_back();
-            requests.back().operateId_ = claimedInfo.operateId;
-        }
-
-        requests[groupIndex].actionResults_.push_back(MMC_READ_FINISH);
-        requests[groupIndex].keys_.push_back(claimedInfo.key);
-        requests[groupIndex].ranks_.push_back(claimedInfo.blob.rank_);
-        requests[groupIndex].mediaTypes_.push_back(claimedInfo.blob.mediaType_);
-    }
-}
-
-Result MmcClientDefault::NotifyReadFinishClaims(const std::vector<LocalGvaBlobInfo> &claimedInfos)
-{
-    if (claimedInfos.empty()) {
-        return MMC_OK;
-    }
-
-    std::vector<BatchUpdateRequest> requests;
-    BuildReadFinishRequestsByOperateId(claimedInfos, requests);
-
-    for (auto &request : requests) {
-        AsyncUpdateState(request);
-    }
-    for (const auto &info : claimedInfos) {
-        gvaBlobTracker_.Remove(info.blob.gva_);
-    }
-    return MMC_OK;
-}
-
 Result MmcClientDefault::BatchCopyWritePath(std::vector<void *> &gvas, std::vector<void *> &buffers,
                                             std::vector<size_t> &sizes, int32_t direct)
 {
@@ -1308,50 +1252,45 @@ Result MmcClientDefault::BatchWriteFinish(const std::vector<std::string> &keys,
 
     BatchUpdateRequest updateRequest{};
     std::vector<size_t> sentIdx;
+    sentIdx.reserve(keys.size());
     updateRequest.keys_.reserve(keys.size());
     updateRequest.ranks_.reserve(keys.size());
     updateRequest.mediaTypes_.reserve(keys.size());
     updateRequest.actionResults_.reserve(keys.size());
-    sentIdx.reserve(keys.size());
     for (size_t i = 0; i < keys.size(); ++i) {
         LocalGvaBlobInfo info{};
         Result findRet = gvaBlobTracker_.FindBlobByKey(keys[i], info);
-        if (findRet == MMC_OK && info.IsReadable()) {
-            outResults[i] = MMC_OK;
-            if (writeResults[i] == MMC_OK) {
-                gvaBlobTracker_.MarkWriteSuccess(keys[i]);
-            } else {
-                gvaBlobTracker_.RemoveByKey(keys[i]);
-            }
+        if (findRet != MMC_OK) {
+            MMC_LOG_DEBUG("key " << keys[i] << " not found locally, because of lease timeout, skip");
             continue;
         }
-        if (findRet == MMC_OK) {
-            updateRequest.ranks_.push_back(info.blob.rank_);
-            updateRequest.mediaTypes_.push_back(info.blob.mediaType_);
-            if (updateRequest.keys_.empty()) {
-                updateRequest.operateId_ = info.operateId;
-            }
+        auto opId = gvaBlobTracker_.ReleaseLease(keys[i]);
+        if (opId == UINT64_MAX) {
+            MMC_LOG_DEBUG("key " << keys[i] << " not found locally, because of lease timeout, skip");
+            continue;
         }
+        updateRequest.operateId_ = opId;
         updateRequest.keys_.push_back(keys[i]);
-        updateRequest.actionResults_.push_back((writeResults[i] == MMC_OK) ? MMC_WRITE_OK : MMC_WRITE_FAIL);
+        updateRequest.ranks_.push_back(info.blob.rank_);
+        updateRequest.mediaTypes_.push_back(info.blob.mediaType_);
+        BlobActionResult action = writeResults[i] == MMC_OK ? MMC_WRITE_OK : MMC_WRITE_FAIL;
+        updateRequest.actionResults_.push_back(action);
         sentIdx.push_back(i);
     }
 
     if (updateRequest.keys_.empty()) {
-        MMC_LOG_DEBUG("client " << name_ << " batch write finish: all keys already readable");
+        MMC_LOG_DEBUG("client " << name_ << " batch write finish: no valid keys to send");
         return MMC_OK;
     }
-    MMC_LOG_DEBUG("client " << name_ << " batch write finish: keysCnt=" << keys.size() << ", sent=" << sentIdx.size());
 
     TP_TRACE_BEGIN(TP_MMC_LOCAL_BATCH_UPDATE);
     BatchUpdateResponse updateResponse;
     Result updateResult = metaNetClient_->SyncCall(updateRequest, updateResponse, rpcRetryTimeOut_);
     TP_TRACE_END(TP_MMC_LOCAL_BATCH_UPDATE, updateResult);
-    for (size_t i = 0; i < keys.size(); ++i) {
-        if (writeResults[i] == MMC_OK) {
-            gvaBlobTracker_.MarkWriteSuccess(keys[i]);
-        } else {
-            gvaBlobTracker_.RemoveByKey(keys[i]);
+    for (size_t i = 0; i < sentIdx.size(); ++i) {
+        size_t keyIdx = sentIdx[i];
+        if (writeResults[keyIdx] == MMC_OK) {
+            gvaBlobTracker_.MarkWriteSuccess(keys[keyIdx]);
         }
     }
     if (updateResult != MMC_OK || updateResponse.results_.size() != sentIdx.size()) {
@@ -1363,7 +1302,8 @@ Result MmcClientDefault::BatchWriteFinish(const std::vector<std::string> &keys,
         size_t keyIdx = sentIdx[i];
         outResults[keyIdx] = updateResponse.results_[i];
     }
-    MMC_LOG_DEBUG("client " << name_ << " batch write finish done: keysCnt=" << keys.size());
+    MMC_LOG_DEBUG("client " << name_ << " batch write finish done: keysCnt=" << keys.size()
+                            << ", sent=" << sentIdx.size());
     return MMC_OK;
 }
 

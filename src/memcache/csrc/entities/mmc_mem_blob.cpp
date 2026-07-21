@@ -35,10 +35,6 @@ Result MmcMemBlob::UpdateState(const std::string &key, uint32_t rankId, uint32_t
 
     const auto retIter = curStateIter->second.find(ret);
     if (retIter == curStateIter->second.end()) {
-        if (ret == MMC_WRITE_OK && state_ == READABLE) {
-            return MMC_OK; // layerwise 并发写相同key，会来重复更新 MMC_WRITE_OK
-        }
-
         MMC_LOG_ERROR("Cannot find " << ret << " from " << state_ << "! key:" << key << ", gva=" << gva_
                                      << ", type=" << mediaType_);
         return MMC_UNMATCHED_RET;

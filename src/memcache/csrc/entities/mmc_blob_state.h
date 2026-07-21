@@ -78,7 +78,8 @@ enum BlobActionResult : uint8_t {
     MMC_READ_START,
     MMC_READ_FINISH,
 
-    MMC_REMOVE_START
+    MMC_REMOVE_START,
+    MMC_REPEAT_ALLOC
 };
 
 inline std::ostream &operator<<(std::ostream &os, BlobActionResult ret)
@@ -101,6 +102,9 @@ inline std::ostream &operator<<(std::ostream &os, BlobActionResult ret)
             break;
         case MMC_REMOVE_START:
             os << "MMC_REMOVE_START";
+            break;
+        case MMC_REPEAT_ALLOC:
+            os << "MMC_REPEAT_ALLOC";
             break;
         default:
             os << "UNEXCEPTION";

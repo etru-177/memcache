@@ -47,8 +47,6 @@ public:
         ock::mf::WriteGuard lockGuard(metaLock_);
         auto iter = metaMap_.find(key);
         if (iter != metaMap_.end()) {
-            MMC_LOG_WARN("Fail to insert "
-                         << key << " into MmcMetaContainer. Key already exists. ErrCode: " << MMC_DUPLICATED_OBJECT);
             return MMC_DUPLICATED_OBJECT;
         }
 
@@ -238,7 +236,6 @@ public:
         if (res == EvictResult::REMOVE) {
             metaMap_.erase(mapIter);
             lruLists_[mediaType].erase(iter);
-            MMC_LOG_INFO("Key " << key << " was evicted.");
             return true;
         }
         if (res == EvictResult::MOVE_DOWN) {

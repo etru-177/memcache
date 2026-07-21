@@ -735,8 +735,6 @@ Result MmcMetaManager::Alloc(const std::string &key, const AllocOptions &allocOp
     }
 
     if (ret == MMC_DUPLICATED_OBJECT && (allocOpt.flags_ & ALLOC_FLAGS_GVA_MALLOC_MASK)) {
-        MMC_LOG_WARN("Alloc duplicate key=" << key << " with GVA_MALLOC flag, reusing existing meta. "
-                                            << "Non-GVA_MALLOC overwrite is not yet supported.");
         tempMetaObj = nullptr;
         auto repRet = metaContainer_->Get(key, tempMetaObj);
         if (repRet != MMC_OK || tempMetaObj == nullptr) {
@@ -747,6 +745,17 @@ Result MmcMetaManager::Alloc(const std::string &key, const AllocOptions &allocOp
 
     if (ret == MMC_OK || (ret == MMC_DUPLICATED_OBJECT && (allocOpt.flags_ & ALLOC_FLAGS_GVA_MALLOC_MASK))) {
         std::unique_lock<std::mutex> guard(tempMetaObj->Mutex());
+        uint32_t opRankId = GetRankIdByOperateId(operateId);
+        uint32_t opSeq = GetSequenceByOperateId(operateId);
+        for (auto &blob : tempMetaObj->GetBlobs()) {
+            if (blob != nullptr) {
+                BlobActionResult actionRet = (ret == MMC_DUPLICATED_OBJECT) ? MMC_REPEAT_ALLOC : MMC_ALLOCATED_OK;
+                auto leaseRet = blob->UpdateState(key, opRankId, opSeq, actionRet);
+                if (leaseRet != MMC_OK) {
+                    MMC_LOG_WARN("Alloc: grant write lease failed, key=" << key << ", ret=" << leaseRet);
+                }
+            }
+        }
         objMeta.prot_ = tempMetaObj->Prot();
         objMeta.priority_ = tempMetaObj->Priority();
         objMeta.size_ = tempMetaObj->Size();
@@ -1658,8 +1667,6 @@ EvictResult MmcMetaManager::EvictCallBackFunction(const std::string &key, const 
         MMC_LOG_ERROR("objMeta is null");
         return EvictResult::FAIL;
     }
-
-    MMC_LOG_INFO("Evict key=" << key << " from " << srcMediaType);
 
     TP_TRACE_BEGIN(TP_MMC_META_EVICT);
 
