@@ -194,6 +194,9 @@ Result KVParser::ParseLine(std::string &strLine)
         MMC_LOG_ERROR("Configuration item has empty key");
         return MMC_ERROR;
     }
+    if (!StartsWith(strKey, "ock.mmc.")) {
+        return MMC_OK;
+    }
     if (SetItem(strKey, strValue) != MMC_OK) {
         MMC_LOG_ERROR("Failed to set key <" << strKey << "> with value <" << strValue << ">");
         return MMC_ERROR;

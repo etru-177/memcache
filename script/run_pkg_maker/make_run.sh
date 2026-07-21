@@ -65,7 +65,7 @@ cp "${PROJECT_DIR}"/config/* ${PKG_DIR}/config
 
 if compgen -G "${OUTPUT_DIR}/3rdparty/ubsio/lib/*.so*" > /dev/null; then
     \cp -d "${OUTPUT_DIR}"/3rdparty/ubsio/lib/*.so* ${PKG_DIR}/"${ARCH_OS}"/lib64/
-    \cp -r "${OUTPUT_DIR}"/3rdparty/ubsio/conf/* ${PKG_DIR}/config/
+
 fi
 
 if [ "$BUILD_TEST" = "ON" ]; then

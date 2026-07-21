@@ -117,9 +117,6 @@ if [ "${BUILD_UBSIO:-OFF}" == "ON" ]; then
 fi
 mkdir -p "${PROJ_DIR}/src/memcache/python/memcache_hybrid/config"
 \cp -v "${PROJ_DIR}"/config/* "${PROJ_DIR}/src/memcache/python/memcache_hybrid/config"
-if [ "${BUILD_UBSIO:-OFF}" == "ON" ]; then
-    \cp -v "${PROJ_DIR}/output/3rdparty/ubsio/conf/"* "${PROJ_DIR}/src/memcache/python/memcache_hybrid/config" 2>/dev/null || true
-fi
 
 cd "${PROJ_DIR}"
 rm -f "${PROJ_DIR}"/src/memcache/python/memcache_hybrid/_pymmc.cpython*.so

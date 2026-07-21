@@ -1613,7 +1613,7 @@ bool MmcMetaManager::HandleEvictSsdBranch(const std::string &key, const MmcMemOb
     }
     uint16_t dramWatermark = GetRewarmWatermark(MEDIA_DRAM);
     if (globalAllocator_->IsAboveUsageRatio(MEDIA_DRAM, dramWatermark)) {
-        MMC_LOG_WARN("Evict REMOVE key=" << key << " from " << srcMediaType << " reason=dram_full_skip_ssd");
+        MMC_LOG_DEBUG("Evict REMOVE key=" << key << " from " << srcMediaType << " reason=dram_full_skip_ssd");
         if (evictRank != UINT32_MAX) {
             MmcBlobFilterPtr ssdFilter = MmcMakeRef<MmcBlobFilter>(evictRank, MEDIA_SSD, NONE);
             if (ssdFilter != nullptr) {
@@ -1678,7 +1678,7 @@ EvictResult MmcMetaManager::EvictCallBackFunction(const std::string &key, const 
     std::vector<MmcMemBlobDesc> evictBlobs;
     objMeta->GetBlobsDesc(evictBlobs, srcFilter);
     if (evictBlobs.empty()) {
-        MMC_LOG_DEBUG("Evict skip key=" << key << " from " << srcMediaType << ", no READABLE blobs");
+        MMC_LOG_WARN("Evict skip key=" << key << " from " << srcMediaType << ", no READABLE blobs");
         TP_TRACE_END(TP_MMC_META_EVICT, MMC_OK);
         return EvictResult::FAIL;
     }
@@ -1686,7 +1686,7 @@ EvictResult MmcMetaManager::EvictCallBackFunction(const std::string &key, const 
     MmcMetaMetricManager::GetInstance().IncrementEvictCounter(evictRank);
 
     if (dstMedium == MEDIA_NONE) {
-        MMC_LOG_WARN("Evict REMOVE key=" << key << " from " << srcMediaType << " reason=no_lower_tier");
+        MMC_LOG_DEBUG("Evict REMOVE key=" << key << " from " << srcMediaType << " reason=no_lower_tier");
         TP_TRACE_END(TP_MMC_META_EVICT, MMC_OK);
         return EvictRemoveSrc(key, objMeta, srcFilter, evictRank, srcMediaType, dstMedium, true);
     }
@@ -1701,8 +1701,8 @@ EvictResult MmcMetaManager::EvictCallBackFunction(const std::string &key, const 
 
     uint64_t freeSize = globalAllocator_->GetFreeSpace(dstMedium);
     if (dstMedium != MEDIA_SSD && freeSize < objMeta->Size()) {
-        MMC_LOG_WARN("Evict REMOVE key=" << key << " from " << srcMediaType << " reason=no_space, freeSize=" << freeSize
-                                         << ", need=" << objMeta->Size());
+        MMC_LOG_DEBUG("Evict REMOVE key=" << key << " from " << srcMediaType
+                                          << " reason=no_space, freeSize=" << freeSize << ", need=" << objMeta->Size());
         TP_TRACE_END(TP_MMC_META_EVICT, MMC_OK);
         return EvictRemoveSrc(key, objMeta, srcFilter, evictRank, srcMediaType, dstMedium, false);
     }

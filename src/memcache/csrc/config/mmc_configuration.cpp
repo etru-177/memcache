@@ -152,6 +152,15 @@ bool Configuration::LoadFromFile(const std::string &filePath)
         SAFE_DELETE(kvParser);
         return false;
     }
+
+    MMC_LOG_INFO("Loaded " << size << " config items:");
+    for (uint32_t i = 0; i < size; i++) {
+        std::string key;
+        std::string value;
+        kvParser->GetI(i, key, value);
+        MMC_LOG_INFO("  " << key << " = " << value);
+    }
+
     SAFE_DELETE(kvParser);
 
     ResolveAllUrlDomains();

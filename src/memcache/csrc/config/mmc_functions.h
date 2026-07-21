@@ -76,6 +76,11 @@ inline bool OckStof(const std::string &str, float &value)
 
 const std::unordered_map<std::string, bool> Str2Bool{{"0", false}, {"1", true}, {"false", false}, {"true", true}};
 
+inline bool StartsWith(const std::string &str, const std::string &prefix)
+{
+    return str.size() >= prefix.size() && str.compare(0, prefix.size(), prefix) == 0;
+}
+
 inline bool IsBool(const std::string &str, bool &value)
 {
     std::string tmp = str;
