@@ -235,7 +235,6 @@ Result MmcClientDefault::Put(const std::string &key, const MmcBufferArray &bufAr
 
     Result result = MMC_OK;
     BatchUpdateRequest updateRequest{};
-    updateRequest.operateId_ = operateId;
     for (uint8_t i = 0; i < response.numBlobs_; i++) {
         auto blob = response.blobs_[i];
         MMC_LOG_DEBUG("Attempting to put to blob " << static_cast<int>(i) << " key " << key);
@@ -252,6 +251,7 @@ Result MmcClientDefault::Put(const std::string &key, const MmcBufferArray &bufAr
         updateRequest.keys_.push_back(key);
         updateRequest.ranks_.push_back(blob.rank_);
         updateRequest.mediaTypes_.push_back(blob.mediaType_);
+        updateRequest.operateIds_.push_back(operateId);
     }
     SyncUpdateState(updateRequest);
     return result;
@@ -316,13 +316,13 @@ Result MmcClientDefault::BatchPut(const std::vector<std::string> &keys, const st
 
     // update blob state
     BatchUpdateRequest updateRequest{};
-    updateRequest.operateId_ = operateId;
     for (size_t i = 0; i < keys.size(); ++i) {
         for (const auto &blob : allocResponse.blobs_[i]) {
             updateRequest.keys_.push_back(keys[i]);
             updateRequest.ranks_.push_back(blob.rank_);
             updateRequest.mediaTypes_.push_back(blob.mediaType_);
             updateRequest.actionResults_.push_back(batchResult[i] == 0 ? MMC_WRITE_OK : MMC_WRITE_FAIL);
+            updateRequest.operateIds_.push_back(operateId);
         }
     }
     SyncUpdateState(updateRequest); // 写需要同步更新，异步更新会出现立即读查询blob不可读的情况
@@ -370,7 +370,7 @@ Result MmcClientDefault::Get(const std::string &key, const MmcBufferArray &bufAr
     updateRequest.keys_.push_back(key);
     updateRequest.ranks_.push_back(blob.rank_);
     updateRequest.mediaTypes_.push_back(blob.mediaType_);
-    updateRequest.operateId_ = operateId;
+    updateRequest.operateIds_.push_back(operateId);
     AsyncUpdateState(updateRequest);
 
     if (ret != MMC_OK) {
@@ -489,13 +489,13 @@ Result MmcClientDefault::BatchGet(const std::vector<std::string> &keys, const st
     }
     // update read state
     BatchUpdateRequest updateRequest{};
-    updateRequest.operateId_ = operateId;
     for (size_t i = 0; i < keys.size(); ++i) {
         for (const auto &blob : response.blobs_[i]) {
             updateRequest.keys_.push_back(keys[i]);
             updateRequest.ranks_.push_back(blob.rank_);
             updateRequest.mediaTypes_.push_back(blob.mediaType_);
             updateRequest.actionResults_.push_back(MMC_READ_FINISH);
+            updateRequest.operateIds_.push_back(operateId);
         }
     }
     AsyncUpdateState(updateRequest);
@@ -752,7 +752,8 @@ Result MmcClientDefault::BatchRemoveLease(const std::vector<std::string> &keys)
         MMC_LOG_ERROR("client " << name_ << " batch remove lease invalid input, key size:" << keys.size());
         return MMC_INVALID_PARAM;
     }
-    uint64_t opId = 0;
+    std::vector<uint64_t> operateIds;
+    operateIds.reserve(keys.size());
     for (size_t i = 0; i < keys.size(); ++i) {
         LocalGvaBlobInfo info{};
         Result findRet = gvaBlobTracker_.FindReadLeaseByKey(keys[i], info);
@@ -763,14 +764,10 @@ Result MmcClientDefault::BatchRemoveLease(const std::vector<std::string> &keys)
         }
         auto innerOpId = gvaBlobTracker_.ReleaseLease(keys[i]);
         if (innerOpId == UINT64_MAX) {
-            MMC_LOG_WARN("key " << keys[i] << " inner operateId_:" << innerOpId << " opId:" << opId
-                                << " remove keys != alloc keys ");
-            continue;
+            MMC_LOG_DEBUG("key " << keys[i] << " inner operateId_:" << innerOpId << " remove keys != alloc keys ");
         }
-        opId = innerOpId;
+        operateIds.push_back(innerOpId);
     }
-    std::vector<uint64_t> operateIds;
-    operateIds.resize(keys.size(), opId);
 
     BatchUpdateLeaseRequest request{keys, operateIds, 0, 1};
     AsyncUpdateLease(request);
@@ -857,7 +854,7 @@ void MmcClientDefault::SyncUpdateState(BatchUpdateRequest &updateRequest)
         MMC_LOG_ERROR("client " << name_ << " batch get update failed:" << updateResult << ", key size:"
                                 << updateRequest.keys_.size() << ", ret size:" << updateResponse.results_.size());
     } else {
-        for (size_t i = 0; i < updateRequest.keys_.size() && i < updateRequest.keys_.size(); ++i) {
+        for (size_t i = 0; i < updateRequest.keys_.size(); ++i) {
             if (updateResponse.results_[i] != MMC_OK) {
                 MMC_LOG_ERROR("client " << name_ << " batch update for key " << updateRequest.keys_[i]
                                         << " failed:" << updateResponse.results_[i]);
@@ -1136,8 +1133,8 @@ Result MmcClientDefault::BatchMalloc(const std::vector<std::string> &keys, const
             // alloc has error, reserve alloc error code
             if (allocResponse.results_[i] != MMC_DUPLICATED_OBJECT) {
                 MMC_LOG_ERROR("Alloc blob failed for key " << key << ", error code=" << allocResponse.results_[i]);
+                continue;
             }
-            continue;
         } else if (numBlobs == 0 || blobs.size() != numBlobs) {
             MMC_LOG_ERROR("Invalid number of blobs" << numBlobs << " , " << blobs.size() << " for key " << key);
             continue;
@@ -1257,6 +1254,7 @@ Result MmcClientDefault::BatchWriteFinish(const std::vector<std::string> &keys,
     updateRequest.ranks_.reserve(keys.size());
     updateRequest.mediaTypes_.reserve(keys.size());
     updateRequest.actionResults_.reserve(keys.size());
+    updateRequest.operateIds_.reserve(keys.size());
     for (size_t i = 0; i < keys.size(); ++i) {
         LocalGvaBlobInfo info{};
         Result findRet = gvaBlobTracker_.FindBlobByKey(keys[i], info);
@@ -1267,14 +1265,13 @@ Result MmcClientDefault::BatchWriteFinish(const std::vector<std::string> &keys,
         auto opId = gvaBlobTracker_.ReleaseLease(keys[i]);
         if (opId == UINT64_MAX) {
             MMC_LOG_DEBUG("key " << keys[i] << " not found locally, because of lease timeout, skip");
-            continue;
         }
-        updateRequest.operateId_ = opId;
         updateRequest.keys_.push_back(keys[i]);
         updateRequest.ranks_.push_back(info.blob.rank_);
         updateRequest.mediaTypes_.push_back(info.blob.mediaType_);
         BlobActionResult action = writeResults[i] == MMC_OK ? MMC_WRITE_OK : MMC_WRITE_FAIL;
         updateRequest.actionResults_.push_back(action);
+        updateRequest.operateIds_.push_back(opId);
         sentIdx.push_back(i);
     }
 

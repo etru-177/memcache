@@ -189,14 +189,15 @@ struct BatchUpdateRequest : MsgBase {
     std::vector<std::string> keys_;
     std::vector<uint32_t> ranks_;
     std::vector<uint16_t> mediaTypes_;
-    uint64_t operateId_;
+    std::vector<uint64_t> operateIds_;
 
-    BatchUpdateRequest() : MsgBase{0, ML_BATCH_UPDATE_REQ, 0}, operateId_{0} {}
+    BatchUpdateRequest() : MsgBase{0, ML_BATCH_UPDATE_REQ, 0} {}
 
     BatchUpdateRequest(const std::vector<BlobActionResult> &actionResults, const std::vector<std::string> &keys,
-                       const std::vector<uint32_t> &ranks, const std::vector<uint16_t> &mediaTypes, uint64_t operateId)
+                       const std::vector<uint32_t> &ranks, const std::vector<uint16_t> &mediaTypes,
+                       const std::vector<uint64_t> &operateIds)
         : MsgBase{0, ML_BATCH_UPDATE_REQ, 0}, actionResults_(actionResults), keys_(keys), ranks_(ranks),
-          mediaTypes_(mediaTypes), operateId_(operateId)
+          mediaTypes_(mediaTypes), operateIds_(operateIds)
     {}
 
     Result Serialize(NetMsgPacker &packer) const override
@@ -208,7 +209,7 @@ struct BatchUpdateRequest : MsgBase {
         packer.Serialize(keys_);
         packer.Serialize(ranks_);
         packer.Serialize(mediaTypes_);
-        packer.Serialize(operateId_);
+        packer.Serialize(operateIds_);
         return MMC_OK;
     }
 
@@ -221,7 +222,7 @@ struct BatchUpdateRequest : MsgBase {
         packer.Deserialize(keys_);
         packer.Deserialize(ranks_);
         packer.Deserialize(mediaTypes_);
-        packer.Deserialize(operateId_);
+        packer.Deserialize(operateIds_);
         return MMC_OK;
     }
 };

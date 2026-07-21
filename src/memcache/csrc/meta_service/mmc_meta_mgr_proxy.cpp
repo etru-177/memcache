@@ -134,12 +134,13 @@ Result MmcMetaMgrProxy::BatchUpdateState(const BatchUpdateRequest &req, BatchUpd
     MmcMetaMetricManager &metricManager = MmcMetaMetricManager::GetInstance();
     metricManager.IncrementRequestCounter(RestMetricType::BATCH_UPDATE_STATE, UINT32_MAX);
     const size_t keyCount = req.keys_.size();
-    MMC_LOG_DEBUG("BatchUpdateState enter, keysCnt=" << keyCount << ", operateId=" << req.operateId_);
-    if (keyCount != req.ranks_.size() || keyCount != req.mediaTypes_.size() || keyCount != req.actionResults_.size()) {
+    MMC_LOG_DEBUG("BatchUpdateState enter, keysCnt=" << keyCount << ", operateIdCnt=" << req.operateIds_.size());
+    if (keyCount != req.ranks_.size() || keyCount != req.mediaTypes_.size() || keyCount != req.actionResults_.size() ||
+        keyCount != req.operateIds_.size()) {
         metricManager.IncrementFailureCounter(RestMetricType::BATCH_UPDATE_STATE);
         MMC_LOG_ERROR("BatchUpdateState: Input vectors size mismatch {keyNum:"
                       << req.keys_.size() << ", rankNum:" << req.ranks_.size()
-                      << ", mediaNum:" << req.mediaTypes_.size() << "}");
+                      << ", mediaNum:" << req.mediaTypes_.size() << ", operateIdNum:" << req.operateIds_.size() << "}");
         return MMC_ERROR;
     }
 
@@ -147,7 +148,7 @@ Result MmcMetaMgrProxy::BatchUpdateState(const BatchUpdateRequest &req, BatchUpd
         MmcLocation loc{req.ranks_[i], static_cast<MediaType>(req.mediaTypes_[i])};
         BlobActionResult action = req.actionResults_[i];
         metricManager.IncrementRequestCounter(RestMetricType::UPDATE_STATE, req.ranks_[i]);
-        Result ret = metaMangerPtr_->UpdateState(req.keys_[i], loc, action, req.operateId_);
+        Result ret = metaMangerPtr_->UpdateState(req.keys_[i], loc, action, req.operateIds_[i]);
         IncrementResultCounter(metricManager, RestMetricType::UPDATE_STATE, ret, req.ranks_[i]);
         if (ret != MMC_OK && ret != MMC_UNMATCHED_KEY) {
             MMC_LOG_ERROR("BatchUpdateState key[" << i << "]=" << req.keys_[i] << " failed, loc=" << loc
@@ -162,8 +163,7 @@ Result MmcMetaMgrProxy::BatchUpdateState(const BatchUpdateRequest &req, BatchUpd
         if (r != MMC_OK)
             failCnt++;
     }
-    MMC_LOG_DEBUG("BatchUpdateState exit, keysCnt=" << keyCount << ", failCnt=" << failCnt
-                                                    << ", operateId=" << req.operateId_);
+    MMC_LOG_DEBUG("BatchUpdateState exit, keysCnt=" << keyCount << ", failCnt=" << failCnt);
     IncrementBatchResultCounter(metricManager, RestMetricType::BATCH_UPDATE_STATE, resp.results_);
     return MMC_OK;
 }

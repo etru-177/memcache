@@ -779,7 +779,7 @@ Result MmcMetaManager::UpdateState(const std::string &key, const MmcLocation &lo
 
     Result ret;
     if (actRet == MMC_WRITE_FAIL) {
-        MMC_LOG_WARN("UpdateState: WRITE_FAIL for key=" << key << ", loc=" << loc << ", removing key");
+        MMC_LOG_DEBUG("UpdateState: WRITE_FAIL for key=" << key << ", loc=" << loc << ", removing key");
         ret = Remove(key);
         if (ret != MMC_OK) {
             MMC_LOG_ERROR("UpdateState: Failed remove key " << key << ", ret: " << ret);
@@ -899,7 +899,7 @@ Result MmcMetaManager::BlobDeleteRpc(const std::string &key, const MmcMemBlobDes
                                                                << ", resp: " << resp.ret_);
         return MMC_ERROR;
     }
-    MMC_LOG_INFO("Deleted blob via RPC successfully, key=" << key << ", rank=" << blob.rank_);
+    MMC_LOG_DEBUG("Deleted blob via RPC successfully, key=" << key << ", rank=" << blob.rank_);
     return MMC_OK;
 }
 
@@ -921,7 +921,7 @@ Result MmcMetaManager::RemoveSsdBlob(const std::string &key, uint32_t rank)
     if (objMeta->NumBlobs() == 0) {
         guard.unlock();
         metaContainer_->Erase(key);
-        MMC_LOG_INFO("RemoveSsdBlob: key=" << key << " fully removed (no remaining blobs)");
+        MMC_LOG_DEBUG("RemoveSsdBlob: key=" << key << " fully removed (no remaining blobs)");
     }
     return MMC_OK;
 }

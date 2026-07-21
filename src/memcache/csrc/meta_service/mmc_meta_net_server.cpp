@@ -238,7 +238,8 @@ Result MetaNetServer::HandleBatchUpdate(const NetContextPtr &context)
     context->GetRequest<BatchUpdateRequest>(req);
 
     auto &metaMgrProxy = metaService_->GetMetaMgrProxy();
-    MMC_LOG_DEBUG("HandleBatchUpdate recv, keysCnt=" << req.keys_.size() << ", operateId=" << req.operateId_);
+    MMC_LOG_DEBUG("HandleBatchUpdate recv, keysCnt=" << req.keys_.size()
+                                                     << ", operateIdCnt=" << req.operateIds_.size());
     TP_TRACE_BEGIN(TP_MMC_META_BATCH_UPDATE);
     auto ret = metaMgrProxy->BatchUpdateState(req, resp);
     TP_TRACE_END(TP_MMC_META_BATCH_UPDATE, ret);

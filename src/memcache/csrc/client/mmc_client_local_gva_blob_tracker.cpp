@@ -14,6 +14,7 @@
 
 #include <limits>
 
+#include "mmc_ptracer.h"
 #include "mmc_montotonic.h"
 
 namespace ock {
@@ -100,6 +101,7 @@ Result LocalGvaBlobTracker::UpdateFromQuery(const std::string &key, const MmcMem
             MMC_LOG_ERROR("unexpected! read before write finish, key:" << info->key << ", gva:" << keyIt->second);
             return MMC_UNMATCHED_STATE;
         }
+        (*blobInfo)->blob.state_ = READABLE;
         (*blobInfo)->leaseDeadlineMs = leaseDeadlineMs;
         (*blobInfo)->operateQueue.push(operateId);
         return MMC_OK;
@@ -175,8 +177,8 @@ Result LocalGvaBlobTracker::FindReadable(uint64_t gva, uint64_t size, LocalGvaBl
     info.operateQueue = (*blobInfo)->operateQueue;
     info.leaseDeadlineMs = (*blobInfo)->leaseDeadlineMs;
     if (!info.IsReadable()) {
-        MMC_LOG_ERROR("read lease expired, key:" << info.key << ", gva:" << info.blob.gva_
-                                                 << ", state:" << info.blob.state_);
+        MMC_LOG_ERROR("find readable failed, key:" << info.key << ", gva:" << info.blob.gva_
+                                                   << ", state:" << info.blob.state_);
         return MMC_UNMATCHED_STATE;
     }
     if (info.IsLeaseExpired(NowMs())) {
@@ -217,20 +219,20 @@ uint64_t LocalGvaBlobTracker::ReleaseLease(const std::string &key)
     std::lock_guard<std::mutex> guard(mutex_);
     auto keyIt = blobStartByKey_.find(key);
     if (keyIt == blobStartByKey_.end()) {
-        MMC_LOG_WARN("release lease failed key:" << key << " blobStartByKey_ not find");
+        MMC_LOG_DEBUG("release lease failed key:" << key << " blobStartByKey_ not find");
         return UINT64_MAX;
     }
 
     auto *blobInfo = intervals_.Query(keyIt->second);
     if (blobInfo == nullptr || *blobInfo == nullptr) {
-        MMC_LOG_WARN("release lease failed key:" << key << " intervals_ not find");
+        MMC_LOG_DEBUG("release lease failed key:" << key << " intervals_ not find");
         return UINT64_MAX;
     }
 
     auto &info = *blobInfo;
 
     if (info->operateQueue.empty()) {
-        MMC_LOG_WARN("release lease failed key:" << key << " operateQueue is empty");
+        MMC_LOG_DEBUG("release lease failed key:" << key << " operateQueue is empty");
         return UINT64_MAX;
     }
     auto opId = info->operateQueue.front();
@@ -266,6 +268,23 @@ void LocalGvaBlobTracker::RemoveExpired()
             continue;
         }
         LocalGvaBlobInfoPtr info = *blobInfo;
+        if (info->operateQueue.empty()) {
+            if (info->blob.state_ == BlobState::ALLOCATED) {
+                TP_TRACE_RECORD(TP_MMC_TRACKER_EVICT_ALLOCATED, 1000ULL, 0);
+            } else if (info->blob.state_ == BlobState::READABLE) {
+                TP_TRACE_RECORD(TP_MMC_TRACKER_EVICT_READABLE, 1000ULL, 0);
+            } else {
+                TP_TRACE_RECORD(TP_MMC_TRACKER_EVICT_NONE, 1000ULL, 0);
+            }
+        } else if (info->IsLeaseExpired(NowMs())) {
+            if (info->blob.state_ == BlobState::ALLOCATED) {
+                TP_TRACE_RECORD(TP_MMC_TRACKER_TIMEOUT_ALLOCATED, 1000ULL, 0);
+            } else if (info->blob.state_ == BlobState::READABLE) {
+                TP_TRACE_RECORD(TP_MMC_TRACKER_TIMEOUT_READABLE, 1000ULL, 0);
+            } else {
+                TP_TRACE_RECORD(TP_MMC_TRACKER_TIMEOUT_NONE, 1000ULL, 0);
+            }
+        }
         if (info->IsLeaseExpired(NowMs()) || info->operateQueue.empty()) {
             (void)intervals_.RemoveAt(info->blob.gva_);
             it = blobStartByKey_.erase(it);
