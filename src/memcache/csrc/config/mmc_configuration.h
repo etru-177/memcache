@@ -44,6 +44,10 @@ constexpr uint64_t HBM_SIZE_ALIGNMENT = 2097152;  // 2MB
 
 const std::string BOOL_ENUM_STR = "false||true";
 const std::string LOG_LEVEL_ENUM_STR = "debug||info||warn||error";
+const std::string LOG_OUTPUT_TARGET_ENUM_STR = "screen||file||both";
+constexpr int32_t LOG_OUTPUT_TARGET_SCREEN = 0;
+constexpr int32_t LOG_OUTPUT_TARGET_FILE = 1;
+constexpr int32_t LOG_OUTPUT_TARGET_BOTH = 2;
 const std::string LOCAL_SERVER_PROTOCAL_ENUM_STR =
     "host_rdma||host_urma||host_tcp||device_rdma||device_urma||device_uboe||device_sdma||host_shm";
 
@@ -204,6 +208,8 @@ public:
                    VIntRange::Create(OCK_MMC_LOG_ROTATION_FILE_COUNT.first, MIN_LOG_ROTATION_FILE_COUNT,
                                      MAX_LOG_ROTATION_FILE_COUNT),
                    0);
+        AddStrConf(OCK_MMC_LOG_OUTPUT_TARGET,
+                   VStrEnum::Create(OCK_MMC_LOG_OUTPUT_TARGET.first, LOG_OUTPUT_TARGET_ENUM_STR), 0);
         AddIntConf(OKC_MMC_EVICT_THRESHOLD_HIGH,
                    VIntRange::Create(OKC_MMC_EVICT_THRESHOLD_HIGH.first, MIN_EVICT_THRESHOLD, MAX_EVICT_THRESHOLD), 0);
         AddIntConf(OKC_MMC_EVICT_THRESHOLD_LOW,
@@ -284,6 +290,15 @@ public:
         config.leaseTtlMs = static_cast<uint64_t>(GetInt(ConfConstant::OCK_MMC_META_LEASE_TTL_MS));
         config.logRotationFileSize = GetInt(ConfConstant::OCK_MMC_LOG_ROTATION_FILE_SIZE) * MB_NUM;
         config.logRotationFileCount = GetInt(ConfConstant::OCK_MMC_LOG_ROTATION_FILE_COUNT);
+        std::string logOutputTargetStr = GetString(ConfConstant::OCK_MMC_LOG_OUTPUT_TARGET);
+        StringToUpper(logOutputTargetStr);
+        if (logOutputTargetStr == "SCREEN") {
+            config.logOutputTarget = LOG_OUTPUT_TARGET_SCREEN;
+        } else if (logOutputTargetStr == "BOTH") {
+            config.logOutputTarget = LOG_OUTPUT_TARGET_BOTH;
+        } else {
+            config.logOutputTarget = LOG_OUTPUT_TARGET_FILE;
+        }
         config.metricsReportIntervalSeconds = GetUInt64(ConfConstant::OCK_MMC_METRICS_REPORT_INTERVAL_SECONDS);
         GetAccTlsConfig(config.accTlsConfig);
         GetConfigStoreTlsConfig(config.configStoreTlsConfig);

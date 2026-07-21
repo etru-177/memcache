@@ -62,6 +62,7 @@ MetaConfig是元数据服务的启动配置类，用于设置MetaService的监�
 | log_path | str | "/var/log/memcache_hybrid" | 日志目录 |
 | log_rotation_file_size | int | 20 | 日志滚动文件大小，单位MB |
 | log_rotation_file_count | int | 50 | 日志滚动文件数量 |
+| log_output_target | str | "file" | 日志输出目标：screen（仅stdout）, file（仅滚动文件）, both（stdout + 滚动文件） |
 | evict_threshold_high | int | 90 | 驱逐高水位百分比 |
 | evict_threshold_low | int | 80 | 驱逐低水位百分比 |
 | ubs_io_enable | bool | false | 是否启用UBS_IO |
@@ -97,6 +98,7 @@ config.log_level = "info"
 config.log_path = "/tmp/memcache_hybrid"
 config.log_rotation_file_size = 20
 config.log_rotation_file_count = 10
+config.log_output_target = "both"
 config.evict_threshold_high = 90
 config.evict_threshold_low = 80
 ```

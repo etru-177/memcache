@@ -17,6 +17,7 @@
 #include "common/mmc_functions.h"
 #include "common/mmc_logger.h"
 #include "mmc.h"
+#include "mmc_configuration.h"
 
 using namespace testing;
 using namespace ock::mmc;
@@ -49,6 +50,7 @@ TEST_F(TestMetaConfigUtils, CreateDefaultMetaConfigReturnsExpectedDefaults)
     EXPECT_STREQ(config.logPath, "/var/log/memcache_hybrid");
     EXPECT_EQ(config.logRotationFileSize, 20 * 1024 * 1024);
     EXPECT_EQ(config.logRotationFileCount, 50);
+    EXPECT_EQ(config.logOutputTarget, LOG_OUTPUT_TARGET_FILE);
     EXPECT_EQ(config.evictThresholdHigh, 90U);
     EXPECT_EQ(config.evictThresholdLow, 80U);
     EXPECT_EQ(config.leaseTtlMs, 10000U);
@@ -87,6 +89,7 @@ TEST_F(TestMetaConfigUtils, MetaConfigToStringReturnsExpectedFormat)
     SafeCopy("/var/log/meta", config.logPath, sizeof(config.logPath));
     config.logRotationFileSize = 64L * 1024 * 1024;
     config.logRotationFileCount = 7L;
+    config.logOutputTarget = LOG_OUTPUT_TARGET_BOTH;
     config.evictThresholdHigh = 95U;
     config.evictThresholdLow = 70U;
     config.leaseTtlMs = 4321U;
@@ -121,6 +124,7 @@ TEST_F(TestMetaConfigUtils, MetaConfigToStringReturnsExpectedFormat)
     ExpectConfigStringContains(actual, "log_path: /var/log/meta");
     ExpectConfigStringContains(actual, "log_rotation_file_size: 67108864");
     ExpectConfigStringContains(actual, "log_rotation_file_count: 7");
+    ExpectConfigStringContains(actual, "log_output_target: 2");
     ExpectConfigStringContains(actual, "evict_threshold_high: 95");
     ExpectConfigStringContains(actual, "evict_threshold_low: 70");
     ExpectConfigStringContains(actual, "tls_enable: true");

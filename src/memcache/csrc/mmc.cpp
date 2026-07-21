@@ -43,6 +43,7 @@ mmc_meta_service_config_t create_default_meta_config()
     SafeCopy("/var/log/memcache_hybrid", config.logPath, sizeof(config.logPath));
     config.logRotationFileSize = 20 * MB_NUM;
     config.logRotationFileCount = 50;
+    config.logOutputTarget = LOG_OUTPUT_TARGET_FILE;
     config.evictThresholdHigh = 90U;
     config.evictThresholdLow = 80U;
     config.rewarmDramWatermark = DEFAULT_REWARM_HIGH_WATERMARK;
@@ -73,6 +74,7 @@ std::string meta_config_to_string(const mmc_meta_service_config_t &config)
     oss << "  log_path: " << config.logPath << "\n";
     oss << "  log_rotation_file_size: " << config.logRotationFileSize << "\n";
     oss << "  log_rotation_file_count: " << config.logRotationFileCount << "\n";
+    oss << "  log_output_target: " << config.logOutputTarget << "\n";
     oss << "  evict_threshold_high: " << config.evictThresholdHigh << "\n";
     oss << "  evict_threshold_low: " << config.evictThresholdLow << "\n";
     oss << "  kv_events_enable: " << (config.kvEvents.enable ? "true" : "false") << "\n";

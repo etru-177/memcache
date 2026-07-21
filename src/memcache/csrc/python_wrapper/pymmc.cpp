@@ -427,6 +427,17 @@ void DefineMmcStructModule(py::module_ &m)
                            R"pbdoc(
                     Log rotation file count.
                 )pbdoc")
+            .def_property(
+                "log_output_target",
+                [](const mmc_meta_service_config_t &config) {
+                    return MetaLogOutputTargetToString(config.logOutputTarget);
+                },
+                [](mmc_meta_service_config_t &config, const std::string &value) {
+                    config.logOutputTarget = MetaLogOutputTargetFromString(value);
+                },
+                R"pbdoc(
+                    Log output target: screen (stdout only), file (rotating file only), both (stdout + file).
+                )pbdoc")
             .def_readwrite("evict_threshold_high", &mmc_meta_service_config_t::evictThresholdHigh,
                            R"pbdoc(
                 Eviction high threshold in percentage.

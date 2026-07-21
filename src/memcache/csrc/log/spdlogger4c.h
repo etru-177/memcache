@@ -30,17 +30,17 @@ using AuditResourceType = enum {
 /**
  * @brief initialize the normal ulog
  *
- * @param logType          - [IN] type of the ulog, could 0 or 1; 0: stdout, 1: file
- * @param minLogLevel      - [IN] min level of message, 0:trace, 1:debug, 2:info, 3:warn, 4:error, 5:critical
  * @param path             - [IN] full path of ulog file name
+ * @param minLogLevel      - [IN] min level of message, 0:trace, 1:debug, 2:info, 3:warn, 4:error, 5:critical
  * @param rotationFileSize - [IN] the max file size of a single rotation file
- * @param rotationFileSize - [IN] the max count of total rotated file
+ * @param rotationFileCount - [IN] the max count of total rotated file
+ * @param outputTarget     - [IN] log output target: 0=screen, 1=file, 2=both
  *
  * @return 0 for success, non zero for failure
  */
-int SPDLOG_Init(const char *path, int minLogLevel, int rotationFileSize, int rotationFileCount);
+int SPDLOG_Init(const char *path, int minLogLevel, int rotationFileSize, int rotationFileCount, int32_t outputTarget);
 
-int SPDLOG_AuditInit(const char *path, int rotationFileSize, int rotationFileCount);
+int SPDLOG_AuditInit(const char *path, int rotationFileSize, int rotationFileCount, int32_t outputTarget);
 
 /**
  * @brief ulog a message into a normal ulog

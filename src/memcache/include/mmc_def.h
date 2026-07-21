@@ -64,6 +64,7 @@ typedef struct {
     char logPath[PATH_MAX_SIZE];
     int32_t logRotationFileSize;
     int32_t logRotationFileCount;
+    int32_t logOutputTarget; /* 0=screen, 1=file, 2=both */
     uint16_t evictThresholdHigh;
     uint16_t evictThresholdLow;
     uint64_t leaseTtlMs;

@@ -451,3 +451,50 @@ TEST_F(TestMmcConfiguration, DramBestEffortEnabledTest)
     clientConfig.GetLocalServiceConfig(localServiceConfig);
     ASSERT_NE(localServiceConfig.flags & SMEM_BM_FLAG_DRAM_BEST_EFFORT, 0U);
 }
+
+TEST_F(TestMmcConfiguration, LogOutputTargetEnumConversionTest)
+{
+    // Test string-to-enum conversion for log_output_target config
+    MetaServiceConfig metaConfig;
+    metaConfig.LoadDefault();
+
+    // NOTE: must use std::string() wrapper for the value argument — otherwise
+    // Set(const string&, bool) is selected (const char* → bool is a standard
+    // conversion, preferred over const char* → std::string user-defined).
+
+    // "screen" -> LOG_OUTPUT_TARGET_SCREEN (0)
+    metaConfig.Set(ConfConstant::OCK_MMC_LOG_OUTPUT_TARGET.first, std::string("screen"));
+    mmc_meta_service_config_t config1{};
+    metaConfig.GetMetaServiceConfig(config1);
+    ASSERT_EQ(config1.logOutputTarget, LOG_OUTPUT_TARGET_SCREEN);
+
+    // "file" -> LOG_OUTPUT_TARGET_FILE (1)
+    metaConfig.Set(ConfConstant::OCK_MMC_LOG_OUTPUT_TARGET.first, std::string("file"));
+    mmc_meta_service_config_t config2{};
+    metaConfig.GetMetaServiceConfig(config2);
+    ASSERT_EQ(config2.logOutputTarget, LOG_OUTPUT_TARGET_FILE);
+
+    // "both" -> LOG_OUTPUT_TARGET_BOTH (2)
+    metaConfig.Set(ConfConstant::OCK_MMC_LOG_OUTPUT_TARGET.first, std::string("both"));
+    mmc_meta_service_config_t config3{};
+    metaConfig.GetMetaServiceConfig(config3);
+    ASSERT_EQ(config3.logOutputTarget, LOG_OUTPUT_TARGET_BOTH);
+
+    // Default value (not explicitly set) should be "file" -> 1
+    MetaServiceConfig defaultConfig;
+    defaultConfig.LoadDefault();
+    mmc_meta_service_config_t config4{};
+    defaultConfig.GetMetaServiceConfig(config4);
+    ASSERT_EQ(config4.logOutputTarget, LOG_OUTPUT_TARGET_FILE);
+
+    // Case insensitivity: "SCREEN" and "Both" should work
+    metaConfig.Set(ConfConstant::OCK_MMC_LOG_OUTPUT_TARGET.first, std::string("SCREEN"));
+    mmc_meta_service_config_t config5{};
+    metaConfig.GetMetaServiceConfig(config5);
+    ASSERT_EQ(config5.logOutputTarget, LOG_OUTPUT_TARGET_SCREEN);
+
+    metaConfig.Set(ConfConstant::OCK_MMC_LOG_OUTPUT_TARGET.first, std::string("Both"));
+    mmc_meta_service_config_t config6{};
+    metaConfig.GetMetaServiceConfig(config6);
+    ASSERT_EQ(config6.logOutputTarget, LOG_OUTPUT_TARGET_BOTH);
+}

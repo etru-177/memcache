@@ -266,7 +266,8 @@ int MmcMetaServiceProcess::InitLogger(const mmc_meta_service_config_t &options)
 
     std::cout << "Meta service log level " << options.logLevel << ", log path: " << logPath
               << ", audit log path: " << logAuditPath << ", log rotation file size: " << options.logRotationFileSize
-              << ", log rotation file count: " << options.logRotationFileCount << std::endl;
+              << ", log rotation file count: " << options.logRotationFileCount
+              << ", log output target: " << options.logOutputTarget << std::endl;
 
     auto ret = MmcOutLogger::Instance().SetLogLevel(static_cast<LogLevel>(options.logLevel));
     if (ret != 0) {
@@ -274,14 +275,16 @@ int MmcMetaServiceProcess::InitLogger(const mmc_meta_service_config_t &options)
         return -1;
     }
     mf::OutLogger::Instance().SetLogLevel(static_cast<mf::LogLevel>(options.logLevel));
-    ret = SPDLOG_Init(logPath.c_str(), options.logLevel, options.logRotationFileSize, options.logRotationFileCount);
+    ret = SPDLOG_Init(logPath.c_str(), options.logLevel, options.logRotationFileSize, options.logRotationFileCount,
+                      options.logOutputTarget);
     if (ret != 0) {
         std::cerr << "Failed to init spdlog, error: " << SPDLOG_GetLastErrorMessage() << std::endl;
         return -1;
     }
     MmcOutLogger::Instance().SetExternalLogFunction(SPDLOG_LogMessage);
     mf::OutLogger::Instance().SetExternalLogFunction(SPDLOG_LogMessage);
-    ret = SPDLOG_AuditInit(logAuditPath.c_str(), options.logRotationFileSize, options.logRotationFileCount);
+    ret = SPDLOG_AuditInit(logAuditPath.c_str(), options.logRotationFileSize, options.logRotationFileCount,
+                           options.logOutputTarget);
     if (ret != 0) {
         std::cerr << "Failed to init audit spdlog, error: " << SPDLOG_GetLastErrorMessage() << std::endl;
         return -1;

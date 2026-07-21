@@ -14,6 +14,7 @@
 
 #include <algorithm>
 
+#include "mmc_configuration.h"
 #include "mmc_logger.h"
 
 namespace ock {
@@ -41,6 +42,33 @@ inline int32_t MetaLogLevelFromString(const std::string &logLevel)
     std::transform(upperLevel.begin(), upperLevel.end(), upperLevel.begin(),
                    [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
     return MmcOutLogger::Instance().GetLogLevel(upperLevel);
+}
+
+inline std::string MetaLogOutputTargetToString(const int32_t logOutputTarget)
+{
+    switch (logOutputTarget) {
+        case LOG_OUTPUT_TARGET_SCREEN:
+            return "screen";
+        case LOG_OUTPUT_TARGET_BOTH:
+            return "both";
+        case LOG_OUTPUT_TARGET_FILE:
+        default:
+            return "file";
+    }
+}
+
+inline int32_t MetaLogOutputTargetFromString(const std::string &logOutputTarget)
+{
+    std::string upperTarget = logOutputTarget;
+    std::transform(upperTarget.begin(), upperTarget.end(), upperTarget.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
+    if (upperTarget == "SCREEN") {
+        return LOG_OUTPUT_TARGET_SCREEN;
+    }
+    if (upperTarget == "BOTH") {
+        return LOG_OUTPUT_TARGET_BOTH;
+    }
+    return LOG_OUTPUT_TARGET_FILE;
 }
 
 } // namespace mmc

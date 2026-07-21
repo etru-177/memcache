@@ -26,7 +26,7 @@ endif ()
 
 ADD_UNIT_TEST(test_mmc_test
         FILES ${mmc_test_src} ${TEST_SRC_PATHS}/ut_main.cpp
-        INCLUDE_PATHS ${TEST_INCLUDE_PATHS} ${PROJECT_MMC_SRC_BASE}/csrc/kv_event ${MMC_KV_EVENTS_MSGPACK_INCLUDE_DIR}
+        INCLUDE_PATHS ${TEST_INCLUDE_PATHS} ${PROJECT_MMC_SRC_BASE}/csrc/kv_event ${MMC_KV_EVENTS_MSGPACK_INCLUDE_DIR} ${PROJECT_3RDPARTY_BIN_DIR}/spdlog/include
         LINK_LIBRARIES ${TEST_DEPEND_LIBS}
         BUILD_FLAGS -fpermissive --coverage -DMSGPACK_NO_BOOST
 )

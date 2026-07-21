@@ -9,9 +9,10 @@
  * MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
  * See the Mulan PSL v2 for more details.
 */
-#include "spdlog/sinks/stdout_sinks.h"
-#include "spdlog/sinks/rotating_file_sink.h"
 #include "spdlogger.h"
+#include <vector>
+#include "spdlog/sinks/stdout_color_sinks.h"
+#include "spdlog/sinks/rotating_file_sink.h"
 
 namespace ock::mmc::log {
 thread_local std::string SpdLogger::gLastErrorMessage;
@@ -21,10 +22,18 @@ constexpr int ROTATION_FILE_COUNT_MAX = 50;
 constexpr mode_t LOG_FILE_CREATE_MODE = 0640;
 constexpr mode_t LOG_FILE_READ_ONLY_MODE = 0440;
 
-int SpdLogger::ValidateParams(int minLogLevel, const std::string &path, int rotationFileSize, int rotationFileCount)
+int SpdLogger::ValidateLogLevel(int minLogLevel)
 {
     if (minLogLevel < static_cast<int>(LogLevel::TRACE) || minLogLevel >= static_cast<int>(LogLevel::CRITICAL)) {
         gLastErrorMessage = "Invalid min log level, which should be 0,1,2,3,4,5";
+        return -1;
+    }
+    return 0;
+}
+
+int SpdLogger::ValidateParams(int minLogLevel, const std::string &path, int rotationFileSize, int rotationFileCount)
+{
+    if (ValidateLogLevel(minLogLevel) != 0) {
         return -1;
     }
 
@@ -63,39 +72,82 @@ const char *SpdLogger::GetLastErrorMessage()
     return gLastErrorMessage.c_str();
 }
 
-int SpdLogger::Initialize(const std::string &path, int minLogLevel, int rotationFileSize, int rotationFileCount)
+int SpdLogger::ValidateInitialize(const InitOptions &options, bool &needFile, bool &needStdout)
+{
+    if (ValidateLogLevel(options.minLogLevel) != 0) {
+        return -1;
+    }
+    needFile = (options.outputTarget == static_cast<int32_t>(LogOutputTarget::FILE) ||
+                options.outputTarget == static_cast<int32_t>(LogOutputTarget::BOTH));
+    needStdout = (options.outputTarget == static_cast<int32_t>(LogOutputTarget::SCREEN) ||
+                  options.outputTarget == static_cast<int32_t>(LogOutputTarget::BOTH));
+    if (needFile &&
+        ValidateParams(options.minLogLevel, options.path, options.rotationFileSize, options.rotationFileCount) != 0) {
+        return -1;
+    }
+    if (!needFile && !needStdout) {
+        gLastErrorMessage = "Invalid log output target: " + std::to_string(options.outputTarget);
+        return -1;
+    }
+    return 0;
+}
+
+void SpdLogger::BuildSinks(const InitOptions &options, bool needFile, bool needStdout,
+                           std::vector<spdlog::sink_ptr> &sinks)
+{
+    if (needStdout) {
+        sinks.push_back(std::make_shared<spdlog::sinks::stdout_color_sink_mt>());
+    }
+    if (needFile) {
+        spdlog::file_event_handlers handlers;
+        handlers.before_open = &BeforeOpenCallback;
+        handlers.after_open = &AfterOpenCallback;
+        handlers.after_close = &AfterCloseCallback;
+        sinks.push_back(std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
+            options.path, options.rotationFileSize, options.rotationFileCount, true, handlers));
+    }
+}
+
+void SpdLogger::ConfigureLogger(int minLogLevel)
+{
+    spdlog::register_logger(mSPDLogger);
+    mSPDLogger->set_pattern("%v");
+    mSPDLogger->info("", "");
+    mSPDLogger->set_pattern("%Y-%m-%d %H:%M:%S.%f %t %v");
+    mSPDLogger->info("Log default format: yyyy-mm-dd hh:mm:ss.uuuuuu threadid loglevel msg");
+    mSPDLogger->set_pattern("%Y-%m-%d %H:%M:%S.%f %t %l %v");
+    spdlog::flush_every(std::chrono::seconds(1));
+    mSPDLogger->set_level(static_cast<spdlog::level::level_enum>(minLogLevel));
+    mSPDLogger->flush_on(spdlog::level::err);
+}
+
+int SpdLogger::Initialize(const std::string &path, int minLogLevel, int rotationFileSize, int rotationFileCount,
+                          int32_t outputTarget)
 {
     try {
         std::lock_guard<std::mutex> guard(mutex_);
         if (started_) {
             return 0;
         }
-        if (ValidateParams(minLogLevel, path, rotationFileSize, rotationFileCount) != 0) {
+
+        InitOptions options{path, minLogLevel, rotationFileSize, rotationFileCount, outputTarget};
+
+        bool needFile = false;
+        bool needStdout = false;
+        if (ValidateInitialize(options, needFile, needStdout) != 0) {
             return -1;
         }
-        std::string logName = "log:" + path;
-        spdlog::file_event_handlers handlers;
-        handlers.before_open = &BeforeOpenCallback;
-        handlers.after_open = &AfterOpenCallback;
-        handlers.after_close = &AfterCloseCallback;
-        mSPDLogger =
-            spdlog::rotating_logger_mt(logName.c_str(), path, rotationFileSize, rotationFileCount, true, handlers);
+        std::vector<spdlog::sink_ptr> sinks;
+        BuildSinks(options, needFile, needStdout, sinks);
+        mSPDLogger = std::make_shared<spdlog::logger>("log:" + path, sinks.begin(), sinks.end());
         if (mSPDLogger == nullptr) {
             gLastErrorMessage = "spdlog logger is not created yet";
             return -1;
         }
-        mSPDLogger->set_pattern("%v");
-        mSPDLogger->info("", "");
-        mSPDLogger->set_pattern("%Y-%m-%d %H:%M:%S.%f %t %v");
-        mSPDLogger->info("Log default format: yyyy-mm-dd hh:mm:ss.uuuuuu threadid loglevel msg");
-        mSPDLogger->set_pattern("%Y-%m-%d %H:%M:%S.%f %t %l %v");
-        spdlog::flush_every(std::chrono::seconds(1));
-        mSPDLogger->set_level(static_cast<spdlog::level::level_enum>(minLogLevel));
-        mSPDLogger->flush_on(spdlog::level::err);
+        ConfigureLogger(minLogLevel);
         started_ = true;
     } catch (const spdlog::spdlog_ex &ex) {
-        gLastErrorMessage = "Failed to create log: ";
-        gLastErrorMessage += ex.what();
+        gLastErrorMessage = std::string("Failed to create log: ") + ex.what();
         return -1;
     } catch (...) {
         return -1;

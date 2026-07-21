@@ -18,6 +18,7 @@
 #include <sstream>
 #include <chrono>
 #include <memory>
+#include <vector>
 #include <spdlog/common.h>
 #include <spdlog/spdlog.h>
 
@@ -31,6 +32,13 @@ enum class LogLevel {
     CRITICAL = 5,
     LOG_LEVEL_MAX,
 };
+
+enum class LogOutputTarget {
+    SCREEN = 0,
+    FILE = 1,
+    BOTH = 2,
+};
+
 class SpdLogger {
 public:
     SpdLogger() = default;
@@ -49,7 +57,8 @@ public:
         return instance;
     }
 
-    int Initialize(const std::string &path, int minLogLevel, int rotationFileSize, int rotationFileCount);
+    int Initialize(const std::string &path, int minLogLevel, int rotationFileSize, int rotationFileCount,
+                   int32_t outputTarget = static_cast<int32_t>(LogOutputTarget::FILE));
     int SetLogMinLevel(int minLevel);
     void LogMessage(int level, const char *message);
     void AuditLogMessage(const char *message);
@@ -57,7 +66,19 @@ public:
     void Flush(void);
 
 private:
+    struct InitOptions {
+        std::string path;
+        int minLogLevel = 0;
+        int rotationFileSize = 0;
+        int rotationFileCount = 0;
+        int32_t outputTarget = static_cast<int32_t>(LogOutputTarget::FILE);
+    };
+    static int ValidateLogLevel(int minLogLevel);
     static int ValidateParams(int minLogLevel, const std::string &path, int rotationFileSize, int rotationFileCount);
+    static int ValidateInitialize(const InitOptions &options, bool &needFile, bool &needStdout);
+    static void BuildSinks(const InitOptions &options, bool needFile, bool needStdout,
+                           std::vector<spdlog::sink_ptr> &sinks);
+    void ConfigureLogger(int minLogLevel);
 
     static void BeforeOpenCallback(const std::string &filename);
     static void AfterOpenCallback(const std::string &filename, std::FILE *file_stream);

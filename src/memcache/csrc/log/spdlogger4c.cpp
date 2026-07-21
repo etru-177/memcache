@@ -14,17 +14,17 @@
 #include "spdlogger4c.h"
 namespace ock {
 namespace mmc {
-int SPDLOG_Init(const char *path, int minLogLevel, int rotationFileSize, int rotationFileCount)
+int SPDLOG_Init(const char *path, int minLogLevel, int rotationFileSize, int rotationFileCount, int32_t outputTarget)
 {
     return ock::mmc::log::SpdLogger::GetInstance().Initialize(path, minLogLevel + 1, rotationFileSize,
-                                                              rotationFileCount);
+                                                              rotationFileCount, outputTarget);
 }
 
-int SPDLOG_AuditInit(const char *path, int rotationFileSize, int rotationFileCount)
+int SPDLOG_AuditInit(const char *path, int rotationFileSize, int rotationFileCount, int32_t outputTarget)
 {
     const int minLogLevel = 3;
     return ock::mmc::log::SpdLogger::GetAuditInstance().Initialize(path, minLogLevel, rotationFileSize,
-                                                                   rotationFileCount);
+                                                                   rotationFileCount, outputTarget);
 }
 
 void SPDLOG_LogMessage(int32_t level, const char *msg)
