@@ -19,6 +19,7 @@
 #include "mmc_montotonic.h"
 #include "mmc_types.h"
 #include "mmc_define.h"
+#include "mmc_ptracer.h"
 
 namespace ock {
 namespace mmc {
@@ -59,6 +60,7 @@ void MmcMetaLeaseManager::Wait()
     while (!useClient.empty()) {
         if ((ock::dagger::Monotonic::TimeUs() / 1000ULL) >= lease_) {
             MMC_LOG_DEBUG("MmcMetaLeaseManager Wait " << " ttl " << waitIntervalMs);
+            TP_TRACE_RECORD(TP_MMC_META_LEASE_TIMEOUT_COUNT, defaultTtlMs_ * 1000ULL, 0);
             return;
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(waitIntervalMs));

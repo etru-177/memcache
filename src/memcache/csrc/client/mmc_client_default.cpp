@@ -738,6 +738,7 @@ Result MmcClientDefault::BatchAddLease(const std::vector<std::string> &keys, uin
                                     << ", ret:" << trackRet);
             results[i] = trackRet;
         }
+        TP_TRACE_RECORD(TP_MMC_TRACKER_ADD_LEASE_FROM_READ, 1000ULL, trackRet);
     }
     return MMC_OK;
 }
@@ -766,6 +767,7 @@ Result MmcClientDefault::BatchRemoveLease(const std::vector<std::string> &keys)
         if (innerOpId == UINT64_MAX) {
             MMC_LOG_DEBUG("key " << keys[i] << " inner operateId_:" << innerOpId << " remove keys != alloc keys ");
         }
+        TP_TRACE_RECORD(TP_MMC_TRACKER_REMOVE_LEASE_FROM_READ, 1000ULL, innerOpId == UINT64_MAX ? -1 : 0);
         operateIds.push_back(innerOpId);
     }
 
@@ -1145,6 +1147,7 @@ Result MmcClientDefault::BatchMalloc(const std::vector<std::string> &keys, const
         if (trackRet != MMC_OK) {
             MMC_LOG_ERROR("Register batch alloc gva info failed for key " << key << ", ret:" << trackRet);
         }
+        TP_TRACE_RECORD(TP_MMC_TRACKER_ADD_LEASE_FROM_WRITE, 1000ULL, trackRet);
     }
     return MMC_OK;
 }
@@ -1266,6 +1269,7 @@ Result MmcClientDefault::BatchWriteFinish(const std::vector<std::string> &keys,
         if (opId == UINT64_MAX) {
             MMC_LOG_DEBUG("key " << keys[i] << " not found locally, because of lease timeout, skip");
         }
+        TP_TRACE_RECORD(TP_MMC_TRACKER_REMOVE_LEASE_FROM_WRITE, 1000ULL, opId == UINT64_MAX ? -1 : 0);
         updateRequest.keys_.push_back(keys[i]);
         updateRequest.ranks_.push_back(info.blob.rank_);
         updateRequest.mediaTypes_.push_back(info.blob.mediaType_);

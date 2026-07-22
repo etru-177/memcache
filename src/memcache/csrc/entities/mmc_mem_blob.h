@@ -170,6 +170,10 @@ public:
     inline uint64_t LeaseTimeoutTtlMs() const;
     inline void SetDefaultLeaseTtlMs(uint64_t defaultTtlMs);
 
+    // Number of clients currently holding a read lease on this blob.
+    // Non-zero means eviction must wait for lease timeout (LeaseWait) before freeing.
+    inline uint32_t UseCount() const;
+
     friend std::ostream &operator<<(std::ostream &os, const MmcMemBlob &blob)
     {
         os << "Blob{rank=" << blob.rank_ << ",gva=" << blob.gva_ << ",size=" << blob.size_
@@ -293,6 +297,11 @@ bool MmcMemBlob::IsLeaseExpired()
 inline uint64_t MmcMemBlob::LeaseTimeoutTtlMs() const
 {
     return metaLeaseManager_.RemainingLeaseTtlMs();
+}
+
+inline uint32_t MmcMemBlob::UseCount() const
+{
+    return metaLeaseManager_.UseCount();
 }
 
 inline void MmcMemBlob::SetDefaultLeaseTtlMs(uint64_t defaultTtlMs)

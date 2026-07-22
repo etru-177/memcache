@@ -845,7 +845,18 @@ Result MmcMetaManager::UpdateState(const std::string &key, const MmcLocation &lo
 void MmcMetaManager::PushRemoveList(const std::string &key, const MmcMemObjMetaPtr &meta,
                                     const MmcBlobFilterPtr &filter, bool triggerSsdPreFree)
 {
-    auto future = threadPool_->Enqueue(
+    bool hasActiveLease = false;
+    for (const auto &blob : meta->GetBlobs(filter)) {
+        if (blob != nullptr && blob->UseCount() > 0) {
+            hasActiveLease = true;
+            break;
+        }
+    }
+
+    TP_TRACE_RECORD(TP_MMC_META_EVICT_DELETE_COUNT, 1000ULL, hasActiveLease ? -1 : 0);
+    const MmcThreadPoolPtr &pool = hasActiveLease ? removeThreadPool_ : threadPool_;
+
+    auto future = pool->Enqueue(
         [&](const std::string keyL, const MmcMemObjMetaPtr metaL, MmcGlobalAllocatorPtr allocator,
             MmcBlobFilterPtr filterL, bool triggerSsdPreFreeL) {
             std::unique_lock<std::mutex> guard(metaL->Mutex());
@@ -1179,6 +1190,14 @@ Result MmcMetaManager::Query(const std::string &key, uint64_t operateId, uint32_
         return MMC_UNMATCHED_KEY;
     }
 
+    TP_TRACE_BEGIN(TP_MMC_META_QUERY_PROMOTE_LRU);
+    auto ret = metaContainer_->Promote(key);
+    TP_TRACE_END(TP_MMC_META_QUERY_PROMOTE_LRU, ret)
+    if (ret != MMC_OK) {
+        MMC_LOG_ERROR("Query key: " << key << " Promote failed. ErrCode: " << ret);
+        return ret;
+    }
+
     std::unique_lock<std::mutex> guard(objMeta->Mutex());
     std::vector<MmcMemBlobDesc> blobs;
     objMeta->GetBlobsDesc(blobs);
@@ -1209,10 +1228,18 @@ Result MmcMetaManager::AddLease(const std::string &key, uint64_t operateId, uint
         return MMC_UNMATCHED_KEY;
     }
 
+    TP_TRACE_BEGIN(TP_MMC_META_ADD_LEASE_PROMOTE_LRU);
+    auto ret = metaContainer_->Promote(key);
+    TP_TRACE_END(TP_MMC_META_ADD_LEASE_PROMOTE_LRU, ret);
+    if (ret != MMC_OK) {
+        MMC_LOG_ERROR("AddLease key: " << key << " Promote failed. ErrCode: " << ret);
+        return ret;
+    }
+
     std::unique_lock<std::mutex> guard(objMeta->Mutex());
     std::vector<MmcMemBlobPtr> blobs = objMeta->GetBlobs();
     MmcMemBlobPtr selectedBlob = nullptr;
-    Result ret = SelectReadableGvaBlob(blobs, selectedBlob);
+    ret = SelectReadableGvaBlob(blobs, selectedBlob);
     if (ret != MMC_OK) {
         MMC_LOG_ERROR("AddLease requires one readable GVA blob, optionally with one SSD blob, key:"
                       << key << ", blobNum:" << blobs.size());

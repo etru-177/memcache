@@ -36,7 +36,7 @@ public:
     Result Extend(uint64_t ttl);
     void Wait();
     inline uint64_t RemainingLeaseTtlMs() const;
-    inline uint32_t UseCount();
+    inline uint32_t UseCount() const;
     inline uint64_t DefaultTtlMs() const;
     inline void SetDefaultTtlMs(uint64_t defaultTtlMs);
     inline uint64_t GenerateClientId(uint32_t rankId, uint32_t requestId);
@@ -61,7 +61,7 @@ private:
 
 using MmcMetaLeaseManagerPtr = MmcRef<MmcMetaLeaseManager>;
 
-inline uint32_t MmcMetaLeaseManager::UseCount()
+inline uint32_t MmcMetaLeaseManager::UseCount() const
 {
     return useClient.size();
 }

@@ -33,6 +33,7 @@ namespace mmc {
 
 constexpr int METAMGR_POOL_BASE = 16;
 constexpr int REWARM_POOL_BASE = 32;
+constexpr int REMOVE_POOL_BASE = 16;
 constexpr uint16_t DEFAULT_REWARM_HIGH_WATERMARK = 95U;
 constexpr uint16_t REWARM_WATERMARK_DELTA = 5U;
 constexpr uint16_t REWARM_WATERMARK_MIN = 10U;
@@ -139,6 +140,12 @@ public:
         rewarmThreadPool_ = MmcMakeRef<MmcThreadPool>("rewarm_pool", REWARM_POOL_BASE);
         MMC_ASSERT_LOG_AND_RETURN(rewarmThreadPool_ != nullptr, "rewarmThreadPool_ is nullptr", MMC_MALLOC_FAILED);
         MMC_RETURN_ERROR(rewarmThreadPool_->Start(), "rewarm thread pool start failed");
+        // Dedicated pool for evicting keys that still have active read leases (useClient non-empty).
+        // FreeBlobs on such keys blocks in LeaseWait until lease timeout; isolating them avoids
+        // starving the metamgr_pool used by Alloc/Get/Update/RPC paths.
+        removeThreadPool_ = MmcMakeRef<MmcThreadPool>("remove_pool", REMOVE_POOL_BASE);
+        MMC_ASSERT_LOG_AND_RETURN(removeThreadPool_ != nullptr, "removeThreadPool_ is nullptr", MMC_MALLOC_FAILED);
+        MMC_RETURN_ERROR(removeThreadPool_->Start(), "remove thread pool start failed");
         // P4: 注册 FreeBlobs 的 SSD 预释放回调，在释放 SSD blob 前通过 RPC 删除远端数据
         MmcMemBlob::ssdPreFreeHandler_ = [this](const std::string &key, const MmcMemBlobDesc &desc) {
             threadPool_->Enqueue([this, key, desc]() {
@@ -161,6 +168,7 @@ public:
         }
         threadPool_->Destroy();
         rewarmThreadPool_->Destroy();
+        removeThreadPool_->Destroy();
         MmcMemBlob::ssdPreFreeHandler_ = nullptr;
         started_ = false;
         MMC_LOG_INFO("Stop MmcMetaManager");
@@ -470,6 +478,7 @@ private:
 
     MmcMetaChangeCallbacks changeCallbacks_;
     MmcThreadPoolPtr rewarmThreadPool_;
+    MmcThreadPoolPtr removeThreadPool_;
     std::unordered_set<uint32_t> ssdEnabledRanks_;
     mutable std::mutex ssdMutex_;
 };
