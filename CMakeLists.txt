@@ -141,7 +141,7 @@ else ()
     message(STATUS "add definition for last commit: empty")
 endif ()
 
-if (ENABLE_TRACE_L0G)
+if (ENABLE_TRACE_LOG)
     add_definitions(-DLOG_TRACE_INFO_ENABLED)
 endif ()
 
