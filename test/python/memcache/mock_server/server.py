@@ -276,6 +276,37 @@ class MmcTest(TestServer):
             CliCommand("get_key_info", "get data info of: [key]", self.get_key_info, 1),
             CliCommand("batch_get_key_info", "batch get data info of: [keys]", self.batch_get_key_info, 1),
             CliCommand(
+                "batch_alloc",
+                "batch allocate GVA: [keys] [sizes] [media(0:hbm 1:dram)]",
+                self.batch_alloc,
+                2,
+            ),
+            CliCommand(
+                "batch_copy",
+                "batch copy between GVA and buffers: [gvas] [sizes] [direct(0:l2g 1:g2l 2:g2h 3:h2g)]",
+                self.batch_copy,
+                3,
+            ),
+            CliCommand(
+                "batch_copy_layers",
+                "batch copy layered buffers: [gvas] [sizes] [direct(0:l2g 1:g2l 2:g2h 3:h2g)]",
+                self.batch_copy_layers,
+                3,
+            ),
+            CliCommand(
+                "batch_write_finish",
+                "batch notify write finish: [keys] [res]",
+                self.batch_write_finish,
+                2,
+            ),
+            CliCommand(
+                "batch_add_lease",
+                "batch add read lease: [keys] [lease_ttl_ms]",
+                self.batch_add_lease,
+                1,
+            ),
+            CliCommand("batch_remove_lease", "batch remove read lease: [keys]", self.batch_remove_lease, 1),
+            CliCommand(
                 "put_from_layers",
                 "put data from multiple buffers [key] [sizes] [media(0:cpu 1:npu)]",
                 self.put_from_layers,
@@ -587,6 +618,91 @@ class MmcTest(TestServer):
     def batch_get_key_info(self, keys: List[str]):
         res = self._store.batch_get_key_info(keys)
         self.cli_return(res)
+
+    @result_handler
+    def batch_alloc(self, keys: List[str], sizes: List[int], media: int = 1):
+        gvas = self._store.batch_alloc(keys, sizes, media)
+        self.cli_return(gvas)
+
+    @result_handler
+    def batch_copy(self, gvas: List[int], sizes: List[int], direct: int):
+        if direct in (MmcDirect.COPY_G2H.value, MmcDirect.COPY_H2G.value):
+            device = 'cpu'
+        else:
+            device = 'npu'
+        blocks = []
+        registered = []
+        try:
+            for size in sizes:
+                tensor = self.malloc_tensor(mini_block_size=size, device=device)
+                if tensor is not None:
+                    reg_ret = self._store.register_buffer(tensor.data_ptr(), size)
+                    if reg_ret != 0:
+                        raise RuntimeError(
+                            f"register_buffer failed, ret={reg_ret} (ptr={tensor.data_ptr()}, size={size})"
+                        )
+                    registered.append((tensor.data_ptr(), size))
+                blocks.append(tensor)
+
+            buffer_ptrs = [0 if block is None else block.data_ptr() for block in blocks]
+            result = self._store.batch_copy(gvas, buffer_ptrs, sizes, direct)
+            if device == 'npu':
+                self.sync_stream()
+            tensor_sums = [tensor_sum(block) for block in blocks]
+            self.cli_return(str([result, tensor_sums]))
+        finally:
+            self._unregister_registered_buffers(registered)
+
+    @result_handler
+    def batch_copy_layers(self, gvas: List[int], sizes: List[List[int]], direct: int):
+        if direct in (MmcDirect.COPY_G2H.value, MmcDirect.COPY_H2G.value):
+            device = 'cpu'
+        else:
+            device = 'npu'
+        blocks = []
+        registered = []
+        try:
+            for layer_sizes in sizes:
+                layer_count = len(layer_sizes)
+                mini_block_size = max(layer_sizes, default=0)
+                tensor = self.malloc_tensor(
+                    layer_num=layer_count,
+                    mini_block_size=mini_block_size,
+                    device=device,
+                )
+                if tensor is not None:
+                    register_size = mini_block_size * layer_count
+                    reg_ret = self._store.register_buffer(tensor.data_ptr(), register_size)
+                    if reg_ret != 0:
+                        raise RuntimeError(
+                            f"register_buffer failed, ret={reg_ret} (ptr={tensor.data_ptr()}, size={register_size})"
+                        )
+                    registered.append((tensor.data_ptr(), register_size))
+                blocks.append(tensor)
+
+            buffer_ptrs = [[] if block is None else [layer.data_ptr() for layer in block] for block in blocks]
+            result = self._store.batch_copy_layers(gvas, buffer_ptrs, sizes, direct)
+            if device == 'npu':
+                self.sync_stream()
+            tensor_sums = [tensor_sum(block, layer_sizes) for block, layer_sizes in zip(blocks, sizes)]
+            self.cli_return(str([result, tensor_sums]))
+        finally:
+            self._unregister_registered_buffers(registered)
+
+    @result_handler
+    def batch_write_finish(self, keys: List[str], res: List[int]):
+        results = self._store.batch_write_finish(keys, res)
+        self.cli_return(results)
+
+    @result_handler
+    def batch_add_lease(self, keys: List[str], lease_ttl_ms: int = 0):
+        results = self._store.batch_add_lease(keys, lease_ttl_ms)
+        self.cli_return(results)
+
+    @result_handler
+    def batch_remove_lease(self, keys: List[str]):
+        result = self._store.batch_remove_lease(keys)
+        self.cli_return(result)
 
     @result_handler
     def put_from_layers(

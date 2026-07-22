@@ -119,6 +119,9 @@ def writer_worker(keys, shape, device_id, barrier, barrier_timeout_seconds, erro
         if ret != 0:
             raise AssertionError(f"writer batch_copy failed, ret={ret}")
         sync_stream()
+        finish_results = store.batch_write_finish(keys, [0] * len(keys))
+        if finish_results != [0] * len(keys):
+            raise AssertionError(f"writer batch_write_finish failed, results={finish_results}")
 
         wait_process_barrier(barrier, "writer_finished", barrier_timeout_seconds)
         wait_process_barrier(barrier, "reader_verified", barrier_timeout_seconds)
@@ -276,6 +279,9 @@ class TestExample(unittest.TestCase):
 
             ret = store.batch_copy(gvas, buffers, sizes, L2G)
             self.assertEqual(ret, 0)
+            self._sync_stream()
+            finish_results = store.batch_write_finish(keys, [0] * len(keys))
+            self.assertEqual(finish_results, [0] * len(keys))
 
             infos = store.batch_get_key_info(keys)
             self.assertEqual(len(infos), len(keys))

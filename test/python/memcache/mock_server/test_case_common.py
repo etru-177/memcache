@@ -91,6 +91,24 @@ class TestClient:
     def batch_get_key_info(self, keys: list):
         return self.execute("batch_get_key_info", [keys])
 
+    def batch_alloc(self, keys: List[str], sizes: List[int], media: int = 1):
+        return self.execute("batch_alloc", [keys, sizes, media])
+
+    def batch_copy(self, gvas: List[int], sizes: List[int], direct: int):
+        return self.execute("batch_copy", [gvas, sizes, direct])
+
+    def batch_copy_layers(self, gvas: List[int], sizes: List[List[int]], direct: int):
+        return self.execute("batch_copy_layers", [gvas, sizes, direct])
+
+    def batch_write_finish(self, keys: List[str], res: List[int]):
+        return self.execute("batch_write_finish", [keys, res])
+
+    def batch_add_lease(self, keys: List[str], lease_ttl_ms: int = 0):
+        return self.execute("batch_add_lease", [keys, lease_ttl_ms])
+
+    def batch_remove_lease(self, keys: List[str]):
+        return self.execute("batch_remove_lease", [keys])
+
     def _send_request(self, request: str):
         self._client.sendall(f"{request}\0".encode('utf-8'))
 
