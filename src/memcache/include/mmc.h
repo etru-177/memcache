@@ -123,6 +123,10 @@ typedef struct {
     char hcom_tls_key_path[TLS_PATH_SIZE];
     char hcom_tls_key_pass_path[TLS_PATH_SIZE];
     char hcom_tls_decrypter_path[TLS_PATH_SIZE];
+
+    // Dynamic config: enable periodic polling of config file for URL changes
+    bool dynamic_config_enable;
+    uint32_t dynamic_config_interval; // polling interval in seconds
 } local_config;
 
 /**

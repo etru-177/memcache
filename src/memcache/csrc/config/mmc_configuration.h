@@ -392,6 +392,13 @@ public:
         AddStrConf(OCK_MMC_CLIENT_BATCH_CHUNK_SIZE, VNoCheck::Create(), 0);
         AddIntConf(OCK_MMC_CLIENT_BATCH_CHUNK_COUNT,
                    VIntRange::Create(OCK_MMC_CLIENT_BATCH_CHUNK_COUNT.first, 1, MAX_BATCH_CHUNK_COUNT), 0);
+
+        AddBoolConf(OCK_MMC_DYNAMIC_CONFIG_ENABLE, VStrEnum::Create(OCK_MMC_DYNAMIC_CONFIG_ENABLE.first, BOOL_ENUM_STR),
+                    0);
+        AddIntConf(OCK_MMC_DYNAMIC_CONFIG_INTERVAL,
+                   VIntRange::Create(OCK_MMC_DYNAMIC_CONFIG_INTERVAL.first, MIN_DYNAMIC_CONFIG_INTERVAL,
+                                     MAX_DYNAMIC_CONFIG_INTERVAL),
+                   0);
     }
 
     void GetLocalServiceConfig(mmc_local_service_config_t &config)
@@ -420,6 +427,8 @@ public:
         GetAccTlsConfig(config.accTlsConfig);
         GetHcomTlsConfig(config.hcomTlsConfig);
         GetConfigStoreTlsConfig(config.configStoreTlsConfig);
+        config.dynamicConfigEnable = GetBool(ConfConstant::OCK_MMC_DYNAMIC_CONFIG_ENABLE);
+        config.dynamicConfigInterval = static_cast<uint32_t>(GetInt(ConfConstant::OCK_MMC_DYNAMIC_CONFIG_INTERVAL));
     }
 
     void GetClientConfig(mmc_client_config_t &config)

@@ -151,6 +151,22 @@ void MmcBmProxy::DestroyBm()
     MMC_LOG_INFO("MmcBmProxy (" << name_ << ") is destroyed successfully");
 }
 
+Result MmcBmProxy::UpdateStoreUrl(const std::string &url)
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!started_) {
+        MMC_LOG_WARN("MmcBmProxy not started, cannot update store URL");
+        return MMC_NOT_STARTED;
+    }
+    auto ret = MFSmemApi::SmemBmUpdateStoreUrl(url.c_str());
+    if (ret != 0) {
+        MMC_LOG_ERROR("Failed to update smem bm store URL, ret: " << ret);
+        return MMC_ERROR;
+    }
+    MMC_LOG_INFO("Updated smem bm store URL to: " << url);
+    return MMC_OK;
+}
+
 std::string MmcBmProxy::GetDataOpType() const
 {
     return createConfig_.dataOpType;

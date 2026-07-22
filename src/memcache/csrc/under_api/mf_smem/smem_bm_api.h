@@ -44,6 +44,7 @@ using smemBmRegisterUserMemFunc = int32_t (*)(smem_bm_t, uint64_t, uint64_t);
 using smemBmUnregisterUserMemFunc = int32_t (*)(smem_bm_t, uint64_t);
 using smemBmWaitFunc = int32_t (*)(smem_bm_t);
 using smemBmGvaToVaFunc = int32_t (*)(smem_bm_t, void *, smem_bm_mem_type_t, void **);
+using smemBmUpdateStoreUrlFunc = int32_t (*)(const char *);
 
 class MFSmemApi {
 public:
@@ -157,6 +158,11 @@ public:
         return gSmemBmGvaToVa(handle, gva, vaMemType, va);
     }
 
+    static int32_t SmemBmUpdateStoreUrl(const char *storeURL)
+    {
+        return gSmemBmUpdateStoreUrl(storeURL);
+    }
+
 private:
     static Result LoadAllSymbols();
     static Result LoadSymbol(const char *symbolName, void **target);
@@ -190,6 +196,7 @@ private:
     static smemBmUnregisterUserMemFunc gSmemBmUnregisterUserMem;
     static smemBmWaitFunc gSmemBmWait;
     static smemBmGvaToVaFunc gSmemBmGvaToVa;
+    static smemBmUpdateStoreUrlFunc gSmemBmUpdateStoreUrl;
 };
 } // namespace mmc
 } // namespace ock

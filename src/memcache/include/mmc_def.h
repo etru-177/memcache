@@ -99,6 +99,9 @@ typedef struct {
     ExternalLog logFunc;
     mmc_tls_config hcomTlsConfig;
     mmc_tls_config configStoreTlsConfig;
+    bool dynamicConfigEnable;
+    uint32_t dynamicConfigInterval;
+    char configFilePath[PATH_MAX_SIZE];
 } mmc_local_service_config_t;
 
 typedef struct {

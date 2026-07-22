@@ -52,6 +52,7 @@ smemBmRegisterUserMemFunc MFSmemApi::gSmemBmRegisterUserMem = nullptr;
 smemBmUnregisterUserMemFunc MFSmemApi::gSmemBmUnregisterUserMem = nullptr;
 smemBmWaitFunc MFSmemApi::gSmemBmWait = nullptr;
 smemBmGvaToVaFunc MFSmemApi::gSmemBmGvaToVa = nullptr;
+smemBmUpdateStoreUrlFunc MFSmemApi::gSmemBmUpdateStoreUrl = nullptr;
 
 Result MFSmemApi::LoadAllSymbols()
 {
@@ -77,6 +78,7 @@ Result MFSmemApi::LoadAllSymbols()
         {reinterpret_cast<void **>(&gSmemBmUnregisterUserMem), "smem_bm_unregister_user_mem"},
         {reinterpret_cast<void **>(&gSmemBmWait), "smem_bm_wait"},
         {reinterpret_cast<void **>(&gSmemBmGvaToVa), "smem_bm_gva_to_va"},
+        {reinterpret_cast<void **>(&gSmemBmUpdateStoreUrl), "smem_bm_update_store_url"},
     };
 
     for (const auto &symbol : kSmemSymbols) {
@@ -123,7 +125,7 @@ Result MFSmemApi::LoadLibrary()
     }
 
     gLoaded = true;
-    MMC_LOG_INFO("MFSmemApi LoadLibrary: loaded 21 smem_bm symbols from " << gSmemLibName);
+    MMC_LOG_INFO("MFSmemApi LoadLibrary: loaded 22 smem_bm symbols from " << gSmemLibName);
     return MMC_OK;
 }
 
@@ -150,6 +152,7 @@ void MFSmemApi::ClearAllSymbols()
     gSmemBmUnregisterUserMem = nullptr;
     gSmemBmWait = nullptr;
     gSmemBmGvaToVa = nullptr;
+    gSmemBmUpdateStoreUrl = nullptr;
 }
 
 void MFSmemApi::CleanupLibrary()

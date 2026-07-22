@@ -124,6 +124,8 @@ local_config create_default_local_config()
     cfg.tls_enable = false;
     cfg.config_store_tls_enable = false;
     cfg.hcom_tls_enable = false;
+    cfg.dynamic_config_enable = false;
+    cfg.dynamic_config_interval = DEFAULT_DYNAMIC_CONFIG_INTERVAL;
     return cfg;
 }
 
@@ -171,6 +173,8 @@ std::string local_config_to_string(const local_config &config)
     oss << "  hcom_tls_key_path: " << config.hcom_tls_key_path << "\n";
     oss << "  hcom_tls_key_pass_path: " << config.hcom_tls_key_pass_path << "\n";
     oss << "  hcom_tls_decrypter_path: " << config.hcom_tls_decrypter_path << "\n";
+    oss << "  dynamic_config_enable: " << (config.dynamic_config_enable ? "true" : "false") << "\n";
+    oss << "  dynamic_config_interval: " << config.dynamic_config_interval << "\n";
     oss << "}";
     return oss.str();
 }
@@ -193,6 +197,9 @@ static int32_t LoadAndValidateConfig(const local_config *config)
 
     g_localServiceConfig.flags = 0;
     g_clientConfig.GetLocalServiceConfig(g_localServiceConfig);
+    if (config->config_path[0] != '\0') {
+        SafeCopy(config->config_path, g_localServiceConfig.configFilePath, PATH_MAX_SIZE);
+    }
     if (g_clientConfig.ValidateLocalServiceConfig(g_localServiceConfig) != MMC_OK) {
         MMC_LOG_ERROR("Invalid local service config");
         return MMC_INVALID_PARAM;

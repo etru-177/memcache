@@ -12,6 +12,8 @@
 #ifndef MEM_FABRIC_MMC_LOCAL_SERVICE_DEFAULT_H
 #define MEM_FABRIC_MMC_LOCAL_SERVICE_DEFAULT_H
 
+#include <ctime>
+
 #include "mmc_meta_net_client.h"
 #include "mmc_local_service.h"
 #include "mmc_bm_proxy.h"
@@ -19,6 +21,7 @@
 #include "mmc_blob_common.h"
 #include "mmc_def.h"
 #include "mmc_thread_pool.h"
+#include "mmc_periodic_task.h"
 
 namespace ock {
 namespace mmc {
@@ -96,6 +99,14 @@ private:
 
     std::string ResolveBackendId();
     MmcThreadPoolPtr ubsioEventPool_;
+
+    // Dynamic config polling
+    static constexpr const char *configPollTaskName = "DynamicConfigPolling";
+    time_t lastConfigMtime_{0};
+
+    void StartConfigPolling();
+    void StopConfigPolling();
+    Result UpdateConfig();
 };
 
 inline const std::string &MmcLocalServiceDefault::Name() const

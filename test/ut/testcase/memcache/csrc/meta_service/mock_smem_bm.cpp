@@ -46,6 +46,11 @@ void smem_bm_uninit(uint32_t flags)
     return;
 }
 
+int32_t smem_bm_update_store_url(const char *storeURL)
+{
+    return 0;
+}
+
 uint32_t smem_bm_get_rank_id(void)
 {
     return 0; // 默认返回rank 0

@@ -9,18 +9,25 @@
  * MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
  * See the Mulan PSL v2 for more details.
 */
-#include "mmc_local_service_default.h"
+
+#include <sys/stat.h>
+
 #include "mmc_meta_net_client.h"
 #include "mmc_msg_client_meta.h"
 #include "mmc_ptracer.h"
 #include "mmc_functions.h"
+#include "mmc_configuration.h"
+#include "mmc_local_service_default.h"
 
 namespace ock {
 namespace mmc {
 constexpr int TIMEOUT_THIRTY = 30;
 constexpr int CLIENT_THREAD_COUNT = 2;
 
-MmcLocalServiceDefault::~MmcLocalServiceDefault() {}
+MmcLocalServiceDefault::~MmcLocalServiceDefault()
+{
+    StopConfigPolling();
+}
 
 Result MmcLocalServiceDefault::Start(const mmc_local_service_config_t &config)
 {
@@ -94,6 +101,9 @@ Result MmcLocalServiceDefault::Start(const mmc_local_service_config_t &config)
         std::bind(&MmcLocalServiceDefault::BatchCopyBlob, this, std::placeholders::_1, std::placeholders::_2,
                   std::placeholders::_3));
     started_ = true;
+    if (options_.dynamicConfigEnable && options_.configFilePath[0] != '\0') {
+        StartConfigPolling();
+    }
     MMC_LOG_INFO("Started LocalService (" << name_ << ") server " << options_.discoveryURL
                                           << ", rank: " << options_.rankId);
     return MMC_OK;
@@ -106,6 +116,7 @@ void MmcLocalServiceDefault::Stop()
         MMC_LOG_WARN("MmcLocalServiceDefault has not been started" << ", rank: " << options_.rankId);
         return;
     }
+    StopConfigPolling();
     DestroyBm();
     if (metaNetClient_ != nullptr) {
         metaNetClient_->Stop();
@@ -596,6 +607,99 @@ void MmcLocalServiceDefault::HandleUbsIoMetaEvents(int type, const std::vector<s
     } else {
         MMC_LOG_ERROR("unknown UBS IO meta event type=" << type << ", keyCount=" << keys.size());
     }
+}
+
+void MmcLocalServiceDefault::StartConfigPolling()
+{
+    struct stat fileStat;
+    if (stat(options_.configFilePath, &fileStat) == 0) {
+        lastConfigMtime_ = fileStat.st_mtime;
+    } else {
+        MMC_LOG_WARN("Failed to stat config file: " << options_.configFilePath);
+    }
+
+    auto periodicTask = MmcPeriodicTaskFactory::GetInstance();
+    if (periodicTask == nullptr) {
+        MMC_LOG_ERROR("Failed to get periodic task instance for config polling");
+        return;
+    }
+
+    auto ret = periodicTask->RegisterTask(configPollTaskName, options_.dynamicConfigInterval, [this]() {
+        struct stat fileStat {};
+        if (stat(options_.configFilePath, &fileStat) != 0) {
+            MMC_LOG_WARN("Failed to stat config file: " << options_.configFilePath);
+            return;
+        }
+        if (fileStat.st_mtime == lastConfigMtime_) {
+            return;
+        }
+        lastConfigMtime_ = fileStat.st_mtime;
+        MMC_LOG_INFO("Config file modified, reloading...");
+        auto ret = UpdateConfig();
+        if (ret != MMC_OK) {
+            MMC_LOG_WARN("Failed to update config, will retry next cycle");
+        }
+    });
+    if (!ret) {
+        MMC_LOG_ERROR("Failed to register config polling task");
+        return;
+    }
+    if (!periodicTask->IsRunning() && !periodicTask->Start()) {
+        MMC_LOG_ERROR("Failed to start periodic task scheduler for config polling");
+        return;
+    }
+    MMC_LOG_INFO("Config polling task registered, interval: " << options_.dynamicConfigInterval
+                                                              << "s, file: " << options_.configFilePath);
+}
+
+void MmcLocalServiceDefault::StopConfigPolling()
+{
+    auto periodicTask = MmcPeriodicTaskFactory::GetInstance();
+    if (periodicTask != nullptr) {
+        periodicTask->UnregisterTask(configPollTaskName);
+    }
+}
+
+Result MmcLocalServiceDefault::UpdateConfig()
+{
+    ClientConfig newConfig;
+    if (!newConfig.LoadFromFile(options_.configFilePath)) {
+        MMC_LOG_ERROR("Failed to load config from file: " << options_.configFilePath);
+        return MMC_ERROR;
+    }
+
+    mmc_local_service_config_t newServiceConfig{};
+    newConfig.GetLocalServiceConfig(newServiceConfig);
+
+    // Compare and update meta_service_url (discoveryURL)
+    std::string oldMetaUrl(options_.discoveryURL);
+    std::string newMetaUrl(newServiceConfig.discoveryURL);
+    if (oldMetaUrl != newMetaUrl) {
+        MMC_LOG_INFO("meta_service_url changed from " << oldMetaUrl << " to " << newMetaUrl);
+        if (metaNetClient_ != nullptr) {
+            if (auto ret = metaNetClient_->UpdateServerUrl(newMetaUrl); ret == MMC_OK) {
+                SafeCopy(newMetaUrl, options_.discoveryURL, DISCOVERY_URL_SIZE);
+            } else {
+                MMC_LOG_ERROR("Failed to update meta net client server URL");
+            }
+        }
+    }
+
+    // Compare and update config_store_url (bmIpPort)
+    std::string oldStoreUrl(options_.bmIpPort);
+    std::string newStoreUrl(newServiceConfig.bmIpPort);
+    if (oldStoreUrl != newStoreUrl) {
+        MMC_LOG_INFO("config_store_url changed from " << oldStoreUrl << " to " << newStoreUrl);
+        if (bmProxyPtr_ != nullptr) {
+            if (auto ret = bmProxyPtr_->UpdateStoreUrl(newStoreUrl); ret == MMC_OK) {
+                SafeCopy(newStoreUrl, options_.bmIpPort, DISCOVERY_URL_SIZE);
+            } else {
+                MMC_LOG_ERROR("Failed to update bm store URL");
+            }
+        }
+    }
+
+    return MMC_OK;
 }
 
 } // namespace mmc

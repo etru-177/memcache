@@ -58,6 +58,7 @@ public:
 
     Result InitBm(const mmc_bm_init_config_t &initConfig, const mmc_bm_create_config_t &createConfig);
     void DestroyBm();
+    Result UpdateStoreUrl(const std::string &url);
     Result Copy(uint64_t srcBmAddr, uint64_t dstBmAddr, uint64_t size, smem_bm_copy_type type);
     Result Put(const mmc_buffer *buf, uint64_t bmAddr, uint64_t size);
     Result Get(const mmc_buffer *buf, uint64_t bmAddr, uint64_t size);

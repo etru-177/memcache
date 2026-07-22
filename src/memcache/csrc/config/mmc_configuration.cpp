@@ -112,6 +112,8 @@ bool Configuration::Setup(const local_config *config)
     res &= SetWithTypeAutoConvert(ConfConstant::OCK_MMC_HCOM_TLS_KEY_PATH.first, config->hcom_tls_key_path);
     res &= SetWithTypeAutoConvert(ConfConstant::OCK_MMC_HCOM_TLS_KEY_PASS_PATH.first, config->hcom_tls_key_pass_path);
     res &= SetWithTypeAutoConvert(ConfConstant::OCK_MMC_HCOM_TLS_DECRYPTER_PATH.first, config->hcom_tls_decrypter_path);
+    res &= SetWithTypeAutoConvert(ConfConstant::OCK_MMC_DYNAMIC_CONFIG_ENABLE.first, config->dynamic_config_enable);
+    res &= SetWithTypeAutoConvert(ConfConstant::OCK_MMC_DYNAMIC_CONFIG_INTERVAL.first, config->dynamic_config_interval);
     if (res) {
         ResolveAllUrlDomains();
     }

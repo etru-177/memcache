@@ -110,6 +110,21 @@ public:
         return running_.load();
     }
 
+    void UnregisterTask(const std::string &name)
+    {
+        {
+            std::unique_lock<std::mutex> lock(mutex_);
+            cvTaskDone_.wait(lock, [this]() { return !taskRunning_; });
+            auto it = std::remove_if(tasks_.begin(), tasks_.end(),
+                                     [&name](const TaskEntry &entry) { return entry.name == name; });
+            if (it != tasks_.end()) {
+                tasks_.erase(it, tasks_.end());
+                MMC_LOG_INFO("Unregistered periodic task: " << name);
+            }
+        }
+        cv_.notify_all();
+    }
+
 private:
     struct TaskEntry {
         std::string name;
@@ -152,6 +167,7 @@ private:
                     cv_.wait_until(lock, nextWake);
                     continue;
                 }
+                taskRunning_ = true;
             }
 
             for (const auto &entry : dueTasks) {
@@ -163,6 +179,12 @@ private:
                     MMC_LOG_ERROR("Periodic task " << entry.name << " failed with unknown exception");
                 }
             }
+
+            {
+                std::lock_guard<std::mutex> lock(mutex_);
+                taskRunning_ = false;
+            }
+            cvTaskDone_.notify_all();
         }
         MMC_LOG_INFO("Periodic task scheduler worker exiting");
     }
@@ -175,6 +197,8 @@ private:
     std::condition_variable cv_;
     std::atomic<bool> running_{false};
     std::atomic<bool> stop_{false};
+    bool taskRunning_{false};
+    std::condition_variable cvTaskDone_;
 };
 
 class MmcPeriodicTaskFactory {

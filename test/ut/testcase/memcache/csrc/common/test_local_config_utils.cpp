@@ -165,6 +165,8 @@ TEST_F(TestLocalConfigUtils, LocalConfigToStringReturnsExpectedFormat)
                                  "  hcom_tls_key_path: /hcom/key.pem\n"
                                  "  hcom_tls_key_pass_path: /hcom/key.pass\n"
                                  "  hcom_tls_decrypter_path: /hcom/dec.so\n"
+                                 "  dynamic_config_enable: false\n"
+                                 "  dynamic_config_interval: 0\n"
                                  "}";
 
     EXPECT_EQ(local_config_to_string(config), expected);

@@ -65,6 +65,14 @@ public:
     Result Connect(const std::string &url);
 
     /**
+     * @brief Update server URL for reconnection without disconnecting current connection.
+     * When the connection breaks, HandleLinkBroken will use the new URL to reconnect.
+     * @param url          [in] new url of net server
+     * @return 0 if successful
+     */
+    Result UpdateServerUrl(const std::string &url);
+
+    /**
      * @brief Do sync call to net server, returned if server response or timeout
      *
      * @tparam REQ         [in] request class type
@@ -157,7 +165,8 @@ private:
     ClientBatchBlobCopyHandler batchBlobCopyHandler_ = nullptr;
     std::string serverUrl_;
 
-    /* not hot used variables */
+    /* Protects started_, ip_, port_, serverUrl_ from concurrent access between
+     * UpdateServerUrl (config polling thread) and HandleLinkBroken (IO callback thread). */
     std::mutex mutex_;
     bool started_ = false;
     std::string name_;
