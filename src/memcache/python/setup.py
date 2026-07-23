@@ -78,7 +78,7 @@ setup(
     license="Mulan PSL v2",
     python_requires=">=3.8",
     install_requires=[
-        "memfabric_hybrid>=1.1.0",
+        "memfabric_hybrid>=1.2.0",
     ],
     zip_safe=False,
     package_data={"memcache_hybrid": ["_pymmc.cpython*.so", "lib/**", "config/**", "VERSION"]},
