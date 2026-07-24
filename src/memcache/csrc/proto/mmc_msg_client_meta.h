@@ -16,6 +16,7 @@
 #include "mmc_mem_blob.h"
 #include "mmc_msg_base.h"
 #include "mmc_msg_packer.h"
+#include "mmc_client_metric_snapshot.h"
 
 namespace ock {
 namespace mmc {
@@ -1214,6 +1215,63 @@ struct UbsIoMetaDeleteResponse : MsgBase {
 
     UbsIoMetaDeleteResponse() : MsgBase{0, ML_UBSIO_META_DELETE_RESP, 0} {}
     explicit UbsIoMetaDeleteResponse(const Result &ret) : MsgBase{0, ML_UBSIO_META_DELETE_RESP, 0}, ret_(ret) {}
+
+    Result Serialize(NetMsgPacker &packer) const override
+    {
+        packer.Serialize(msgVer);
+        packer.Serialize(msgId);
+        packer.Serialize(destRankId);
+        packer.Serialize(ret_);
+        return MMC_OK;
+    }
+
+    Result Deserialize(NetMsgUnpacker &packer) override
+    {
+        packer.Deserialize(msgVer);
+        packer.Deserialize(msgId);
+        packer.Deserialize(destRankId);
+        packer.Deserialize(ret_);
+        return MMC_OK;
+    }
+};
+
+// client→meta metric 周期上报请求
+struct StatsReportRequest : MsgBase {
+    uint32_t rank_{UINT32_MAX};
+    BandwidthMetricData bandwidths_[static_cast<size_t>(MetricOp::COUNT)]{};
+
+    StatsReportRequest() : MsgBase{0, ML_STATS_REPORT_REQ, 0} {}
+
+    Result Serialize(NetMsgPacker &packer) const override
+    {
+        packer.Serialize(msgVer);
+        packer.Serialize(msgId);
+        packer.Serialize(destRankId);
+        packer.Serialize(rank_);
+        for (const auto &bw : bandwidths_) {
+            packer.Serialize(bw); // POD, memcpy
+        }
+        return MMC_OK;
+    }
+
+    Result Deserialize(NetMsgUnpacker &packer) override
+    {
+        packer.Deserialize(msgVer);
+        packer.Deserialize(msgId);
+        packer.Deserialize(destRankId);
+        packer.Deserialize(rank_);
+        for (auto &bw : bandwidths_) {
+            packer.Deserialize(bw);
+        }
+        return MMC_OK;
+    }
+};
+
+struct StatsReportResponse : MsgBase {
+    int32_t ret_{MMC_OK};
+
+    StatsReportResponse() : MsgBase{0, ML_STATS_REPORT_RESP, 0} {}
+    explicit StatsReportResponse(int32_t ret) : MsgBase{0, ML_STATS_REPORT_RESP, 0}, ret_(ret) {}
 
     Result Serialize(NetMsgPacker &packer) const override
     {

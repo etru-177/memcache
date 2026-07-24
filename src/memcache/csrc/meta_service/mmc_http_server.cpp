@@ -478,6 +478,20 @@ void MmcHttpServer::RegisterMetricsEndpoint()
     };
     server_->RegisterHttpHandler(acc::AccHttpMethod::GET, "/api/v1/analysis/alloc_free_latency",
                                  allocFreeLatencyHandler);
+
+    // Client metrics (Prometheus text format, separated from /metrics)
+    auto clientMetricsHandler = [this](acc::AccHttpRequestContext &ctx) -> int32_t {
+        if (restApiFacade_ == nullptr) {
+            return ReplyJsonError200(ctx, kErrorInternalServer);
+        }
+        std::string result;
+        const Result ret = restApiFacade_->BuildClientMetricsPrometheus(result);
+        if (ret != MMC_OK) {
+            return ReplyJsonError200(ctx, kErrorInternalServer);
+        }
+        return ReplyTextOk(ctx, result);
+    };
+    server_->RegisterHttpHandler(acc::AccHttpMethod::GET, "/metrics/client", clientMetricsHandler);
 }
 
 bool MmcHttpServer::Start()

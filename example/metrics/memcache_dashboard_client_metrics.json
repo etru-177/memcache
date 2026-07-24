@@ -1,0 +1,492 @@
+{
+  "__inputs": [],
+  "__requires": [
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "10.0.0"
+    },
+    {
+      "type": "prometheus",
+      "id": "prometheus",
+      "name": "Prometheus",
+      "version": "1.0.0"
+    }
+  ],
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "target": {
+          "limit": 100,
+          "matchAny": false,
+          "tags": [],
+          "type": "dashboard"
+        },
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 7
+      },
+      "id": 200,
+      "panels": [],
+      "title": "PUT / GET Performance (Window)",
+      "type": "row"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "s"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "id": 201,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "memcache_client_bandwidth_latency_seconds{rank=~\"$rank\", operation=\"get\", quantile=~\"$quantile\"}",
+          "legendFormat": "{{rank}}@{{quantile}}",
+          "refId": "A"
+        }
+      ],
+      "title": "GET Latency",
+      "type": "timeseries",
+      "description": "GET 操作延迟分位数，窗口瞬时值，支持 $rank / $quantile 过滤",
+      "datasource": "${datasource}"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "s"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "id": 204,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "memcache_client_bandwidth_latency_seconds{rank=~\"$rank\", operation=\"put\", quantile=~\"$quantile\"}",
+          "legendFormat": "{{rank}}@{{quantile}}",
+          "refId": "A"
+        }
+      ],
+      "title": "PUT Latency",
+      "type": "timeseries",
+      "description": "PUT 操作延迟分位数，窗口瞬时值，支持 $rank / $quantile 过滤",
+      "datasource": "${datasource}"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "decbytes"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "id": 202,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "memcache_client_bandwidth_bytes{rank=~\"$rank\", operation=\"get\"}",
+          "legendFormat": "{{rank}}",
+          "refId": "A"
+        }
+      ],
+      "title": "GET Bytes",
+      "type": "timeseries",
+      "description": "GET 窗口内传输字节量(gauge, 上报后归零)，支持 $rank 过滤",
+      "datasource": "${datasource}"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "decbytes"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "id": 205,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "memcache_client_bandwidth_bytes{rank=~\"$rank\", operation=\"put\"}",
+          "legendFormat": "{{rank}}",
+          "refId": "A"
+        }
+      ],
+      "title": "PUT Bytes",
+      "type": "timeseries",
+      "description": "PUT 窗口内传输字节量(gauge, 上报后归零)，支持 $rank 过滤",
+      "datasource": "${datasource}"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "Bps"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "id": 203,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "memcache_client_bandwidth_bytes_per_sec{rank=~\"$rank\", operation=\"get\"}",
+          "legendFormat": "{{rank}}",
+          "refId": "A"
+        }
+      ],
+      "title": "GET Bandwidth",
+      "type": "timeseries",
+      "description": "GET 窗口瞬时吞吐率 = totalBytes × 1000 / totalDurationMs (Bps)，支持 $rank 过滤",
+      "datasource": "${datasource}"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "Bps"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      },
+      "id": 206,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "memcache_client_bandwidth_bytes_per_sec{rank=~\"$rank\", operation=\"put\"}",
+          "legendFormat": "{{rank}}",
+          "refId": "A"
+        }
+      ],
+      "title": "PUT Bandwidth",
+      "type": "timeseries",
+      "description": "PUT 窗口瞬时吞吐率 = totalBytes × 1000 / totalDurationMs (Bps)，支持 $rank 过滤",
+      "datasource": "${datasource}"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 32
+      },
+      "id": 400,
+      "panels": [],
+      "title": "PUT / GET Performance (Lifetime)",
+      "type": "row"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "s"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 33
+      },
+      "id": 401,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "memcache_client_bandwidth_duration_ms_cum_total{rank=~\"$rank\"} / 1000",
+          "legendFormat": "{{operation}} @ {{rank}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Cumulative Latency (seconds)",
+      "type": "timeseries",
+      "description": "累计IO耗时 = cumTotalDurationMs / 1000，进程启动以来总IO耗时(秒)，counter永不复位，支持 $rank 过滤",
+      "datasource": "${datasource}"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "decbytes"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 33
+      },
+      "id": 402,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "memcache_client_bandwidth_bytes_cum_total{rank=~\"$rank\"}",
+          "legendFormat": "{{operation}} @ {{rank}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Cumulative Bytes",
+      "type": "timeseries",
+      "description": "累计传输字节 = cumTotalBytes，进程启动以来总传输量(bytes)，counter永不复位，支持 $rank 过滤",
+      "datasource": "${datasource}"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "Bps"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 33
+      },
+      "id": 403,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "memcache_client_bandwidth_bytes_cum_total{rank=~\"$rank\"} / (memcache_client_bandwidth_duration_ms_cum_total{rank=~\"$rank\"} / 1000)",
+          "legendFormat": "{{operation}} @ {{rank}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Cumulative Bandwidth (Lifetime Avg Bps)",
+      "type": "timeseries",
+      "description": "累计带宽 = cumTotalBytes / (cumTotalDurationMs / 1000)，生命周期平均吞吐率(Bps)，无IO时除零无线。支持 $rank 过滤",
+      "datasource": "${datasource}"
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 38,
+  "tags": [
+    "memcache",
+    "client-metrics"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {},
+        "hide": 0,
+        "includeAll": false,
+        "label": "Data Source",
+        "name": "datasource",
+        "options": [],
+        "query": "prometheus",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(memcache_client_bandwidth_bytes_cum_total, rank)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Rank",
+        "multi": true,
+        "name": "rank",
+        "options": [],
+        "query": {
+          "query": "label_values(memcache_client_bandwidth_bytes_cum_total, rank)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(memcache_client_bandwidth_latency_seconds, quantile)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Quantile",
+        "multi": true,
+        "name": "quantile",
+        "options": [],
+        "query": {
+          "query": "label_values(memcache_client_bandwidth_latency_seconds, quantile)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "MemCache Client Metrics",
+  "uid": "memcache-client-metrics",
+  "version": 1,
+  "weekStart": ""
+}

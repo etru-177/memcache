@@ -74,6 +74,8 @@ private:
 
     Result HandleUbsIoMetaDelete(const NetContextPtr &context);
 
+    Result HandleStatsReport(const NetContextPtr &context);
+
 private:
     NetEnginePtr engine_;
     MmcMetaServicePtr metaService_;

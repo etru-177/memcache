@@ -18,6 +18,7 @@ include_directories(
         ${PROJECT_MMC_SRC_BASE}/csrc/common
         ${PROJECT_MMC_SRC_BASE}/csrc/config
         ${PROJECT_MMC_SRC_BASE}/csrc/client
+        ${PROJECT_MMC_SRC_BASE}/csrc/client/metric
         ${PROJECT_MMC_SRC_BASE}/csrc/local_service
         ${PROJECT_MMC_SRC_BASE}/csrc/entities
         ${PROJECT_MMC_SRC_BASE}/csrc/ha
@@ -70,6 +71,7 @@ set(MMC_SRC_KV_EVENT_RUNTIME "")
 aux_source_directory(common MMC_SRC_COMMON)
 aux_source_directory(config MMC_SRC_CONFIG)
 aux_source_directory(client MMC_SRC_CLIENT)
+aux_source_directory(client/metric MMC_SRC_CLIENT_METRIC)
 aux_source_directory(local_service MMC_SRC_LOCAL_SERVICE)
 aux_source_directory(entities MMC_SRC_ENTITIES)
 aux_source_directory(ha MMC_SRC_HA)
@@ -100,6 +102,7 @@ endif ()
 set(PLATFORM_SRC ${MMC_SRC_COMMON}
         ${MMC_SRC_CONFIG}
         ${MMC_SRC_CLIENT}
+        ${MMC_SRC_CLIENT_METRIC}
         ${MMC_SRC_LOCAL_SERVICE}
         ${MMC_SRC_ENTITIES}
         ${MMC_SRC_HA}

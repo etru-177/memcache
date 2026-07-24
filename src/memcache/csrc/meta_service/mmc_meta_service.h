@@ -65,6 +65,7 @@ public:
     kv_event::KvEventStats GetKvEventStats() const;
 
 private:
+    std::string GetBackendIdForRank(uint32_t rank);
     void PublishClearedForRanks(const std::vector<uint32_t> &ranks);
 
     MetaNetServerPtr metaNetServer_;
@@ -87,7 +88,6 @@ private:
     bool StartPeriodicTask(const std::string &taskName, uint32_t intervalSeconds, MmcPeriodicTask::Task task);
     void StopPeriodicTask();
     void StartMetricsReportTask();
-    std::string GetBackendIdForRank(uint32_t rank);
 };
 inline const std::string &MmcMetaService::Name() const
 {

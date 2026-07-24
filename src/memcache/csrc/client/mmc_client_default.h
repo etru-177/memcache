@@ -27,6 +27,7 @@
 #include "mmc_thread_pool.h"
 #include "mmc_msg_client_meta.h"
 #include "mmc_periodic_task.h"
+#include "mmc_bandwidth_collector.h"
 
 namespace ock {
 namespace mmc {
@@ -160,6 +161,8 @@ private:
     Result BatchCopyReadPath(std::vector<void *> &gvas, std::vector<void *> &buffers, std::vector<size_t> &sizes,
                              int32_t direct);
     Result RegisterPeriodicTask(const std::string &taskName, uint32_t intervalSeconds, MmcPeriodicTask::Task task);
+    Result InitMetricReporting();
+    void ReportMetrics();
     void ProcessExpiredReadLeases();
     Result ExecuteConcurrently(const std::vector<void *> &gvas, const std::vector<void *> &buffers,
                                const std::vector<size_t> &sizes, bool isPut, MediaType mediaType, size_t chunkSize);
@@ -197,6 +200,7 @@ private:
     uint64_t batchChunkSize_ = 0;
     uint32_t batchChunkCount_ = 0;
     LocalGvaBlobTracker gvaBlobTracker_{};
+    BandwidthCollector *bandwidthCollector_ = nullptr;
 };
 
 uint32_t MmcClientDefault::RankId(const affinity_policy &policy)

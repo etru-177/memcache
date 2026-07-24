@@ -22,6 +22,7 @@
 
 #include "mmc_logger.h"
 #include "mmc_meta_metric_manager.h"
+#include "mmc_client_metric_store.h"
 #include "smem_config_store_errno.h"
 
 namespace {
@@ -105,6 +106,34 @@ void AppendOperationMetrics(std::ostringstream &oss, const std::string &metricNa
         AppendMetricHeader(oss, notFoundMetricName, "Total number of " + helpName + " not found results", "counter");
         AppendMetricValue(oss, notFoundMetricName, notFoundCount);
     }
+}
+
+void AppendBandwidthPrometheus(std::ostringstream &oss, const std::string &rank, const std::string &operation,
+                               const ock::mmc::BandwidthMetricData &data)
+{
+    // 窗口值 (gauge)
+    oss << "memcache_client_bandwidth_bytes{rank=\"" << rank << "\",operation=\"" << operation << "\"} "
+        << data.totalBytes << '\n';
+    oss << "memcache_client_bandwidth_duration_ms{rank=\"" << rank << "\",operation=\"" << operation << "\"} "
+        << data.totalDurationMs << '\n';
+
+    // 累计值 (counter)
+    oss << "memcache_client_bandwidth_bytes_cum_total{rank=\"" << rank << "\",operation=\"" << operation << "\"} "
+        << data.cumTotalBytes << '\n';
+    oss << "memcache_client_bandwidth_duration_ms_cum_total{rank=\"" << rank << "\",operation=\"" << operation << "\"} "
+        << data.cumTotalDurationMs << '\n';
+
+    oss << "memcache_client_bandwidth_latency_seconds{rank=\"" << rank << "\",operation=\"" << operation
+        << "\",quantile=\"P50\"} " << data.latencyP50 << '\n';
+    oss << "memcache_client_bandwidth_latency_seconds{rank=\"" << rank << "\",operation=\"" << operation
+        << "\",quantile=\"P90\"} " << data.latencyP90 << '\n';
+    oss << "memcache_client_bandwidth_latency_seconds{rank=\"" << rank << "\",operation=\"" << operation
+        << "\",quantile=\"P99\"} " << data.latencyP99 << '\n';
+    oss << "memcache_client_bandwidth_latency_seconds{rank=\"" << rank << "\",operation=\"" << operation
+        << "\",quantile=\"Avg\"} " << data.latencyAve << '\n';
+
+    oss << "memcache_client_bandwidth_bytes_per_sec{rank=\"" << rank << "\",operation=\"" << operation << "\"} "
+        << data.bytesPerSec << '\n';
 }
 
 } // namespace
@@ -780,6 +809,46 @@ Result MmcRestApiFacade::BuildPrometheusMetrics(bool serviceReady, std::string &
     AppendMetricHeader(oss, "memcache_kv_events_last_sequence", "Last published KV event ZMQ sequence", "gauge");
     AppendMetricValue(oss, "memcache_kv_events_last_sequence", kvStats.lastSequence);
 
+    result = oss.str();
+    return MMC_OK;
+}
+
+Result MmcRestApiFacade::BuildClientMetricsPrometheus(std::string &result) const
+{
+    std::ostringstream oss;
+    const auto clientViews = MmcClientMetricStore::GetInstance().GetAll(CLIENT_METRIC_STALE_THRESHOLD_SECONDS);
+    if (!clientViews.empty()) {
+        // 窗口值 (gauge): 每 30s 重置
+        AppendMetricHeader(oss, "memcache_client_bandwidth_bytes", "Client bandwidth window bytes transferred",
+                           "gauge");
+        AppendMetricHeader(oss, "memcache_client_bandwidth_duration_ms",
+                           "Client bandwidth window duration in milliseconds", "gauge");
+        // 累计值 (counter): 永不复位
+        AppendMetricHeader(oss, "memcache_client_bandwidth_bytes_cum_total",
+                           "Client bandwidth cumulative bytes transferred", "counter");
+        AppendMetricHeader(oss, "memcache_client_bandwidth_duration_ms_cum_total",
+                           "Client bandwidth cumulative duration in milliseconds", "counter");
+        AppendMetricHeader(oss, "memcache_client_bandwidth_latency_seconds",
+                           "Client bandwidth operation latency in seconds", "gauge");
+        AppendMetricHeader(oss, "memcache_client_bandwidth_bytes_per_sec",
+                           "Client bandwidth instantaneous bytes per second", "gauge");
+        AppendMetricHeader(oss, "memcache_client_metric_stale", "Client metric stale status (1 = stale, 0 = fresh)",
+                           "gauge");
+    }
+    for (const auto &view : clientViews) {
+        if (view.rank == UINT32_MAX) {
+            continue;
+        }
+        const std::string rankStr = std::to_string(view.rank);
+
+        oss << "memcache_client_metric_stale{rank=\"" << rankStr << "\"} " << (view.stale ? 1 : 0) << '\n';
+        if (view.stale) {
+            continue; // 避免 Grafana 显示已退出 client 的旧数据
+        }
+        for (size_t opIdx = 0; opIdx < static_cast<size_t>(MetricOp::COUNT); ++opIdx) {
+            AppendBandwidthPrometheus(oss, rankStr, K_METRIC_OP_LABEL[opIdx], view.bandwidths[opIdx]);
+        }
+    }
     result = oss.str();
     return MMC_OK;
 }

@@ -39,6 +39,7 @@ include_directories(
         ${PROJECT_MMC_SRC_BASE}/csrc/
         ${PROJECT_MMC_SRC_BASE}/csrc/common
         ${PROJECT_MMC_SRC_BASE}/csrc/client
+        ${PROJECT_MMC_SRC_BASE}/csrc/client/metric
         ${PROJECT_MMC_SRC_BASE}/csrc/config
         ${PROJECT_MMC_SRC_BASE}/csrc/net
         ${PROJECT_MMC_SRC_BASE}/csrc/log

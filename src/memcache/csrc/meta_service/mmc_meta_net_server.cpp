@@ -14,6 +14,7 @@
 #include "mmc_msg_client_meta.h"
 #include "mmc_meta_service.h"
 #include "mmc_ptracer.h"
+#include "mmc_client_metric_store.h"
 
 namespace ock {
 namespace mmc {
@@ -87,6 +88,8 @@ Result ock::mmc::MetaNetServer::Start(NetEngineOptions &options)
     server->RegRequestReceivedHandler(LOCAL_META_OPCODE_REQ::LM_BATCH_BLOB_COPY_REQ, nullptr);
     server->RegRequestReceivedHandler(LOCAL_META_OPCODE_REQ::ML_UBSIO_META_DELETE_REQ,
                                       std::bind(&MetaNetServer::HandleUbsIoMetaDelete, this, std::placeholders::_1));
+    server->RegRequestReceivedHandler(LOCAL_META_OPCODE_REQ::ML_STATS_REPORT_REQ,
+                                      std::bind(&MetaNetServer::HandleStatsReport, this, std::placeholders::_1));
     server->RegNewLinkHandler(std::bind(&MetaNetServer::HandleNewLink, this, std::placeholders::_1));
     server->RegLinkBrokenHandler(std::bind(&MetaNetServer::HandleLinkBroken, this, std::placeholders::_1));
 
@@ -418,6 +421,16 @@ Result MetaNetServer::HandleUbsIoMetaDelete(const NetContextPtr &context)
         MMC_LOG_WARN("HandleUbsIoMetaDelete failed, keyCount=" << req.keys_.size() << ", ret=" << ret);
     }
     UbsIoMetaDeleteResponse resp(ret);
+    return context->Reply(req.msgId, resp);
+}
+
+Result MetaNetServer::HandleStatsReport(const NetContextPtr &context)
+{
+    MMC_ASSERT_LOG_AND_RETURN(context != nullptr, "context is nullptr", MMC_ERROR);
+    StatsReportRequest req;
+    context->GetRequest<StatsReportRequest>(req);
+    MmcClientMetricStore::GetInstance().Update(req);
+    StatsReportResponse resp(MMC_OK);
     return context->Reply(req.msgId, resp);
 }
 

@@ -7,6 +7,7 @@ file(GLOB_RECURSE mmc_test_src
         ${CMAKE_CURRENT_SOURCE_DIR}/log/*
         ${CMAKE_CURRENT_SOURCE_DIR}/proto/*
         ${CMAKE_CURRENT_SOURCE_DIR}/under_api/ubs_io/*
+        ${CMAKE_CURRENT_SOURCE_DIR}/client/*
 )
 list(FILTER mmc_test_src EXCLUDE REGEX ".*/test_local_handler\\.cpp$")
 

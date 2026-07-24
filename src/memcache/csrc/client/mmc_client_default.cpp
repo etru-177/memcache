@@ -16,6 +16,8 @@
 #include "mmc_bm_proxy.h"
 #include "mmc_montotonic.h"
 #include "mmc_ptracer.h"
+#include "mmc_client_metric_manager.h"
+#include "mmc_bandwidth_collector.h"
 
 #include <algorithm>
 #include <chrono>
@@ -72,6 +74,7 @@ constexpr int32_t MMC_BATCH_TRANSPORT = 1U;
 constexpr int32_t MMC_ASYNC_TRANSPORT = 2U;
 constexpr uint32_t KEY_MAX_LENTH = 256U;
 constexpr uint32_t GVA_LEASE_CLEANUP_INTERVAL_SECONDS = 1U;
+constexpr uint32_t CLIENT_METRIC_REPORT_INTERVAL_SECONDS = 30U;
 
 MmcClientDefault *MmcClientDefault::gClientHandler = nullptr;
 std::mutex MmcClientDefault::gClientHandlerMtx;
@@ -132,6 +135,9 @@ Result MmcClientDefault::Start(const mmc_client_config_t &config)
     MMC_RETURN_ERROR(RegisterPeriodicTask("client_lease_cleanup", GVA_LEASE_CLEANUP_INTERVAL_SECONDS,
                                           [this]() { ProcessExpiredReadLeases(); }),
                      "Failed to register client periodic task");
+
+    MMC_RETURN_ERROR(InitMetricReporting(), "Failed to init metric reporting");
+
     started_ = true;
     return MMC_OK;
 }
@@ -310,8 +316,9 @@ Result MmcClientDefault::BatchPut(const std::vector<std::string> &keys, const st
         return MMC_ERROR;
     }
 
-    // put obj
-    batchResult.resize(keys.size(), MMC_OK);
+    // put obj — 从此时开始计时, alloc 失败不会产生虚假指标
+    batchResult.assign(keys.size(), MMC_OK);
+    BandwidthGuard guard(MetricOp::PUT, bandwidthCollector_, bufArrs, batchResult);
     auto ret = PutData2Blobs(keys, bufArrs, allocResponse, batchResult);
 
     // update blob state
@@ -429,7 +436,8 @@ Result MmcClientDefault::BatchGet(const std::vector<std::string> &keys, const st
                                 << response.blobs_.size());
         return MMC_ERROR;
     }
-    // read data
+    // read data — 从此时开始计时, alloc 失败不会产生虚假指标
+    BandwidthGuard guard(MetricOp::GET, bandwidthCollector_, bufArrs, batchResult);
     std::vector<uint64_t> localLeaseDeadlinesMs = ToLocalLeaseDeadlinesMs(response.blobs_);
     MediaType mediaType = MEDIA_NONE;
     std::vector<std::tuple<uint32_t, uint32_t, std::future<int32_t>>> futures;
@@ -931,6 +939,36 @@ Result MmcClientDefault::RegisterPeriodicTask(const std::string &taskName, uint3
 
     MMC_LOG_INFO("Registered periodic task in client: " << taskName << ", intervalSeconds=" << intervalSeconds);
     return MMC_OK;
+}
+
+Result MmcClientDefault::InitMetricReporting()
+{
+    auto &metricMgr = MmcClientMetricManager::GetInstance();
+    bandwidthCollector_ = metricMgr.InitDefaultCollectors();
+
+    MMC_RETURN_ERROR(RegisterPeriodicTask("client_metric_report", CLIENT_METRIC_REPORT_INTERVAL_SECONDS,
+                                          [this]() { ReportMetrics(); }),
+                     "Failed to register client metric report task");
+    return MMC_OK;
+}
+
+void MmcClientDefault::ReportMetrics()
+{
+    auto &metricMgr = MmcClientMetricManager::GetInstance();
+    auto snapshot = metricMgr.CollectAll();
+    StatsReportRequest req;
+    req.rank_ = rankId_;
+    for (size_t i = 0; i < static_cast<size_t>(MetricOp::COUNT); ++i) {
+        req.bandwidths_[i] = snapshot.bandwidths[i];
+    }
+    StatsReportResponse resp;
+    const Result ret = metaNetClient_->SyncCall(req, resp, rpcRetryTimeOut_);
+    if (ret != MMC_OK) {
+        MMC_LOG_WARN("Failed to report client metrics, ret: " << ret
+                                                              << ", window data will be accumulated into next report");
+    } else {
+        metricMgr.ResetAll();
+    }
 }
 
 void MmcClientDefault::ProcessExpiredReadLeases()

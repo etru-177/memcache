@@ -85,6 +85,7 @@ public:
 
     Result BuildMetricsSummary(bool serviceReady, std::string &result) const;
     Result BuildPrometheusMetrics(bool serviceReady, std::string &result) const;
+    Result BuildClientMetricsPrometheus(std::string &result) const;
 
     Result GetPtracerText(std::string &result) const;
     Result GetAllocFreeLatencyText(std::string &result) const;
