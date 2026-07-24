@@ -80,7 +80,7 @@ public:
     Result BatchRemoveLease(const std::vector<std::string> &keys);
 
     Result BatchMalloc(const std::vector<std::string> &keys, const std::vector<size_t> &sizes,
-                       const mmc_put_options &options, std::vector<uintptr_t> &gvas);
+                       const mmc_put_options &options, uint64_t leaseTtlMs, std::vector<uintptr_t> &gvas);
 
     Result BatchCopy(std::vector<void *> &gvas, std::vector<void *> &buffers, std::vector<size_t> &sizes,
                      const int32_t direct);

@@ -279,7 +279,7 @@ int32_t mmcc_batch_remove_lease(const char **keys, uint32_t keys_count);
 #### mmcc_batch_malloc
 ```c
 int32_t mmcc_batch_malloc(const char **keys, uint32_t keys_count, const size_t *sizes,
-                          mmc_put_options options, uint64_t *gvas);
+                          mmc_put_options options, uint64_t lease_ttl_ms, uint64_t *gvas);
 ```
 **功能**: 批量为多个 key 申请 GVA blob，并返回每个 key 对应的 GVA 起始地址。
 
@@ -289,6 +289,7 @@ int32_t mmcc_batch_malloc(const char **keys, uint32_t keys_count, const size_t *
 - `keys_count`: 键的数量
 - `sizes`: 每个 key 对应的 GVA blob 大小
 - `options`: 申请 GVA blob 的选项
+- `lease_ttl_ms`: 要增加的租约时间，单位为毫秒；为 `0` 时使用 MetaService 配置的默认租期
 - `gvas`: 输出的 GVA 起始地址数组；对应 key 申请失败时该元素为 `0`
 
 **返回值**:

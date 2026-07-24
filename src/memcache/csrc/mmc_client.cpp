@@ -221,7 +221,7 @@ MMC_API int32_t mmcc_batch_remove_lease(const char **keys, uint32_t keys_count)
 }
 
 MMC_API int32_t mmcc_batch_malloc(const char **keys, uint32_t keys_count, const size_t *sizes, mmc_put_options options,
-                                  uint64_t *gvas)
+                                  uint64_t lease_ttl_ms, uint64_t *gvas)
 {
     MMC_VALIDATE_RETURN(MmcClientDefault::GetInstance() != nullptr, "client is not initialize", MMC_CLIENT_NOT_INIT);
     MMC_VALIDATE_RETURN(keys != nullptr, "invalid param, keys is null", MMC_INVALID_PARAM);
@@ -244,7 +244,8 @@ MMC_API int32_t mmcc_batch_malloc(const char **keys, uint32_t keys_count, const 
     }
 
     std::vector<uintptr_t> gvaVector;
-    Result ret = MmcClientDefault::GetInstance()->BatchMalloc(keysVector, sizesVector, options, gvaVector);
+    Result ret =
+        MmcClientDefault::GetInstance()->BatchMalloc(keysVector, sizesVector, options, lease_ttl_ms, gvaVector);
     if (gvaVector.size() != keys_count) {
         MMC_LOG_ERROR("invalid batch malloc gva size (" << gvaVector.size() << "), should be " << keys_count);
         return ret == MMC_OK ? MMC_ERROR : ret;

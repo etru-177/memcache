@@ -733,6 +733,7 @@ Result MmcClientDefault::BatchAddLease(const std::vector<std::string> &keys, uin
 
         const auto &blob = queryInfo.blobs_[0];
         Result trackRet = gvaBlobTracker_.UpdateFromQuery(keys[i], blob, operateIds[i], ToLocalLeaseDeadlineMs(blob));
+        MMC_LOG_DEBUG("UpdateFromQuery key:" << keys[i] << ", leaseTime:" << blob.leaseTimeoutTtlMs_);
         if (trackRet != MMC_OK) {
             MMC_LOG_ERROR("client " << name_ << " batch add lease track failed for key " << keys[i]
                                     << ", ret:" << trackRet);
@@ -1096,7 +1097,7 @@ Result MmcClientDefault::UnRegisterBuffer(uint64_t addr, uint64_t size)
 }
 
 Result MmcClientDefault::BatchMalloc(const std::vector<std::string> &keys, const std::vector<size_t> &sizes,
-                                     const mmc_put_options &options, std::vector<uintptr_t> &gvas)
+                                     const mmc_put_options &options, uint64_t leaseTtlMs, std::vector<uintptr_t> &gvas)
 {
     MMC_VALIDATE_RETURN(bmProxy_ != nullptr, "BmProxy is null", MMC_CLIENT_NOT_INIT);
     MMC_VALIDATE_RETURN(metaNetClient_ != nullptr, "MetaNetClient is null", MMC_CLIENT_NOT_INIT);
@@ -1110,7 +1111,7 @@ Result MmcClientDefault::BatchMalloc(const std::vector<std::string> &keys, const
     // alloc blobs
     uint32_t flags = ALLOC_RANDOM | ALLOC_FLAGS_GVA_MALLOC_MASK;
     uint64_t operateId = GenerateOperateId(rankId_);
-    BatchAllocRequest request(keys, {}, flags, operateId);
+    BatchAllocRequest request(keys, {}, flags, operateId, leaseTtlMs);
     for (const auto &size : sizes) {
         AllocOptions tmpAllocOptions{};
         MMC_VALIDATE_RETURN(PrepareAllocOpt(size, options, flags, tmpAllocOptions) == MMC_OK, "option param error",
@@ -1144,6 +1145,7 @@ Result MmcClientDefault::BatchMalloc(const std::vector<std::string> &keys, const
 
         gvas[i] = blobs[0].gva_;
         Result trackRet = gvaBlobTracker_.RegisterFromBatchAlloc(key, blobs[0], operateId);
+        MMC_LOG_DEBUG("BatchMalloc key:" << keys[i] << ", leaseTime:" << blobs[0].leaseTimeoutTtlMs_);
         if (trackRet != MMC_OK) {
             MMC_LOG_ERROR("Register batch alloc gva info failed for key " << key << ", ret:" << trackRet);
         }

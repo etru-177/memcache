@@ -115,7 +115,7 @@ TEST_F(TestMetaManagerKvEvents, UpdateStateEmitsStored)
 
     AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, 0};
     MmcMemMetaDesc objMeta;
-    ASSERT_EQ(metaMng->Alloc("k_stored", allocReq, 1, objMeta), MMC_OK);
+    ASSERT_EQ(metaMng->Alloc("k_stored", allocReq, 1, 0, objMeta), MMC_OK);
     // Alloc 仅置 ALLOCATED，未可读 -> 不应有 stored。
     EXPECT_EQ(sink.CountOfType("stored"), 0U);
 
@@ -149,7 +149,7 @@ TEST_F(TestMetaManagerKvEvents, RemoveEmitsRemoved)
 
     AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, 0};
     MmcMemMetaDesc objMeta;
-    ASSERT_EQ(metaMng->Alloc("k_rm", allocReq, 1, objMeta), MMC_OK);
+    ASSERT_EQ(metaMng->Alloc("k_rm", allocReq, 1, 0, objMeta), MMC_OK);
     ASSERT_EQ(metaMng->UpdateState("k_rm", loc, MMC_WRITE_OK, 1), MMC_OK);
 
     ASSERT_EQ(metaMng->Remove("k_rm"), MMC_OK);
@@ -181,7 +181,7 @@ TEST_F(TestMetaManagerKvEvents, NoSinkIsNoop)
 
     AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, 0};
     MmcMemMetaDesc objMeta;
-    ASSERT_EQ(metaMng->Alloc("k_noop", allocReq, 1, objMeta), MMC_OK);
+    ASSERT_EQ(metaMng->Alloc("k_noop", allocReq, 1, 0, objMeta), MMC_OK);
     ASSERT_EQ(metaMng->UpdateState("k_noop", loc, MMC_WRITE_OK, 1), MMC_OK);
     ASSERT_EQ(metaMng->Remove("k_noop"), MMC_OK);
     metaMng->Stop();
@@ -208,7 +208,7 @@ TEST_F(TestMetaManagerKvEvents, RemoveAllEmitsRemovedPerKey)
     for (int i = 0; i < numKeys; ++i) {
         MmcMemMetaDesc objMeta;
         std::string key = "k_all_" + std::to_string(i);
-        ASSERT_EQ(metaMng->Alloc(key, allocReq, 1, objMeta), MMC_OK);
+        ASSERT_EQ(metaMng->Alloc(key, allocReq, 1, 0, objMeta), MMC_OK);
         ASSERT_EQ(metaMng->UpdateState(key, loc, MMC_WRITE_OK, 1), MMC_OK);
     }
     EXPECT_EQ(sink.CountOfType("stored"), static_cast<size_t>(numKeys));

@@ -332,7 +332,7 @@ virtual int BatchRemoveLease(const std::vector<std::string> &keys) = 0;
 #### BatchMalloc
 ```c++
 virtual std::vector<uintptr_t> BatchMalloc(const std::vector<std::string> &keys, const std::vector<size_t> &sizes,
-                                               uint16_t media) = 0;
+                                               uint16_t media, uint64_t leaseTtlMs = 0) = 0;
 ```
 **功能**: 批量为多个 key 申请全局内存，并返回每个 key 对应的起始 GVA。
 
@@ -340,6 +340,7 @@ virtual std::vector<uintptr_t> BatchMalloc(const std::vector<std::string> &keys,
 - `keys`: 要申请内存的 key 列表，长度必须与 `sizes` 一致
 - `sizes`: 每个 key 对应的数据大小列表
 - `media`: 申请的介质类型，如 `MEDIA_HBM` 或 `MEDIA_DRAM`
+- `leaseTtlMs`: 要增加的租约时间，单位为毫秒，默认为 `0`。为 `0` 时使用 meta 侧配置项 `ock.mmc.meta.lease_ttl_ms`
 
 **返回值**:
 - `std::vector<uintptr_t>`: 每个元素为一个 key 对应的起始 GVA

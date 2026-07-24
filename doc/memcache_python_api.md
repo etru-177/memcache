@@ -801,7 +801,7 @@ ret = store.batch_remove_lease(keys)
 #### batch_alloc
 
 ```python
-gvas = store.batch_alloc(keys, sizes, media=1)
+gvas = store.batch_alloc(keys, sizes, media=1, leaseTtlMs=0)
 ```
 
 **功能**: 批量为多个 key 申请全局内存，并返回每个 key 对应的起始 GVA
@@ -811,6 +811,7 @@ gvas = store.batch_alloc(keys, sizes, media=1)
 - `keys`: 要申请内存的 key 列表
 - `sizes`: 每个 key 对应的数据大小列表，长度必须与 `keys` 一致
 - `media`: 申请的介质类型，默认值为 `1`（`MEDIA_DRAM`）；`0` 表示 `MEDIA_HBM`
+- `leaseTtlMs`: 要增加的租约时间，单位为毫秒，默认为 `0`。为 `0` 时使用 meta 侧配置项 `ock.mmc.meta.lease_ttl_ms`
 
 **返回值**:
 

@@ -121,7 +121,7 @@ TEST_F(TestLocalHandler, Alloc)
 
     AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, 0}; // blobSize, numBlobs, mediaType, preferredRank, flags
     MmcMemMetaDesc objMeta;
-    Result ret = metaMng->Alloc("test_string", allocReq, 1, objMeta);
+    Result ret = metaMng->Alloc("test_string", allocReq, 1, 0, objMeta);
     ASSERT_TRUE(ret == MMC_OK);
     ASSERT_TRUE(objMeta.NumBlobs() == 1);
     ASSERT_TRUE(objMeta.Size() == SIZE_32K);

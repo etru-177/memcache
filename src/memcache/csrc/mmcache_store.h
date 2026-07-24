@@ -137,7 +137,7 @@ public:
     int BatchRemoveLease(const std::vector<std::string> &keys) override;
 
     std::vector<uintptr_t> BatchMalloc(const std::vector<std::string> &keys, const std::vector<size_t> &sizes,
-                                       uint16_t media) override;
+                                       uint16_t media, uint64_t leaseTtlMs = 0) override;
 
     int BatchCopy(std::vector<void *> &gvas, std::vector<void *> &buffers, std::vector<size_t> &sizes,
                   const int32_t direct = 3) override;

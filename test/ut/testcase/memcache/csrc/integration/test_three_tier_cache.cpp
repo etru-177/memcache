@@ -74,7 +74,7 @@ TEST_F(TestThreeTierCache, PutGet_HbmHit)
     std::string key = "hbm_key";
     AllocOptions allocReq{SIZE_32K, 1, MEDIA_HBM, {0}, 0};
     MmcMemMetaDesc objMeta;
-    ASSERT_EQ(mgr->Alloc(key, allocReq, 1, objMeta), MMC_OK);
+    ASSERT_EQ(mgr->Alloc(key, allocReq, 1, 0, objMeta), MMC_OK);
     ASSERT_EQ(mgr->UpdateState(key, hbmLoc, MMC_WRITE_OK, 1), MMC_OK);
 
     MmcMemMetaDesc result;
@@ -107,7 +107,7 @@ TEST_F(TestThreeTierCache, EvictDram_CascadingEviction)
         keys.push_back(k);
         AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, 0};
         MmcMemMetaDesc meta;
-        ASSERT_EQ(mgr->Alloc(k, allocReq, 1, meta), MMC_OK);
+        ASSERT_EQ(mgr->Alloc(k, allocReq, 1, 0, meta), MMC_OK);
         ASSERT_EQ(mgr->UpdateState(k, dramLoc, MMC_WRITE_OK, 1), MMC_OK);
     }
 
@@ -150,7 +150,7 @@ TEST_F(TestThreeTierCache, MassivePut_MultiLevelEviction)
         keys.push_back(k);
         AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, 0};
         MmcMemMetaDesc meta;
-        ASSERT_EQ(mgr->Alloc(k, allocReq, 1, meta), MMC_OK);
+        ASSERT_EQ(mgr->Alloc(k, allocReq, 1, 0, meta), MMC_OK);
         ASSERT_EQ(mgr->UpdateState(k, dramLoc, MMC_WRITE_OK, 1), MMC_OK);
     }
 
@@ -211,14 +211,14 @@ TEST_F(TestThreeTierCache, RepeatedPut_OverwritesOldData)
     // First Put (smaller size)
     AllocOptions req1{SIZE_32K / 2, 1, MEDIA_DRAM, {0}, 0};
     MmcMemMetaDesc meta1;
-    ASSERT_EQ(mgr->Alloc(key, req1, 1, meta1), MMC_OK);
+    ASSERT_EQ(mgr->Alloc(key, req1, 1, 0, meta1), MMC_OK);
     ASSERT_EQ(mgr->UpdateState(key, dramLoc, MMC_WRITE_OK, 1), MMC_OK);
 
     // Second Put (larger size)
     mgr->Remove(key);
     AllocOptions req2{SIZE_32K, 1, MEDIA_DRAM, {0}, 0};
     MmcMemMetaDesc meta2;
-    ASSERT_EQ(mgr->Alloc(key, req2, 2UL, meta2), MMC_OK);
+    ASSERT_EQ(mgr->Alloc(key, req2, 2UL, 0, meta2), MMC_OK);
     ASSERT_EQ(mgr->UpdateState(key, dramLoc, MMC_WRITE_OK, 2U), MMC_OK);
 
     // Get returns latest version
@@ -263,7 +263,7 @@ TEST_F(TestThreeTierCache, SsdWriteFailure_EvictionFallsBackToRemove)
         keys.push_back(k);
         AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, 0};
         MmcMemMetaDesc meta;
-        ASSERT_EQ(mgr->Alloc(k, allocReq, 1, meta), MMC_OK);
+        ASSERT_EQ(mgr->Alloc(k, allocReq, 1, 0, meta), MMC_OK);
         ASSERT_EQ(mgr->UpdateState(k, dramLoc, MMC_WRITE_OK, 1), MMC_OK);
     }
 
@@ -298,7 +298,7 @@ TEST_F(TestThreeTierCache, RebuildMeta_SegmentInfoConsistent)
     std::string key = "rebuild_key";
     AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, 0};
     MmcMemMetaDesc objMeta;
-    ASSERT_EQ(mgr->Alloc(key, allocReq, 1, objMeta), MMC_OK);
+    ASSERT_EQ(mgr->Alloc(key, allocReq, 1, 0, objMeta), MMC_OK);
     ASSERT_EQ(mgr->UpdateState(key, dramLoc, MMC_WRITE_OK, 1), MMC_OK);
 
     // Segment info reflects current state
@@ -329,7 +329,7 @@ TEST_F(TestThreeTierCache, SsdFull_DramEviction_HandlesGracefully)
         keys.push_back(k);
         AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, 0};
         MmcMemMetaDesc meta;
-        ASSERT_EQ(mgr->Alloc(k, allocReq, 1, meta), MMC_OK);
+        ASSERT_EQ(mgr->Alloc(k, allocReq, 1, 0, meta), MMC_OK);
         ASSERT_EQ(mgr->UpdateState(k, dramLoc, MMC_WRITE_OK, 1), MMC_OK);
     }
 
@@ -370,7 +370,7 @@ TEST_F(TestThreeTierCache, NoMetaNetServer_RpcFailsGracefully)
     std::string key = "nometa";
     AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, 0};
     MmcMemMetaDesc meta;
-    ASSERT_EQ(mgr->Alloc(key, allocReq, 1, meta), MMC_OK);
+    ASSERT_EQ(mgr->Alloc(key, allocReq, 1, 0, meta), MMC_OK);
     ASSERT_EQ(mgr->UpdateState(key, dramLoc, MMC_WRITE_OK, 1), MMC_OK);
 
     MmcMemMetaDesc result;
@@ -401,7 +401,7 @@ TEST_F(TestThreeTierCache, ConcurrentGet_DuringWrite)
     // Allocate (state = ALLOCATED)
     AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, 0};
     MmcMemMetaDesc objMeta;
-    ASSERT_EQ(mgr->Alloc(key, allocReq, 1, objMeta), MMC_OK);
+    ASSERT_EQ(mgr->Alloc(key, allocReq, 1, 0, objMeta), MMC_OK);
 
     std::atomic<bool> getDone{false};
     std::atomic<int> getResult{-1};
@@ -447,7 +447,7 @@ TEST_F(TestThreeTierCache, GetLatency_Benchmark)
     std::string key = "perf_get";
     AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, 0};
     MmcMemMetaDesc objMeta;
-    ASSERT_EQ(mgr->Alloc(key, allocReq, 1, objMeta), MMC_OK);
+    ASSERT_EQ(mgr->Alloc(key, allocReq, 1, 0, objMeta), MMC_OK);
     ASSERT_EQ(mgr->UpdateState(key, dramLoc, MMC_WRITE_OK, 1), MMC_OK);
 
     auto start = chrono::steady_clock::now();
@@ -487,7 +487,7 @@ TEST_F(TestThreeTierCache, Eviction_Throughput)
         keys.push_back(k);
         AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, 0};
         MmcMemMetaDesc meta;
-        ASSERT_EQ(mgr->Alloc(k, allocReq, 1, meta), MMC_OK);
+        ASSERT_EQ(mgr->Alloc(k, allocReq, 1, 0, meta), MMC_OK);
         ASSERT_EQ(mgr->UpdateState(k, dramLoc, MMC_WRITE_OK, 1), MMC_OK);
     }
 
@@ -541,7 +541,7 @@ TEST_F(TestThreeTierCache, ThreeTierFullPath_LatencyRegression)
         auto t0 = chrono::steady_clock::now();
         AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, 0};
         MmcMemMetaDesc meta;
-        ASSERT_EQ(mgr->Alloc(key, allocReq, 1, meta), MMC_OK);
+        ASSERT_EQ(mgr->Alloc(key, allocReq, 1, 0, meta), MMC_OK);
         ASSERT_EQ(mgr->UpdateState(key, dramLoc, MMC_WRITE_OK, 1), MMC_OK);
         getAllocLat.push_back(chrono::duration_cast<chrono::microseconds>(chrono::steady_clock::now() - t0).count());
 

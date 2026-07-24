@@ -186,7 +186,8 @@ public:
      * @param key          [in] key of the meta object
      * @param metaInfo     [out] the meta object created
      */
-    Result Alloc(const std::string &key, const AllocOptions &allocOpt, uint64_t operateId, MmcMemMetaDesc &objMeta);
+    Result Alloc(const std::string &key, const AllocOptions &allocOpt, uint64_t operateId, uint64_t leaseTtlMs,
+                 MmcMemMetaDesc &objMeta);
 
     /**
      * @brief Batch get with rewarm grouped by SSD rank

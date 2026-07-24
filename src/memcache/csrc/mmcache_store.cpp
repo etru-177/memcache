@@ -980,7 +980,7 @@ int MmcacheStore::BatchRemoveLease(const std::vector<std::string> &keys)
 }
 
 std::vector<uintptr_t> MmcacheStore::BatchMalloc(const std::vector<std::string> &keys, const std::vector<size_t> &sizes,
-                                                 uint16_t media)
+                                                 uint16_t media, uint64_t leaseTtlMs)
 {
     std::vector<uintptr_t> gvas(keys.size(), 0);
     if (keys.size() != sizes.size()) {
@@ -1006,7 +1006,7 @@ std::vector<uintptr_t> MmcacheStore::BatchMalloc(const std::vector<std::string> 
     }
     std::vector<uint64_t> gvaValues(keys.size(), 0);
     TP_TRACE_BEGIN(TP_MMC_PY_BATCH_ALLOC);
-    Result ret = mmcc_batch_malloc(keyArray.data(), keys.size(), sizes.data(), options, gvaValues.data());
+    Result ret = mmcc_batch_malloc(keyArray.data(), keys.size(), sizes.data(), options, leaseTtlMs, gvaValues.data());
     TP_TRACE_END(TP_MMC_PY_BATCH_ALLOC, ret);
     for (size_t i = 0; i < gvaValues.size(); ++i) {
         gvas[i] = static_cast<uintptr_t>(gvaValues[i]);

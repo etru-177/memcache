@@ -704,7 +704,7 @@ void MmcMetaManager::CheckAndEvict(MediaType media, uint64_t wantAllocSize)
 }
 
 Result MmcMetaManager::Alloc(const std::string &key, const AllocOptions &allocOpt, uint64_t operateId,
-                             MmcMemMetaDesc &objMeta)
+                             uint64_t leaseTtlMs, MmcMemMetaDesc &objMeta)
 {
     MmcMemObjMetaPtr tempMetaObj = MmcMakeRef<MmcMemObjMeta>();
     if (tempMetaObj == nullptr) {
@@ -720,8 +720,11 @@ Result MmcMetaManager::Alloc(const std::string &key, const AllocOptions &allocOp
         return ret;
     }
 
+    const uint64_t actualLeaseTtlMs = leaseTtlMs == 0 ? defaultTtlMs_ : leaseTtlMs;
+    MMC_LOG_DEBUG("Alloc key=" << key << ", leaseTtlMs=" << leaseTtlMs << ", defaultTtlMs_=" << defaultTtlMs_
+                               << ", actualLeaseTtlMs=" << actualLeaseTtlMs);
     for (auto &blob : blobs) {
-        blob->SetDefaultLeaseTtlMs(defaultTtlMs_);
+        blob->SetDefaultLeaseTtlMs(actualLeaseTtlMs);
         MMC_LOG_DEBUG("Blob allocated, key=" << key << ", size=" << blob->Size() << ", rank=" << blob->Rank());
         tempMetaObj->AddBlob(blob);
     }

@@ -83,7 +83,7 @@ TEST_F(TestMmcMetaManager, AllocAndFree)
 
     AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, 0}; // blobSize, numBlobs, mediaType, preferredRank, flags
     MmcMemMetaDesc objMeta;
-    Result ret = metaMng->Alloc("test_string", allocReq, 1, objMeta);
+    Result ret = metaMng->Alloc("test_string", allocReq, 1, 0, objMeta);
     ASSERT_TRUE(ret == MMC_OK);
     ASSERT_TRUE(objMeta.NumBlobs() == 1);
     ASSERT_TRUE(objMeta.Size() == SIZE_32K);
@@ -92,6 +92,38 @@ TEST_F(TestMmcMetaManager, AllocAndFree)
 
     ret = metaMng->Remove("test_string");
     ASSERT_TRUE(ret == MMC_OK);
+    metaMng->Stop();
+}
+
+TEST_F(TestMmcMetaManager, AllocUsesPerRequestLeaseTtl)
+{
+    MmcLocation loc{0, MEDIA_DRAM};
+    MmcLocalMemlInitInfo locInfo{0, 1000000};
+
+    const uint64_t defaultTtl = 2000;
+    MmcRef<MmcMetaManager> metaMng = MmcMakeRef<MmcMetaManager>(defaultTtl, 70U, 60U, REWARM_DRAM_WATERMARK);
+    metaMng->Start();
+    std::vector<std::pair<std::string, MmcMemBlobDesc>> blobMap;
+    metaMng->Mount(loc, locInfo, blobMap, false);
+
+    AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, 0};
+    MmcMemMetaDesc objMetaDefault;
+    ASSERT_EQ(metaMng->Alloc("lease_default", allocReq, 1, 0, objMetaDefault), MMC_OK);
+    ASSERT_EQ(objMetaDefault.NumBlobs(), 1U);
+    const uint64_t timeoutDefault = objMetaDefault.blobs_[0].leaseTimeoutTtlMs_;
+
+    constexpr uint64_t perRequestLeaseTtl = 5000;
+    MmcMemMetaDesc objMetaCustom;
+    ASSERT_EQ(metaMng->Alloc("lease_custom", allocReq, 1, perRequestLeaseTtl, objMetaCustom), MMC_OK);
+    ASSERT_EQ(objMetaCustom.NumBlobs(), 1U);
+    const uint64_t timeoutCustom = objMetaCustom.blobs_[0].leaseTimeoutTtlMs_;
+
+    // Per-request leaseTtlMs (5000) must yield a later lease timeout than the default
+    // (2000). The two grants happen back-to-back, so the grant-time gap is negligible
+    // and (timeoutCustom - timeoutDefault) reflects the 5000 vs 2000 difference.
+    EXPECT_GT(timeoutCustom, timeoutDefault);
+    EXPECT_GE(timeoutCustom - timeoutDefault, perRequestLeaseTtl - defaultTtl);
+
     metaMng->Stop();
 }
 
@@ -114,7 +146,7 @@ TEST_F(TestMmcMetaManager, AllocAndFreeMulti)
     for (int i = 0; i < numKeys; ++i) {
         MmcMemMetaDesc objMeta;
         string key = "testKey" + std::to_string(i);
-        ret = metaMng->Alloc(key, allocReq, 1, objMeta);
+        ret = metaMng->Alloc(key, allocReq, 1, 0, objMeta);
         memMetaObjs.push_back(objMeta);
         keys.push_back(key);
     }
@@ -148,7 +180,7 @@ TEST_F(TestMmcMetaManager, GetAndUpdate)
     for (int i = 0; i < numKeys; ++i) {
         MmcMemMetaDesc objMeta;
         string key = "testKey" + std::to_string(i);
-        ret = metaMng->Alloc(key, allocReq, 1, objMeta);
+        ret = metaMng->Alloc(key, allocReq, 1, 0, objMeta);
         memMetaObjs.push_back(objMeta);
         keys.push_back(key);
     }
@@ -192,7 +224,7 @@ TEST_F(TestMmcMetaManager, LRU)
         MetaNetServerPtr server;
         metaMng->CheckAndEvict(MEDIA_DRAM, SIZE_32K);
         usleep(1000 * 500);
-        ret = metaMng->Alloc(key, allocReq, 1, objMeta);
+        ret = metaMng->Alloc(key, allocReq, 1, 0, objMeta);
         ASSERT_TRUE(ret == MMC_OK);
         memMetaObjs.push_back(objMeta);
         keys.push_back(key);
@@ -225,7 +257,7 @@ TEST_F(TestMmcMetaManager, AllocAndExistKey)
 
     AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, 0};
     MmcMemMetaDesc objMeta;
-    Result ret = metaMng->Alloc("test_string", allocReq, 1, objMeta);
+    Result ret = metaMng->Alloc("test_string", allocReq, 1, 0, objMeta);
     metaMng->UpdateState("test_string", loc, MMC_WRITE_OK, 1);
     ASSERT_TRUE(ret == MMC_OK);
     ASSERT_TRUE(objMeta.NumBlobs() == 1);
@@ -254,7 +286,7 @@ TEST_F(TestMmcMetaManager, AllocAndBatchExistKey)
     for (uint16_t i = 0U; i < numKeys; ++i) {
         MmcMemMetaDesc objMeta;
         string key = "testKey_" + std::to_string(i);
-        ret = metaMng->Alloc(key, allocReq, 1, objMeta);
+        ret = metaMng->Alloc(key, allocReq, 1, 0, objMeta);
         memMetaObjs.push_back(objMeta);
         keys.push_back(key);
         metaMng->UpdateState(key, loc, MMC_WRITE_OK, 1);
@@ -305,7 +337,7 @@ TEST_F(TestMmcMetaManager, Remove)
 
     AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, 0};
     MmcMemMetaDesc objMeta;
-    Result ret = metaMng->Alloc("testKey", allocReq, 1, objMeta);
+    Result ret = metaMng->Alloc("testKey", allocReq, 1, 0, objMeta);
     ASSERT_TRUE(ret == MMC_OK);
 
     // std::this_thread::sleep_for(std::chrono::milliseconds(3000));
@@ -316,7 +348,7 @@ TEST_F(TestMmcMetaManager, Remove)
     ret = metaMng->Remove("nonexistentKey");
     ASSERT_TRUE(ret == MMC_UNMATCHED_KEY);
 
-    ret = metaMng->Alloc("testKey2", allocReq, 1, objMeta);
+    ret = metaMng->Alloc("testKey2", allocReq, 1, 0, objMeta);
     ASSERT_TRUE(ret == MMC_OK);
     ret = metaMng->Remove("testKey2");
     ASSERT_TRUE(ret == MMC_OK);
@@ -335,7 +367,7 @@ TEST_F(TestMmcMetaManager, Get_NotAllBlobsReady)
 
     AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, 0};
     MmcMemMetaDesc objMeta;
-    Result ret = metaMng->Alloc("test_key", allocReq, 1, objMeta);
+    Result ret = metaMng->Alloc("test_key", allocReq, 1, 0, objMeta);
     ASSERT_EQ(ret, MMC_OK);
 
     MmcMemMetaDesc resultMeta;
@@ -361,7 +393,7 @@ TEST_F(TestMmcMetaManager, Alloc_ThresholdEviction)
     for (const auto &key : keys) {
         AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, 0};
         MmcMemMetaDesc objMeta;
-        Result ret = metaMng->Alloc(key, allocReq, 1, objMeta);
+        Result ret = metaMng->Alloc(key, allocReq, 1, 0, objMeta);
         ASSERT_EQ(ret, MMC_OK);
         metaMng->UpdateState(key, loc, MMC_WRITE_OK, 1);
     }
@@ -371,7 +403,7 @@ TEST_F(TestMmcMetaManager, Alloc_ThresholdEviction)
 
     AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, 0};
     MmcMemMetaDesc newObjMeta;
-    Result ret = metaMng->Alloc("key3", allocReq, 1, newObjMeta);
+    Result ret = metaMng->Alloc("key3", allocReq, 1, 0, newObjMeta);
     ASSERT_EQ(ret, MMC_OK);
 
     ASSERT_EQ(metaMng->ExistKey("key1"), MMC_OK);
@@ -401,7 +433,7 @@ TEST_F(TestMmcMetaManager, EvictCallback_NoSsd_GoesToRemove)
         AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, 0};
         uint64_t operateId = 1;
         MmcMemMetaDesc objMeta;
-        ASSERT_EQ(metaMng->Alloc(keys[i], allocReq, operateId, objMeta), MMC_OK);
+        ASSERT_EQ(metaMng->Alloc(keys[i], allocReq, operateId, 0, objMeta), MMC_OK);
         ASSERT_EQ(metaMng->UpdateState(keys[i], dramLoc, MMC_WRITE_OK, operateId), MMC_OK);
     }
     // 访问 key2 使其成为 MRU，确保 key0 是 LRU 末端
@@ -439,7 +471,7 @@ TEST_F(TestMmcMetaManager, EvictCallback_MoveDownIndependentOfBlobOrder)
     for (size_t i = 0; i < keys.size(); ++i) {
         AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, 0};
         MmcMemMetaDesc objMeta;
-        ASSERT_EQ(metaMng->Alloc(keys[i], allocReq, 1, objMeta), MMC_OK);
+        ASSERT_EQ(metaMng->Alloc(keys[i], allocReq, 1, 0, objMeta), MMC_OK);
         ASSERT_EQ(metaMng->UpdateState(keys[i], dramLoc, MMC_WRITE_OK, 1), MMC_OK);
     }
     MmcMemMetaDesc temp;
@@ -488,7 +520,7 @@ TEST_F(TestMmcMetaManager, EvictCallback_SsdEvictionDelegatesViaRpc)
     for (size_t i = 0; i < keys.size(); ++i) {
         AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, 0};
         MmcMemMetaDesc objMeta;
-        ASSERT_EQ(metaMng->Alloc(keys[i], allocReq, 1, objMeta), MMC_OK);
+        ASSERT_EQ(metaMng->Alloc(keys[i], allocReq, 1, 0, objMeta), MMC_OK);
         ASSERT_EQ(metaMng->UpdateState(keys[i], dramLoc, MMC_WRITE_OK, 1), MMC_OK);
     }
     // 访问 key2 使其成为 MRU
@@ -558,7 +590,7 @@ TEST_F(TestMmcMetaManager, RemoveMixedMedia_FreesAllAllocators)
     std::string key = "mixed_key";
     AllocOptions allocReq{SIZE_32K, 1, MEDIA_HBM, {0}, 0};
     MmcMemMetaDesc objMeta;
-    ASSERT_EQ(metaMng->Alloc(key, allocReq, 1, objMeta), MMC_OK);
+    ASSERT_EQ(metaMng->Alloc(key, allocReq, 1, 0, objMeta), MMC_OK);
     ASSERT_EQ(metaMng->UpdateState(key, hbmLoc, MMC_WRITE_OK, 1), MMC_OK);
 
     // 记录 Remove 前各介质使用量
@@ -598,7 +630,7 @@ TEST_F(TestMmcMetaManager, DramOnlyRemove_SsdPreFreeNoop)
     std::string key = "dram_only";
     AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, 0};
     MmcMemMetaDesc objMeta;
-    ASSERT_EQ(metaMng->Alloc(key, allocReq, 1, objMeta), MMC_OK);
+    ASSERT_EQ(metaMng->Alloc(key, allocReq, 1, 0, objMeta), MMC_OK);
     ASSERT_EQ(metaMng->UpdateState(key, dramLoc, MMC_WRITE_OK, 1), MMC_OK);
 
     auto segs = metaMng->GetAllSegmentInfo();
@@ -639,7 +671,7 @@ TEST_F(TestMmcMetaManager, Get_DramHit_NoSsdRewarm)
     std::string key = "get_dram_key";
     AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, 0};
     MmcMemMetaDesc objMeta;
-    ASSERT_EQ(metaMng->Alloc(key, allocReq, 1, objMeta), MMC_OK);
+    ASSERT_EQ(metaMng->Alloc(key, allocReq, 1, 0, objMeta), MMC_OK);
     ASSERT_EQ(metaMng->UpdateState(key, dramLoc, MMC_WRITE_OK, 1), MMC_OK);
 
     MmcMemMetaDesc resultMeta;
@@ -675,7 +707,7 @@ TEST_F(TestMmcMetaManager, RewarmBlob_NoSsdBlob_ReturnsError)
     std::string key = "rewarm_nossd_key";
     AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, 0};
     MmcMemMetaDesc objMeta;
-    ASSERT_EQ(metaMng->Alloc(key, allocReq, 1, objMeta), MMC_OK);
+    ASSERT_EQ(metaMng->Alloc(key, allocReq, 1, 0, objMeta), MMC_OK);
     ASSERT_EQ(metaMng->UpdateState(key, dramLoc, MMC_WRITE_OK, 1), MMC_OK);
 
     // key 没有 SSD blob → Get 正常返回 DRAM blob，不触发回温
@@ -703,7 +735,7 @@ TEST_F(TestMmcMetaManager, GvaAlloc_PendingWriteCannotRead)
     AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, ALLOC_FLAGS_GVA_MALLOC_MASK};
 
     MmcMemMetaDesc objMeta;
-    Result ret = metaMng->Alloc("gva_key_1", allocReq, 1, objMeta);
+    Result ret = metaMng->Alloc("gva_key_1", allocReq, 1, 0, objMeta);
     ASSERT_EQ(ret, MMC_OK);
     ASSERT_EQ(objMeta.NumBlobs(), 1);
 
@@ -734,7 +766,7 @@ TEST_F(TestMmcMetaManager, GvaWriteOk_BecomesReadable)
     AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, ALLOC_FLAGS_GVA_MALLOC_MASK};
 
     MmcMemMetaDesc objMeta;
-    Result ret = metaMng->Alloc("gva_key_2", allocReq, opId1, objMeta);
+    Result ret = metaMng->Alloc("gva_key_2", allocReq, opId1, 0, objMeta);
     ASSERT_EQ(ret, MMC_OK);
     ASSERT_EQ(objMeta.NumBlobs(), 1);
 
@@ -781,7 +813,7 @@ TEST_F(TestMmcMetaManager, AddRemoveLease_WorksForRegularReadableSingleBlob)
     AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, 0};
 
     MmcMemMetaDesc objMeta;
-    Result ret = metaMng->Alloc("regular_key_1", allocReq, opId1, objMeta);
+    Result ret = metaMng->Alloc("regular_key_1", allocReq, opId1, 0, objMeta);
     ASSERT_EQ(ret, MMC_OK);
     ASSERT_EQ(objMeta.NumBlobs(), 1);
     ASSERT_EQ(metaMng->UpdateState("regular_key_1", loc, MMC_WRITE_OK, opId1), MMC_OK);
@@ -816,7 +848,7 @@ TEST_F(TestMmcMetaManager, GvaRemoveAfterReadable_CleansIndex)
     AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, ALLOC_FLAGS_GVA_MALLOC_MASK};
 
     MmcMemMetaDesc objMeta;
-    Result ret = metaMng->Alloc("gva_key_4", allocReq, opId1, objMeta);
+    Result ret = metaMng->Alloc("gva_key_4", allocReq, opId1, 0, objMeta);
     ASSERT_EQ(ret, MMC_OK);
     ASSERT_EQ(objMeta.NumBlobs(), 1);
 
@@ -859,7 +891,7 @@ TEST_F(TestMmcMetaManager, GvaWriteFail_RemovesKey)
     AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, ALLOC_FLAGS_GVA_MALLOC_MASK};
 
     MmcMemMetaDesc objMeta;
-    Result ret = metaMng->Alloc("gva_key_5", allocReq, opId1, objMeta);
+    Result ret = metaMng->Alloc("gva_key_5", allocReq, opId1, 0, objMeta);
     ASSERT_EQ(ret, MMC_OK);
     ASSERT_EQ(objMeta.NumBlobs(), 1);
 
@@ -902,7 +934,7 @@ TEST_F(TestMmcMetaManager, GvaUnmount_CleansSegmentIndex)
     AllocOptions allocReq{SIZE_32K, 1, MEDIA_DRAM, {0}, ALLOC_FLAGS_GVA_MALLOC_MASK};
 
     MmcMemMetaDesc objMeta;
-    Result ret = metaMng->Alloc("gva_key_6", allocReq, opId1, objMeta);
+    Result ret = metaMng->Alloc("gva_key_6", allocReq, opId1, 0, objMeta);
     ASSERT_EQ(ret, MMC_OK);
     ASSERT_EQ(objMeta.NumBlobs(), 1);
 

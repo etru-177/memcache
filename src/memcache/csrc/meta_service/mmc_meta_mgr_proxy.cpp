@@ -57,7 +57,7 @@ Result MmcMetaMgrProxy::Alloc(const AllocRequest &req, AllocResponse &resp)
     metaMangerPtr_->CheckAndEvict(static_cast<MediaType>(req.options_.mediaType_),
                                   req.options_.blobSize_ * req.options_.numBlobs_);
     MmcMemMetaDesc objMeta;
-    auto ret = metaMangerPtr_->Alloc(req.key_, req.options_, req.operateId_, objMeta);
+    auto ret = metaMangerPtr_->Alloc(req.key_, req.options_, req.operateId_, 0, objMeta);
     IncrementResultCounter(metricManager, RestMetricType::ALLOC, ret, rank);
     if (ret != MMC_OK) {
         if (ret != MMC_DUPLICATED_OBJECT) {
@@ -93,7 +93,7 @@ Result MmcMetaMgrProxy::BatchAlloc(const BatchAllocRequest &req, BatchAllocRespo
                                       req.options_[i].blobSize_ * req.options_[i].numBlobs_);
         TP_TRACE_BEGIN(TP_MMC_META_MGR_ALLOC);
         metricManager.IncrementRequestCounter(RestMetricType::ALLOC, rank);
-        Result ret = metaMangerPtr_->Alloc(req.keys_[i], req.options_[i], req.operateId_, objMeta);
+        Result ret = metaMangerPtr_->Alloc(req.keys_[i], req.options_[i], req.operateId_, req.leaseTtlMs_, objMeta);
         TP_TRACE_END(TP_MMC_META_MGR_ALLOC, ret);
         IncrementResultCounter(metricManager, RestMetricType::ALLOC, ret, rank);
         if (ret != MMC_OK) {

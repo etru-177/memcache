@@ -232,12 +232,14 @@ struct BatchAllocRequest : MsgBase {
     std::vector<AllocOptions> options_;
     uint32_t flags_;
     uint64_t operateId_;
+    uint64_t leaseTtlMs_{0};
 
-    BatchAllocRequest() : MsgBase{0, ML_BATCH_ALLOC_REQ, 0}, flags_{0}, operateId_(0) {}
+    BatchAllocRequest() : MsgBase{0, ML_BATCH_ALLOC_REQ, 0}, flags_{0}, operateId_(0), leaseTtlMs_(0) {}
 
     BatchAllocRequest(const std::vector<std::string> &keys, const std::vector<AllocOptions> &options, uint32_t flags,
-                      uint64_t operateId)
-        : MsgBase{0, ML_BATCH_ALLOC_REQ, 0}, keys_(keys), options_(options), flags_(flags), operateId_(operateId)
+                      uint64_t operateId, uint64_t leaseTtlMs = 0)
+        : MsgBase{0, ML_BATCH_ALLOC_REQ, 0}, keys_(keys), options_(options), flags_(flags), operateId_(operateId),
+          leaseTtlMs_(leaseTtlMs)
     {}
 
     Result Serialize(NetMsgPacker &packer) const override
@@ -254,6 +256,7 @@ struct BatchAllocRequest : MsgBase {
         }
         packer.Serialize(flags_);
         packer.Serialize(operateId_);
+        packer.Serialize(leaseTtlMs_);
         return MMC_OK;
     }
 
@@ -270,6 +273,7 @@ struct BatchAllocRequest : MsgBase {
         }
         packer.Deserialize(flags_);
         packer.Deserialize(operateId_);
+        packer.Deserialize(leaseTtlMs_);
         return MMC_OK;
     }
 };
