@@ -43,7 +43,7 @@ public:
 
     Result InitBm();
 
-    Result InitUbsIo(int32_t deviceId);
+    Result InitUbsIo(int32_t deviceId, const std::string &confPath = "");
 
     Result DestroyBm();
 

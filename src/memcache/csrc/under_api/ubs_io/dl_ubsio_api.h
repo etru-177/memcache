@@ -59,13 +59,7 @@ public:
     static Result LoadLibrary();
     static void CleanupLibrary();
 
-    static inline Result UbsioClientInit(int32_t deviceId)
-    {
-        if (pUbsioClientInit == nullptr) {
-            return MMC_NOT_INITIALIZED;
-        }
-        return pUbsioClientInit(deviceId);
-    }
+    static Result UbsioClientInit(int32_t deviceId, const std::string &confPath = "");
 
     static inline Result UbsioPut(const char *key, void *buf, size_t length, uint32_t flags)
     {

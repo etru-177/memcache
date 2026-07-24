@@ -24,7 +24,7 @@ namespace mmc {
 std::map<std::string, MmcRef<MmcUbsIoProxy>> MmcUbsIoProxyFactory::instances_;
 std::mutex MmcUbsIoProxyFactory::instanceMutex_;
 
-Result MmcUbsIoProxy::InitUbsIo(int32_t deviceId)
+Result MmcUbsIoProxy::InitUbsIo(int32_t deviceId, const std::string &confPath)
 {
     std::lock_guard<std::mutex> lock(mutex_);
     if (started_) {
@@ -46,7 +46,7 @@ Result MmcUbsIoProxy::InitUbsIo(int32_t deviceId)
             return result;
         }
     }
-    result = DlUbsioApi::UbsioClientInit(deviceId);
+    result = DlUbsioApi::UbsioClientInit(deviceId, confPath);
     if (result != MMC_OK) {
         MMC_LOG_ERROR("Failed to init ubsio, deviceId=" << deviceId << ", error: " << result);
         DlUbsioApi::CleanupLibrary();

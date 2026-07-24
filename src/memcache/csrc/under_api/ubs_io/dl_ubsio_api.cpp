@@ -37,6 +37,21 @@ ubsio_batch_get_lengthFunc DlUbsioApi::pUbsioBatchGetLength = nullptr;
 ubsio_batch_free_addressFunc DlUbsioApi::pUbsioBatchFreeAddress = nullptr;
 ubsio_register_meta_event_callbackFunc DlUbsioApi::pUbsioRegisterMetaEventCallback = nullptr;
 
+Result DlUbsioApi::UbsioClientInit(int32_t deviceId, const std::string &confPath)
+{
+    if (pUbsioClientInit == nullptr) {
+        return MMC_NOT_INITIALIZED;
+    }
+    if (!confPath.empty()) {
+        constexpr int overwrite = 1;
+        if (setenv("UBSIO_CONFIG_PATH", confPath.c_str(), overwrite) != 0) {
+            MMC_LOG_ERROR("Failed to set UBSIO_CONFIG_PATH=" << confPath);
+            return MMC_ERROR;
+        }
+    }
+    return pUbsioClientInit(deviceId);
+}
+
 Result DlUbsioApi::LoadLibrary()
 {
     std::lock_guard<std::mutex> guard(gMutex);

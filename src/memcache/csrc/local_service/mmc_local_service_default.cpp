@@ -72,7 +72,7 @@ Result MmcLocalServiceDefault::Start(const mmc_local_service_config_t &config)
     MMC_RETURN_ERROR(ubsioEventPool_->Start(), "ubsio event pool start failed");
 
     if (options_.storageEnabled) {
-        if (InitUbsIo(config.deviceId) != MMC_OK) {
+        if (InitUbsIo(config.deviceId, config.configFilePath) != MMC_OK) {
             MMC_LOG_ERROR("Failed to init ubsIo of local service " << name_);
             ubsioEventPool_->Destroy();
             DestroyBm();
@@ -274,7 +274,7 @@ Result MmcLocalServiceDefault::RegisterBm()
     return MMC_OK;
 }
 
-Result MmcLocalServiceDefault::InitUbsIo(int32_t deviceId)
+Result MmcLocalServiceDefault::InitUbsIo(int32_t deviceId, const std::string &confPath)
 {
     MmcUbsIoProxyPtr ubsIoProxy = MmcUbsIoProxyFactory::GetInstance("ubsIoProxyDefault");
     MMC_ASSERT_LOG_AND_RETURN(ubsIoProxy != nullptr, "ubsIoProxy is nullptr", MMC_ERROR);
@@ -287,7 +287,7 @@ Result MmcLocalServiceDefault::InitUbsIo(int32_t deviceId)
         ubsioEventPool_->Enqueue([this, type, keys]() { HandleUbsIoMetaEvents(type, keys); });
     });
 
-    return ubsIoProxy->InitUbsIo(deviceId);
+    return ubsIoProxy->InitUbsIo(deviceId, confPath);
 }
 
 Result MmcLocalServiceDefault::UpdateMetaBackup(const std::vector<uint32_t> &ops, const std::vector<std::string> &keys,
