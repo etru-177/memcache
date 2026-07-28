@@ -31,6 +31,10 @@ from memcache_hybrid import DistributedObjectStore, LocalConfig, ReplicateConfig
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+MIN_CONCURRENT_COPY_WORKERS = 2
+MAX_CONCURRENT_COPY_WORKERS = 8
+CONCURRENT_COPY_BARRIER_TIMEOUT_SECONDS = 30
+
 
 def _set_config_attr(config, attr: str, raw):
     """以属性当前值的类型为基准，将 raw 转换为 bool/int/str 后赋值；未知属性仅 warn。"""
@@ -285,6 +289,15 @@ class MmcTest(TestServer):
                 "batch_copy",
                 "batch copy between GVA and buffers: [gvas] [sizes] [direct(0:l2g 1:g2l 2:g2h 3:h2g)]",
                 self.batch_copy,
+                3,
+            ),
+            CliCommand(
+                "concurrent_batch_copy",
+                (
+                    "concurrent batch copy between GVA and buffers: [gvas_by_worker] [sizes_by_worker] "
+                    "[direct(0:l2g 1:g2l 2:g2h 3:h2g)]"
+                ),
+                self.concurrent_batch_copy,
                 3,
             ),
             CliCommand(
@@ -650,6 +663,78 @@ class MmcTest(TestServer):
                 self.sync_stream()
             tensor_sums = [tensor_sum(block) for block in blocks]
             self.cli_return(str([result, tensor_sums]))
+        finally:
+            self._unregister_registered_buffers(registered)
+
+    @result_handler
+    def concurrent_batch_copy(
+        self,
+        gvas_by_worker: List[List[int]],
+        sizes_by_worker: List[List[int]],
+        direct: int,
+    ):
+        worker_count = len(gvas_by_worker)
+        if not MIN_CONCURRENT_COPY_WORKERS <= worker_count <= MAX_CONCURRENT_COPY_WORKERS:
+            raise ValueError(
+                f"worker count must be in [{MIN_CONCURRENT_COPY_WORKERS}, {MAX_CONCURRENT_COPY_WORKERS}], "
+                f"but got {worker_count}"
+            )
+        if worker_count != len(sizes_by_worker):
+            raise ValueError(
+                f"gvas worker count {worker_count} does not match sizes worker count {len(sizes_by_worker)}"
+            )
+        for worker_index, (gvas, sizes) in enumerate(zip(gvas_by_worker, sizes_by_worker)):
+            if not gvas:
+                raise ValueError(f"worker {worker_index} has no GVA")
+            if len(gvas) != len(sizes):
+                raise ValueError(f"worker {worker_index} GVA count {len(gvas)} does not match size count {len(sizes)}")
+
+        if direct in (MmcDirect.COPY_G2H.value, MmcDirect.COPY_H2G.value):
+            device = 'cpu'
+        else:
+            device = 'npu'
+        blocks_by_worker = []
+        registered = []
+        try:
+            for sizes in sizes_by_worker:
+                blocks = []
+                for size in sizes:
+                    tensor = self.malloc_tensor(mini_block_size=size, device=device)
+                    if tensor is not None:
+                        reg_ret = self._store.register_buffer(tensor.data_ptr(), size)
+                        if reg_ret != 0:
+                            raise RuntimeError(
+                                f"register_buffer failed, ret={reg_ret} (ptr={tensor.data_ptr()}, size={size})"
+                            )
+                        registered.append((tensor.data_ptr(), size))
+                    blocks.append(tensor)
+                blocks_by_worker.append(blocks)
+
+            start_barrier = threading.Barrier(worker_count)
+
+            def copy_task(worker_index):
+                if device == 'npu':
+                    self.set_device()
+                start_barrier.wait(timeout=CONCURRENT_COPY_BARRIER_TIMEOUT_SECONDS)
+                blocks = blocks_by_worker[worker_index]
+                buffer_ptrs = [0 if block is None else block.data_ptr() for block in blocks]
+                result = self._store.batch_copy(
+                    gvas_by_worker[worker_index],
+                    buffer_ptrs,
+                    sizes_by_worker[worker_index],
+                    direct,
+                )
+                if device == 'npu':
+                    self.sync_stream()
+                return result, [tensor_sum(block) for block in blocks]
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=worker_count) as executor:
+                futures = [executor.submit(copy_task, worker_index) for worker_index in range(worker_count)]
+                worker_results = [future.result() for future in futures]
+
+            results = [result for result, _ in worker_results]
+            tensor_sums = [sums for _, sums in worker_results]
+            self.cli_return(str([results, tensor_sums]))
         finally:
             self._unregister_registered_buffers(registered)
 

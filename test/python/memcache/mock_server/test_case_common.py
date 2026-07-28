@@ -97,6 +97,9 @@ class TestClient:
     def batch_copy(self, gvas: List[int], sizes: List[int], direct: int):
         return self.execute("batch_copy", [gvas, sizes, direct])
 
+    def concurrent_batch_copy(self, gvas_by_worker: List[List[int]], sizes_by_worker: List[List[int]], direct: int):
+        return self.execute("concurrent_batch_copy", [gvas_by_worker, sizes_by_worker, direct])
+
     def batch_copy_layers(self, gvas: List[int], sizes: List[List[int]], direct: int):
         return self.execute("batch_copy_layers", [gvas, sizes, direct])
 
