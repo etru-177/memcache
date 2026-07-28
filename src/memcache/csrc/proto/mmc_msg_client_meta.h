@@ -1239,6 +1239,7 @@ struct UbsIoMetaDeleteResponse : MsgBase {
 struct StatsReportRequest : MsgBase {
     uint32_t rank_{UINT32_MAX};
     BandwidthMetricData bandwidths_[static_cast<size_t>(MetricOp::COUNT)]{};
+    UbsIoMetricData ubsIo_{};
 
     StatsReportRequest() : MsgBase{0, ML_STATS_REPORT_REQ, 0} {}
 
@@ -1249,8 +1250,9 @@ struct StatsReportRequest : MsgBase {
         packer.Serialize(destRankId);
         packer.Serialize(rank_);
         for (const auto &bw : bandwidths_) {
-            packer.Serialize(bw); // POD, memcpy
+            packer.Serialize(bw);
         }
+        packer.Serialize(ubsIo_);
         return MMC_OK;
     }
 
@@ -1263,6 +1265,7 @@ struct StatsReportRequest : MsgBase {
         for (auto &bw : bandwidths_) {
             packer.Deserialize(bw);
         }
+        packer.Deserialize(ubsIo_);
         return MMC_OK;
     }
 };

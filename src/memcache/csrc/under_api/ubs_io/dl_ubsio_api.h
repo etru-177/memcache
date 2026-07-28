@@ -19,6 +19,7 @@
 #include <string>
 #include "mmc_types.h"
 #include "mmc_functions.h"
+#include "mmc_ubs_io_types.h"
 
 namespace ock {
 namespace mmc {
@@ -37,6 +38,7 @@ using ubsio_batch_existFunc = int32_t (*)(const char **, uint32_t, bool *, uint3
 using ubsio_batch_deleteFunc = int32_t (*)(const char **, uint32_t, int32_t *, uint32_t);
 using ubsio_batch_get_lengthFunc = int32_t (*)(const char **, uint32_t, size_t *, int32_t *, uint32_t);
 using ubsio_batch_free_addressFunc = int32_t (*)(void **, uint32_t);
+using ubsio_get_resource_infoFunc = int32_t (*)(UbsioResourceInfo *);
 
 // UBS IO metadata event callback types (C ABI for cross-so stability)
 enum UbsioMetaEventTypeC {
@@ -170,6 +172,15 @@ public:
         return pUbsioRegisterMetaEventCallback(callback, context);
     }
 
+    static inline Result UbsioGetResourceInfo(UbsioResourceInfo &info)
+    {
+        if (pUbsioGetResourceInfo == nullptr) {
+            MMC_LOG_WARN("UbsioGetResourceInfo not loaded");
+            return MMC_NOT_INITIALIZED;
+        }
+        return pUbsioGetResourceInfo(&info);
+    }
+
 private:
     static std::mutex gMutex;
     static bool gLoaded;
@@ -190,6 +201,7 @@ private:
     static ubsio_batch_get_lengthFunc pUbsioBatchGetLength;
     static ubsio_batch_free_addressFunc pUbsioBatchFreeAddress;
     static ubsio_register_meta_event_callbackFunc pUbsioRegisterMetaEventCallback;
+    static ubsio_get_resource_infoFunc pUbsioGetResourceInfo;
 };
 } // namespace mmc
 } // namespace ock

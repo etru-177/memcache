@@ -87,6 +87,11 @@ void MmcUbsIoProxy::StaticMetaEventCallback(void *context, const UbsioMetaEventC
     }
 }
 
+Result MmcUbsIoProxy::GetResourceInfo(UbsioResourceInfo &info) const
+{
+    return DlUbsioApi::UbsioGetResourceInfo(info);
+}
+
 Result MmcUbsIoProxy::RegisterMetaEventCallback()
 {
     return DlUbsioApi::UbsioRegisterMetaEventCallback(&StaticMetaEventCallback, this);

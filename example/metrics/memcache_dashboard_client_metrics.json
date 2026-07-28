@@ -52,7 +52,7 @@
       },
       "id": 200,
       "panels": [],
-      "title": "PUT / GET Performance (Window)",
+      "title": "PUT / GET Performance (30s Window)",
       "type": "row"
     },
     {
@@ -83,7 +83,7 @@
       "targets": [
         {
           "expr": "memcache_client_bandwidth_latency_seconds{rank=~\"$rank\", operation=\"get\", quantile=~\"$quantile\"}",
-          "legendFormat": "{{rank}}@{{quantile}}",
+          "legendFormat": "{{rank}} @ {{quantile}}",
           "refId": "A"
         }
       ],
@@ -120,7 +120,7 @@
       "targets": [
         {
           "expr": "memcache_client_bandwidth_latency_seconds{rank=~\"$rank\", operation=\"put\", quantile=~\"$quantile\"}",
-          "legendFormat": "{{rank}}@{{quantile}}",
+          "legendFormat": "{{rank}} @ {{quantile}}",
           "refId": "A"
         }
       ],
@@ -287,7 +287,7 @@
       },
       "id": 400,
       "panels": [],
-      "title": "PUT / GET Performance (Lifetime)",
+      "title": "PUT / GET Performance (Cumulative)",
       "type": "row"
     },
     {
@@ -318,11 +318,11 @@
       "targets": [
         {
           "expr": "memcache_client_bandwidth_duration_ms_cum_total{rank=~\"$rank\"} / 1000",
-          "legendFormat": "{{operation}} @ {{rank}}",
+          "legendFormat": "{{rank}} @ {{operation}}",
           "refId": "A"
         }
       ],
-      "title": "Cumulative Latency (seconds)",
+      "title": "Cumulative Latency",
       "type": "timeseries",
       "description": "累计IO耗时 = cumTotalDurationMs / 1000，进程启动以来总IO耗时(秒)，counter永不复位，支持 $rank 过滤",
       "datasource": "${datasource}"
@@ -355,7 +355,7 @@
       "targets": [
         {
           "expr": "memcache_client_bandwidth_bytes_cum_total{rank=~\"$rank\"}",
-          "legendFormat": "{{operation}} @ {{rank}}",
+          "legendFormat": "{{rank}} @ {{operation}}",
           "refId": "A"
         }
       ],
@@ -392,14 +392,264 @@
       "targets": [
         {
           "expr": "memcache_client_bandwidth_bytes_cum_total{rank=~\"$rank\"} / (memcache_client_bandwidth_duration_ms_cum_total{rank=~\"$rank\"} / 1000)",
-          "legendFormat": "{{operation}} @ {{rank}}",
+          "legendFormat": "{{rank}} @ {{operation}}",
           "refId": "A"
         }
       ],
-      "title": "Cumulative Bandwidth (Lifetime Avg Bps)",
+      "title": "Cumulative Bandwidth",
       "type": "timeseries",
       "description": "累计带宽 = cumTotalBytes / (cumTotalDurationMs / 1000)，生命周期平均吞吐率(Bps)，无IO时除零无线。支持 $rank 过滤",
       "datasource": "${datasource}"
+    },
+    {
+      "type": "row",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 41
+      },
+      "id": 404,
+      "panels": [],
+      "title": "UBS IO Storage"
+    },
+    {
+      "datasource": "${datasource}",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "decbytes"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 42
+      },
+      "id": 405,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "memcache_client_ubs_io_disk_capacity_bytes{rank=~\"$rank\"}",
+          "legendFormat": "{{rank}} @ capacity",
+          "refId": "A"
+        },
+        {
+          "expr": "memcache_client_ubs_io_disk_used_bytes{rank=~\"$rank\"}",
+          "legendFormat": "{{rank}} @ used",
+          "refId": "B"
+        }
+      ],
+      "title": "SSD Capacity & Usage",
+      "type": "timeseries",
+      "description": "SSD total capacity vs used"
+    },
+    {
+      "datasource": "${datasource}",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "decbytes"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 42
+      },
+      "id": 406,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "memcache_client_ubs_io_mem_capacity_bytes{rank=~\"$rank\"}",
+          "legendFormat": "{{rank}} @ capacity",
+          "refId": "A"
+        },
+        {
+          "expr": "memcache_client_ubs_io_mem_used_bytes{rank=~\"$rank\"}",
+          "legendFormat": "{{rank}} @ used",
+          "refId": "B"
+        }
+      ],
+      "title": "Memory Capacity & Usage",
+      "type": "timeseries",
+      "description": "Memory total capacity vs used"
+    },
+    {
+      "datasource": "${datasource}",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "Bps"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 50
+      },
+      "id": 407,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "memcache_client_ubs_io_disk_read_bandwidth_bytes_per_sec{rank=~\"$rank\", disk_path=~\"$disk_path\"}",
+          "legendFormat": "{{rank}} @ {{disk_path}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Per-Disk Read Bandwidth",
+      "type": "timeseries",
+      "description": "Per-disk read bandwidth (bytes/s)"
+    },
+    {
+      "datasource": "${datasource}",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "Bps"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 50
+      },
+      "id": 408,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "memcache_client_ubs_io_disk_write_bandwidth_bytes_per_sec{rank=~\"$rank\", disk_path=~\"$disk_path\"}",
+          "legendFormat": "{{rank}} @ {{disk_path}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Per-Disk Write Bandwidth",
+      "type": "timeseries",
+      "description": "Per-disk write bandwidth (bytes/s)"
+    },
+    {
+      "datasource": "${datasource}",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "Bps"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 58
+      },
+      "id": 409,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "memcache_client_ubs_io_disk_total_bandwidth_bytes_per_sec{rank=~\"$rank\", disk_path=~\"$disk_path\"}",
+          "legendFormat": "{{rank}} @ {{disk_path}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Per-Disk Total Bandwidth",
+      "type": "timeseries",
+      "description": "Per-disk total bandwidth (bytes/s)"
+    },
+    {
+      "datasource": "${datasource}",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 58
+      },
+      "id": 410,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "memcache_client_ubs_io_disk_num{rank=~\"$rank\"}",
+          "legendFormat": "{{rank}} @ total",
+          "refId": "A"
+        },
+        {
+          "expr": "memcache_client_ubs_io_fault_disk_num{rank=~\"$rank\"}",
+          "legendFormat": "{{rank}} @ fault",
+          "refId": "B"
+        }
+      ],
+      "title": "Disk Count & Faults",
+      "type": "timeseries",
+      "description": "Total disks and fault count"
     }
   ],
   "refresh": "10s",
@@ -469,6 +719,33 @@
         "options": [],
         "query": {
           "query": "label_values(memcache_client_bandwidth_latency_seconds, quantile)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(memcache_client_ubs_io_disk_read_bandwidth_bytes_per_sec, disk_path)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Disk Path",
+        "multi": true,
+        "name": "disk_path",
+        "options": [],
+        "query": {
+          "query": "label_values(memcache_client_ubs_io_disk_read_bandwidth_bytes_per_sec, disk_path)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 2,

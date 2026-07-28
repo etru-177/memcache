@@ -961,6 +961,7 @@ void MmcClientDefault::ReportMetrics()
     for (size_t i = 0; i < static_cast<size_t>(MetricOp::COUNT); ++i) {
         req.bandwidths_[i] = snapshot.bandwidths[i];
     }
+    req.ubsIo_ = snapshot.ubsIo;
     StatsReportResponse resp;
     const Result ret = metaNetClient_->SyncCall(req, resp, rpcRetryTimeOut_);
     if (ret != MMC_OK) {

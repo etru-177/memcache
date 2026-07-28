@@ -61,6 +61,7 @@ public:
         metaEventCallback_ = std::move(callback);
     }
 
+    Result GetResourceInfo(UbsioResourceInfo &info) const;
     Result RegisterMetaEventCallback();
 
 private:

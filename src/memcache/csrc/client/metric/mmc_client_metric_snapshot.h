@@ -16,6 +16,8 @@
 #include <cstdint>
 #include <string>
 
+#include "mmc_ubs_io_types.h"
+
 namespace ock {
 namespace mmc {
 
@@ -39,6 +41,31 @@ struct BandwidthMetricData {
     uint64_t cumTotalDurationMs{0}; // 累计总耗时
 };
 
+// 每盘带宽
+struct UbsIoPerDiskMetric {
+    char path[UBSIO_RESOURCE_DISK_PATH_MAX_SIZE]{};
+    uint16_t status{0};
+    uint64_t readBandwidth{0};
+    uint64_t writeBandwidth{0};
+    uint64_t totalBandwidth{0};
+    uint8_t bandwidthValid{0};
+};
+
+// UBS IO 指标数据
+struct UbsIoMetricData {
+    // 容量/使用量
+    uint64_t diskCap{0};
+    uint64_t diskUsed{0};
+    uint64_t memCap{0};
+    uint64_t memUsed{0};
+    // 盘健康
+    uint32_t diskNum{0};
+    uint32_t faultDiskNum{0};
+    // 每盘带宽
+    uint32_t perDiskCount{0};
+    UbsIoPerDiskMetric perDisk[UBSIO_RESOURCE_MAX_DISK_NUM]{};
+};
+
 // 所有区分操作的语义集中在此, 其余各层用数组索引, 通过 MetricOp::COUNT 自动适配
 enum class MetricOp : uint8_t { PUT = 0, GET, COUNT };
 constexpr const char *K_METRIC_OP_LABEL[] = {"put", "get"};
@@ -49,6 +76,7 @@ static_assert(sizeof(K_METRIC_OP_LABEL) / sizeof(K_METRIC_OP_LABEL[0]) == static
 struct ClientMetricSnapshot {
     uint32_t rank{UINT32_MAX};
     BandwidthMetricData bandwidths[static_cast<size_t>(MetricOp::COUNT)]{};
+    UbsIoMetricData ubsIo{};
 };
 
 } // namespace mmc

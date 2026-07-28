@@ -36,6 +36,7 @@ ubsio_batch_deleteFunc DlUbsioApi::pUbsioBatchDelete = nullptr;
 ubsio_batch_get_lengthFunc DlUbsioApi::pUbsioBatchGetLength = nullptr;
 ubsio_batch_free_addressFunc DlUbsioApi::pUbsioBatchFreeAddress = nullptr;
 ubsio_register_meta_event_callbackFunc DlUbsioApi::pUbsioRegisterMetaEventCallback = nullptr;
+ubsio_get_resource_infoFunc DlUbsioApi::pUbsioGetResourceInfo = nullptr;
 
 Result DlUbsioApi::UbsioClientInit(int32_t deviceId, const std::string &confPath)
 {
@@ -82,6 +83,7 @@ Result DlUbsioApi::LoadLibrary()
     DL_LOAD_SYM(pUbsioBatchFreeAddress, ubsio_batch_free_addressFunc, ubsioHandle, "UbsioKvCacheBatchFree");
     DL_LOAD_SYM(pUbsioRegisterMetaEventCallback, ubsio_register_meta_event_callbackFunc, ubsioHandle,
                 "UbsioKvCacheRegisterMetaEventCallback");
+    DlLoadSymOptional(pUbsioGetResourceInfo, ubsioHandle, "UbsioGetResourceInfo");
 
     gLoaded = true;
     return MMC_OK;
@@ -108,6 +110,7 @@ void DlUbsioApi::CleanupLibrary()
     pUbsioBatchGetLength = nullptr;
     pUbsioBatchFreeAddress = nullptr;
     pUbsioRegisterMetaEventCallback = nullptr;
+    pUbsioGetResourceInfo = nullptr;
 
     if (ubsioHandle != nullptr) {
         dlclose(ubsioHandle);

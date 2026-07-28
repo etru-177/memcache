@@ -15,6 +15,7 @@ file(GLOB_RECURSE client_metric_src
         ${CMAKE_CURRENT_SOURCE_DIR}/test_mmc_client_metric_manager.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/test_mmc_client_metric_store.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/test_mmc_bandwidth_collector.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/test_mmc_ubs_io_collector.cpp
 )
 ADD_UNIT_TEST(test_client_metric
         FILES ${client_metric_src} ${TEST_SRC_PATHS}/ut_main.cpp

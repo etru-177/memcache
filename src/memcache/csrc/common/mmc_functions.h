@@ -15,6 +15,7 @@
 
 #include <algorithm>
 #include <climits>
+#include <dlfcn.h>
 #include <string>
 #include <sys/stat.h>
 #include "mmc_types.h"
@@ -32,6 +33,15 @@ namespace mmc {
             return MMC_ERROR;                                                              \
         }                                                                                  \
     } while (0)
+
+template<typename FuncPtr>
+inline void DlLoadSymOptional(FuncPtr &targetFunc, void *handle, const char *symbolName)
+{
+    targetFunc = reinterpret_cast<FuncPtr>(dlsym(handle, symbolName));
+    if (targetFunc == nullptr) {
+        MMC_LOG_WARN("Failed to call dlsym to load " << symbolName << " (non-fatal), error: " << dlerror());
+    }
+}
 
 class Func {
 public:

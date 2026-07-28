@@ -12,6 +12,7 @@
 
 #include "mmc_client_metric_manager.h"
 #include "mmc_bandwidth_collector.h"
+#include "mmc_ubs_io_collector.h"
 
 #include "mmc_logger.h"
 
@@ -29,6 +30,10 @@ BandwidthCollector *MmcClientMetricManager::InitDefaultCollectors()
     auto bwCollector = std::make_unique<BandwidthCollector>();
     auto *bwPtr = bwCollector.get();
     RegisterCollector(std::move(bwCollector));
+
+    auto ubsIoCollector = std::make_unique<UbsIoCollector>();
+    RegisterCollector(std::move(ubsIoCollector));
+
     return bwPtr;
 }
 

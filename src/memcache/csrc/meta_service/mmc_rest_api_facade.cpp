@@ -136,6 +136,35 @@ void AppendBandwidthPrometheus(std::ostringstream &oss, const std::string &rank,
         << data.bytesPerSec << '\n';
 }
 
+void AppendUbsIoPrometheus(std::ostringstream &oss, const std::string &rank, const ock::mmc::UbsIoMetricData &data)
+{
+    // WriteCache 容量/使用量
+    oss << "memcache_client_ubs_io_disk_capacity_bytes{rank=\"" << rank << "\"} " << data.diskCap << '\n';
+    oss << "memcache_client_ubs_io_disk_used_bytes{rank=\"" << rank << "\"} " << data.diskUsed << '\n';
+    oss << "memcache_client_ubs_io_mem_capacity_bytes{rank=\"" << rank << "\"} " << data.memCap << '\n';
+    oss << "memcache_client_ubs_io_mem_used_bytes{rank=\"" << rank << "\"} " << data.memUsed << '\n';
+
+    // 盘健康
+    oss << "memcache_client_ubs_io_disk_num{rank=\"" << rank << "\"} " << data.diskNum << '\n';
+    oss << "memcache_client_ubs_io_fault_disk_num{rank=\"" << rank << "\"} " << data.faultDiskNum << '\n';
+
+    // 每盘指标
+    uint32_t diskCount =
+        (data.perDiskCount < UBSIO_RESOURCE_MAX_DISK_NUM) ? data.perDiskCount : UBSIO_RESOURCE_MAX_DISK_NUM;
+    for (uint32_t i = 0; i < diskCount; ++i) {
+        const auto &disk = data.perDisk[i];
+        const std::string diskLabel(disk.path, strnlen(disk.path, sizeof(disk.path)));
+        oss << "memcache_client_ubs_io_disk_status{rank=\"" << rank << "\",disk_path=\"" << diskLabel << "\"} "
+            << disk.status << '\n';
+        oss << "memcache_client_ubs_io_disk_read_bandwidth_bytes_per_sec{rank=\"" << rank << "\",disk_path=\""
+            << diskLabel << "\"} " << disk.readBandwidth << '\n';
+        oss << "memcache_client_ubs_io_disk_write_bandwidth_bytes_per_sec{rank=\"" << rank << "\",disk_path=\""
+            << diskLabel << "\"} " << disk.writeBandwidth << '\n';
+        oss << "memcache_client_ubs_io_disk_total_bandwidth_bytes_per_sec{rank=\"" << rank << "\",disk_path=\""
+            << diskLabel << "\"} " << disk.totalBandwidth << '\n';
+    }
+}
+
 } // namespace
 
 namespace ock {
@@ -834,6 +863,22 @@ Result MmcRestApiFacade::BuildClientMetricsPrometheus(std::string &result) const
                            "Client bandwidth instantaneous bytes per second", "gauge");
         AppendMetricHeader(oss, "memcache_client_metric_stale", "Client metric stale status (1 = stale, 0 = fresh)",
                            "gauge");
+        AppendMetricHeader(oss, "memcache_client_ubs_io_disk_capacity_bytes",
+                           "Client UBS IO SSD total capacity in bytes", "gauge");
+        AppendMetricHeader(oss, "memcache_client_ubs_io_disk_used_bytes", "Client UBS IO SSD used bytes", "gauge");
+        AppendMetricHeader(oss, "memcache_client_ubs_io_mem_capacity_bytes",
+                           "Client UBS IO memory total capacity in bytes", "gauge");
+        AppendMetricHeader(oss, "memcache_client_ubs_io_mem_used_bytes", "Client UBS IO memory used bytes", "gauge");
+        AppendMetricHeader(oss, "memcache_client_ubs_io_disk_num", "Client UBS IO total disk count", "gauge");
+        AppendMetricHeader(oss, "memcache_client_ubs_io_fault_disk_num", "Client UBS IO fault disk count", "gauge");
+        AppendMetricHeader(oss, "memcache_client_ubs_io_disk_status",
+                           "Client UBS IO per-disk status (0=normal, non-zero=fault)", "gauge");
+        AppendMetricHeader(oss, "memcache_client_ubs_io_disk_read_bandwidth_bytes_per_sec",
+                           "Client UBS IO per-disk read bandwidth", "gauge");
+        AppendMetricHeader(oss, "memcache_client_ubs_io_disk_write_bandwidth_bytes_per_sec",
+                           "Client UBS IO per-disk write bandwidth", "gauge");
+        AppendMetricHeader(oss, "memcache_client_ubs_io_disk_total_bandwidth_bytes_per_sec",
+                           "Client UBS IO per-disk total bandwidth", "gauge");
     }
     for (const auto &view : clientViews) {
         if (view.rank == UINT32_MAX) {
@@ -848,6 +893,7 @@ Result MmcRestApiFacade::BuildClientMetricsPrometheus(std::string &result) const
         for (size_t opIdx = 0; opIdx < static_cast<size_t>(MetricOp::COUNT); ++opIdx) {
             AppendBandwidthPrometheus(oss, rankStr, K_METRIC_OP_LABEL[opIdx], view.bandwidths[opIdx]);
         }
+        AppendUbsIoPrometheus(oss, rankStr, view.ubsIo);
     }
     result = oss.str();
     return MMC_OK;

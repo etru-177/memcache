@@ -33,6 +33,7 @@ struct RankMetricView {
     uint64_t lastUpdateMs{0};
     bool stale{false};
     BandwidthMetricData bandwidths[static_cast<size_t>(MetricOp::COUNT)]{};
+    UbsIoMetricData ubsIo{};
 };
 
 class MmcClientMetricStore {
@@ -51,6 +52,7 @@ private:
         uint32_t rank{UINT32_MAX};
         uint64_t lastUpdateMs{0}; // meta 端 Update() 时用本机时钟写入, 读时用于判 stale
         BandwidthMetricData bandwidths[static_cast<size_t>(MetricOp::COUNT)]{};
+        UbsIoMetricData ubsIo{};
     };
 
     std::unordered_map<uint32_t, Entry> entries_; // rank→entry

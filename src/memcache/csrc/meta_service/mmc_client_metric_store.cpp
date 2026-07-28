@@ -33,6 +33,7 @@ Result MmcClientMetricStore::Update(const StatsReportRequest &req)
     for (size_t i = 0; i < static_cast<size_t>(MetricOp::COUNT); ++i) {
         entry.bandwidths[i] = req.bandwidths_[i];
     }
+    entry.ubsIo = req.ubsIo_;
     return MMC_OK;
 }
 
@@ -52,6 +53,7 @@ std::vector<RankMetricView> MmcClientMetricStore::GetAll(uint32_t staleThreshold
         for (size_t i = 0; i < static_cast<size_t>(MetricOp::COUNT); ++i) {
             view.bandwidths[i] = entry.bandwidths[i];
         }
+        view.ubsIo = entry.ubsIo;
         views.push_back(std::move(view));
     }
     return views;
