@@ -1,3 +1,5 @@
+# Python
+
 ## 代码实现介绍
 
 本样例简单验证了`memcache_hybrid`相关`python`接口
@@ -14,7 +16,7 @@ HDK固件驱动需要使用**25.0.RC1**
 安装完成后需要配置CANN环境变量
 ([参考安装Toolkit开发套件包的第三步配置环境变量](https://www.hiascend.com/document/detail/zh/CANNCommunityEdition/81RC1alpha002/softwareinst/instg/instg_0008.html))
 
-运行样例前请先编译安装 [**memfabric_hybrid的run包**](https://gitcode.com/Ascend/memfabric_hybrid/blob/master/doc/installation.md)，默认安装路径为/usr/local/,然后source安装路径下的set_env.sh
+运行样例前请先编译安装 [**memfabric_hybrid的run包**](https://gitcode.com/Ascend/memfabric_hybrid/blob/develop/docs/installation.md)，默认安装路径为/usr/local/,然后source安装路径下的set_env.sh
 
 memfabric_hybrid参考安装命令
 
@@ -52,7 +54,10 @@ MetaService.main()
 ```
 
 ## 配置大页
-注：仅device rdma/host rdma等protocol需要设置
+
+> [!NOTE] 注意
+> 仅device rdma/host rdma等protocol需要设置。
+
 ```shell
  cat /proc/meminfo
  echo 2048 | sudo tee /sys/devices/system/node/node0/hugepages/hugepages-2048kB/nr_hugepages

@@ -1,13 +1,14 @@
 # run包编译、安装及使用
-介绍run包的安装及使用方法，适用于需要使用C++接口的用户
 
-run包没有发布二进制包，需要用户自行编译
+介绍run包的安装及使用方法，适用于需要使用C++接口的用户。
+
+run包没有发布二进制包，需要用户自行编译。
 
 ## run包编译
 
 ### 环境准备
 
-编译工具建议版本
+编译工具建议版本。
 
 - OS: Ubuntu 22.04 LTS+
 - cmake: 3.20.x
@@ -38,38 +39,37 @@ git submodule update --init 3rdparty/
 git -c submodule.3rdparty/memfabric_hybrid.branch=master submodule update --remote 3rdparty/memfabric_hybrid
 ```
 
-**说明：**
-- `--init 3rdparty/` 初始化并更新 `3rdparty/` 下全部子模块（含 memfabric_hybrid、spdlog、nlohmann、msgpack-c、libzmq 等），避免拉取 test 目录等不必要的依赖
-- 通过 `-c submodule.3rdparty/memfabric_hybrid.branch=<branch_name>` 参数可以指定拉取的目标分支
-- 若需拉取所有子模块（包括测试依赖），可使用 `git submodule update --recursive --init`
+- `--init 3rdparty/` 初始化并更新 `3rdparty/` 下全部子模块（含 memfabric_hybrid、spdlog、nlohmann、msgpack-c、libzmq 等），避免拉取 test 目录等不必要的依赖。
+- 通过 `-c submodule.3rdparty/memfabric_hybrid.branch=<branch_name>` 参数可以指定拉取的目标分支。
+- 若需拉取所有子模块（包括测试依赖），可使用 `git submodule update --recursive --init`。
 
 **3. 编译**
 
-执行如下命令进行编译
+执行如下命令进行编译。
 
 ```bash
 bash script/build_and_pack_run.sh --build_mode RELEASE --build_test OFF
 ```
 
-- build_and_pack_run.sh支持2个参数，分别是--build_mode <build_mode>和--build_test <build_test>
-- build_mode: 编译类型，可填RELEASE、DEBUG或ASAN，默认RELEASE
-- build_test: 是否打包测试工具，可填ON或OFF，默认OFF
+- build_and_pack_run.sh 支持2个参数，分别是`--build_mode <build_mode>`和`--build_test <build_test>`。
+- build_mode: 编译类型，可填RELEASE、DEBUG或ASAN，默认RELEASE。
+- build_test: 是否打包测试工具，可填ON或OFF，默认OFF。
 
-编译成功后，生成的run包在output目录下，生成的whl包在output/memcache/wheel目录下
+编译成功后，生成的run包在output目录下，生成的whl包在output/memcache/wheel目录下。
 
 ## run包安装
 
 ### 安装MemFabric
 
-MemCache依赖MemFabric，需要先安装MemFabric，详细安装方法可参考[MemFabric使用指导](https://gitcode.com/Ascend/memfabric_hybrid/blob/master/doc/installation.md)
+MemCache依赖MemFabric，需要先安装MemFabric，详细安装方法可参考[MemFabric使用指导](https://gitcode.com/Ascend/memfabric_hybrid/blob/develop/docs/installation.md)。
 
 ### 安装MemCache
 
-MemCache将所有特性集成到run包中供用户使用，run包格式为 ```memcache_hybrid-${version}_${os}_${arch}.run```
+MemCache将所有特性集成到run包中供用户使用，run包格式为 `memcache_hybrid-${version}_${os}_${arch}.run`。
 
-其中，version表示MemCache的版本；os表示操作系统，如linux；arch表示架构，如x86_64或aarch64
+其中，version表示MemCache的版本；os表示操作系统，如linux；arch表示架构，如x86_64或aarch64。
 
-run包的默认安装根路径为 /usr/local/
+run包的默认安装根路径为 /usr/local/。
 
 参考安装命令如下：
 
@@ -78,13 +78,13 @@ cd output
 bash memcache_hybrid-*_linux_aarch64.run # 请修改为实际路径和文件名
 ```
 
-如果想要自定义安装路径，可以添加--install-path参数
+如果想要自定义安装路径，可以添加 `--install-path` 参数。
 
 ```bash
 bash memcache_hybrid-*_linux_aarch64.run --install-path=${your path}  # 请修改为实际路径和文件名
 ```
 
-安装的run包可以通过如下命令查看版本（此处以默认安装路径为例）
+安装的run包可以通过如下命令查看版本（此处以默认安装路径为例）。
 
 ```bash
 cat /usr/local/memcache_hybrid/latest/version.info
@@ -102,15 +102,15 @@ source /usr/local/memfabric_hybrid/set_env.sh
 
 ### 启动MetaService
 
-MetaService作为独立进程运行，可以在设置配置项之后直接拉起
+MetaService作为独立进程运行，可以在设置配置项之后直接拉起。
 
 **1. 修改配置文件**
 
-安装完成后配置文件位于安装目录下的memcache_hybrid/latest/config/mmc-meta.conf
+安装完成后配置文件位于安装目录下的`memcache_hybrid/latest/config/mmc-meta.conf`。
 
 **建议将配置文件复制到其他目录再进行修改，防止重新安装后被覆盖**
 
-运行前需要根据 [MetaService配置项](./memcache_config.md) 对配置文件 mmc-meta.conf 进行相关配置
+运行前需要根据 [MetaService配置项](./memcache_config.md) 对配置文件 mmc-meta.conf 进行相关配置。
 
 **2. 设置配置文件路径**
 
@@ -158,7 +158,7 @@ export MMC_LOCAL_CONFIG_PATH=/usr/local/memcache_hybrid/latest/config/mmc-local.
 
 ## 软件卸载
 
-卸载脚本是位于安装目录下的memcache_hybrid/latest/uninstall.sh，直接执行即可完成卸载
+卸载脚本是位于安装目录下的`memcache_hybrid/latest/uninstall.sh`，直接执行即可完成卸载。
 
 ```bash
 # 这里使用的是默认安装路径，请修改为实际路径

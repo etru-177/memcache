@@ -11,24 +11,25 @@
 - `error_message` 返回实际错误原因；未实现接口等场景可返回 `Not supported`
 - 若成功响应包含 `timestamp`，其含义由对应接口定义；错误响应中的 `timestamp` 表示错误响应生成时间，示例中的 `0` 仅为占位值
 
-### 1 `GET /metadata?key=...`
+## 1 `GET /metadata?key=...`
 
-#### 作用
+### 作用
+
 按原样读取指定 metadata value；成功时直接返回原始内容，不额外包装 JSON。
 
-#### curl
+### curl
 
 ```bash
 curl "http://127.0.0.1:8000/metadata?key=demo_key"
 ```
 
-#### 请求参数
+### 请求参数
 
 | 参数名 | 类型 | 必填 | 描述 |
 |---|---|---|---|
 | `key` | String | 是 | 要读取的 metadata key |
 
-#### 成功示例
+### 成功示例
 
 `text/plain; charset=utf-8`：
 
@@ -43,7 +44,7 @@ demo metadata value
 | 原样返回 value | 成功时直接返回 metadata value，不重组外层 JSON | 接口契约 |
 | 成功 `Content-Type` | 本文示例使用 `text/plain; charset=utf-8` | 示例约定 |
 
-#### 错误示例
+### 错误示例
 
 `application/json; charset=utf-8`：
 
@@ -63,31 +64,32 @@ demo metadata value
 | `error_message` | 实际错误原因；此处仅为格式示例 | 全局错误返回格式规则 |
 | `timestamp` | 错误返回格式中的时间戳字段 | 全局错误返回格式规则 |
 
-### 2 `PUT /metadata?key=...`
+## 2 `PUT /metadata?key=...`
 
-#### 作用
+### 作用
+
 按原始文本写入指定 metadata value。
 
-#### curl
+### curl
 
 ```bash
 curl -X PUT "http://127.0.0.1:8000/metadata?key=demo_key" \
   --data 'demo metadata value'
 ```
 
-#### 请求参数
+### 请求参数
 
 | 参数名 | 类型 | 必填 | 描述 |
 |---|---|---|---|
 | `key` | String | 是 | 要写入的 metadata key |
 
-#### 请求体
+### 请求体
 
 `key` 对应的原始文本；服务端按收到的 body 原样写入，不做 schema 校验。
 
 请求体建议使用 `Content-Type: text/plain; charset=utf-8`。
 
-#### 成功示例
+### 成功示例
 
 `text/plain; charset=utf-8`：
 
@@ -102,7 +104,7 @@ metadata updated
 | `metadata updated` | metadata 写入成功后的固定文本 | 接口成功返回约定 |
 | 原样写入 | 请求体不做 schema 校验，按原文保存 | 接口契约 |
 
-#### 错误示例
+### 错误示例
 
 `application/json; charset=utf-8`：
 
@@ -122,24 +124,25 @@ metadata updated
 | `error_message` | 实际错误原因；此处仅为格式示例 | 全局错误返回格式规则 |
 | `timestamp` | 错误返回格式中的时间戳字段 | 全局错误返回格式规则 |
 
-### 3 `DELETE /metadata?key=...`
+## 3 `DELETE /metadata?key=...`
 
-#### 作用
+### 作用
+
 删除指定 metadata key。
 
-#### curl
+### curl
 
 ```bash
 curl -X DELETE "http://127.0.0.1:8000/metadata?key=demo_key"
 ```
 
-#### 请求参数
+### 请求参数
 
 | 参数名 | 类型 | 必填 | 描述 |
 |---|---|---|---|
 | `key` | String | 是 | 要删除的 metadata key |
 
-#### 成功示例
+### 成功示例
 
 `text/plain; charset=utf-8`：
 
@@ -153,7 +156,7 @@ metadata deleted
 |---|---|---|
 | `metadata deleted` | metadata 删除成功后的固定文本 | 接口成功返回约定 |
 
-#### 错误示例
+### 错误示例
 
 `application/json; charset=utf-8`：
 
@@ -173,22 +176,23 @@ metadata deleted
 | `error_message` | 实际错误原因；此处仅为格式示例 | 全局错误返回格式规则 |
 | `timestamp` | 错误返回格式中的时间戳字段 | 全局错误返回格式规则 |
 
-### 4 `GET /health`
+## 4 `GET /health`
 
-#### 作用
+### 作用
+
 返回 HTTP 服务健康状态、HA 状态和服务就绪状态。
 
-#### curl
+### curl
 
 ```bash
 curl "http://127.0.0.1:8000/health"
 ```
 
-#### 请求参数
+### 请求参数
 
 无
 
-#### 成功示例
+### 成功示例
 
 `application/json; charset=utf-8`：
 
@@ -214,7 +218,7 @@ curl "http://127.0.0.1:8000/health"
 | `leader_address` | leader 地址；无稳定来源时固定 `unknown` | HA 状态快照 |
 | `view_version` | 视图版本；无稳定来源时固定 `0` | HA 状态快照 |
 
-#### 错误示例
+### 错误示例
 
 `application/json; charset=utf-8`：
 
@@ -234,22 +238,23 @@ curl "http://127.0.0.1:8000/health"
 | `error_message` | 实际错误原因；此处仅为格式示例 | 全局错误返回格式规则 |
 | `timestamp` | 错误返回格式中的时间戳字段 | 全局错误返回格式规则 |
 
-### 5 `GET /metrics`
+## 5 `GET /metrics`
 
-#### 作用
+### 作用
+
 以 Prometheus 文本格式导出 MemCache 监控指标。当前无法提供的字段允许以 `0` 或 `false` 等占位值导出。
 
-#### curl
+### curl
 
 ```bash
 curl "http://127.0.0.1:8000/metrics"
 ```
 
-#### 请求参数
+### 请求参数
 
 无
 
-#### 成功示例
+### 成功示例
 
 `text/plain; version=0.0.4`：
 
@@ -460,10 +465,10 @@ memcache_allocated_bytes{medium="dram"} 0
 | 成功示例字段 | 成功示例应覆盖当前约定的全部指标族与标签字段 | 监控指标契约 |
 | Proxy 函数调用指标族 | 所有业务接口均按 `memcache_<op>_requests_total`、`memcache_<op>_successes_total`、`memcache_<op>_failures_total` 输出；`get`、`batch_get`、`remove`、`batch_remove`、`update_state`、`batch_update_state`、`query`、`batch_query`、`exist_key`、`batch_exist_key` 额外输出 `memcache_<op>_not_found_total` | 监控指标契约 |
 | 结果口径 | `successes_total` 表示 `MMC_OK`；`failures_total` 表示真实错误（包括 `MMC_DUPLICATED_OBJECT`）；`not_found_total` 表示 `MMC_UNMATCHED_KEY`，不计入 failure；Batch 指标保留接口调用级统计，Batch 子项同时累计到对应非 Batch 指标；Batch 调用级统计中真实错误优先，只有无真实错误且存在子项 `MMC_UNMATCHED_KEY` 时才增加 Batch `not_found_total` | 监控指标契约 |
-| 资源与状态指标族 | 至少覆盖 `memcache_evict_operations_total`、`memcache_stored_keys`、`memcache_segment_capacity_bytes{segment="..."}`、`memcache_segment_allocated_bytes{segment="..."}`、`memcache_total_capacity_bytes{medium="hbm|dram|ssd"}`、`memcache_allocated_bytes{medium="hbm|dram|ssd"}`；其中 `ssd` 仅在 SSD 容量或已用量非 0 时输出 | 监控指标契约 |
+| 资源与状态指标族 | 至少覆盖 `memcache_evict_operations_total`、`memcache_stored_keys`、`memcache_segment_capacity_bytes{segment="..."}`、`memcache_segment_allocated_bytes{segment="..."}`、`memcache_total_capacity_bytes{medium="hbm\|dram\|ssd"}`、`memcache_allocated_bytes{medium="hbm\|dram\|ssd"}`；其中 `ssd` 仅在 SSD 容量或已用量非 0 时输出 | 监控指标契约 |
 | 占位值策略 | 当前无法提供真实值的指标仍保留在成功体中，可使用 `0` 或 `false` 占位 | 降级规则 |
 
-#### 错误示例
+### 错误示例
 
 `application/json; charset=utf-8`：
 
@@ -483,24 +488,25 @@ memcache_allocated_bytes{medium="dram"} 0
 | `error_message` | 实际错误原因；此处仅为格式示例 | 全局错误返回格式规则 |
 | `timestamp` | 错误返回格式中的时间戳字段 | 全局错误返回格式规则 |
 
-### 6 `GET /metrics/summary`
+## 6 `GET /metrics/summary`
 
-#### 作用
+### 作用
+
 返回固定字段顺序的单行文本摘要。属于统计汇总接口，当前无法提供的字段允许按降级策略返回占位值。
 
 返回格式为单行文本，使用空格分隔的 `key=value` 片段组成；字段顺序固定，不换行，不做 JSON 包装。
 
-#### curl
+### curl
 
 ```bash
 curl "http://127.0.0.1:8000/metrics/summary"
 ```
 
-#### 请求参数
+### 请求参数
 
 无
 
-#### 成功示例
+### 成功示例
 
 `text/plain; charset=utf-8`：
 
@@ -519,7 +525,7 @@ keys=2 evict=0 hbm_used=368640/5368709120 dram_used=0/5368709120 alloc_req=68 al
 | 结果口径 | `*_success` 表示 `MMC_OK`；`*_fail` 表示真实错误（包括 `MMC_DUPLICATED_OBJECT`）；`*_not_found` 表示 `MMC_UNMATCHED_KEY`，不计入 fail；Batch 字段为接口调用级统计，Batch 子项同时累计到对应非 Batch 字段；Batch 调用级统计中真实错误优先，只有无真实错误且存在子项 `MMC_UNMATCHED_KEY` 时才增加 Batch `*_not_found` | 统计摘要接口契约 |
 | 占位值策略 | 当前无法提供真实值的字段仍保留在成功体中，可使用 `0`、`0/0` 或空值占位 | 降级规则 |
 
-#### 错误示例
+### 错误示例
 
 `application/json; charset=utf-8`：
 
@@ -539,22 +545,23 @@ keys=2 evict=0 hbm_used=368640/5368709120 dram_used=0/5368709120 alloc_req=68 al
 | `error_message` | 实际错误原因；此处仅为格式示例 | 全局错误返回格式规则 |
 | `timestamp` | 错误返回格式中的时间戳字段 | 全局错误返回格式规则 |
 
-### 7 `GET /metrics/ptracer`
+## 7 `GET /metrics/ptracer`
 
-#### 作用
+### 作用
+
 导出当前 ptracer 原始文本输出。
 
-#### curl
+### curl
 
 ```bash
 curl "http://127.0.0.1:8000/metrics/ptracer"
 ```
 
-#### 请求参数
+### 请求参数
 
 无
 
-#### 成功示例
+### 成功示例
 
 `text/plain; charset=utf-8`：
 
@@ -571,7 +578,7 @@ TIME                   NAME                                    BEGIN          GO
 | ptracer 文本 | 成功时保持当前 ptracer 文本输出格式 | 接口成功返回约定 |
 | alloc/free 打点 | 如新增 alloc/free 打点，也通过该接口暴露 | ptracer 输出范围 |
 
-#### 错误示例
+### 错误示例
 
 `application/json; charset=utf-8`：
 
@@ -591,22 +598,23 @@ TIME                   NAME                                    BEGIN          GO
 | `error_message` | 实际错误原因；此处仅为格式示例 | 全局错误返回格式规则 |
 | `timestamp` | 错误返回格式中的时间戳字段 | 全局错误返回格式规则 |
 
-### 8 `GET /role`
+## 8 `GET /role`
 
-#### 作用
+### 作用
+
 返回当前角色文本。
 
-#### curl
+### curl
 
 ```bash
 curl "http://127.0.0.1:8000/role"
 ```
 
-#### 请求参数
+### 请求参数
 
 无
 
-#### 成功示例
+### 成功示例
 
 `text/plain; charset=utf-8`：
 
@@ -620,7 +628,7 @@ leader
 |---|---|---|
 | `leader` / `standby` / `unknown` | 当前角色文本 | HA 状态映射结果 |
 
-#### 错误示例
+### 错误示例
 
 `application/json; charset=utf-8`：
 
@@ -640,22 +648,23 @@ leader
 | `error_message` | 实际错误原因；此处仅为格式示例 | 全局错误返回格式规则 |
 | `timestamp` | 错误返回格式中的时间戳字段 | 全局错误返回格式规则 |
 
-### 9 `GET /ha_status`
+## 9 `GET /ha_status`
 
-#### 作用
+### 作用
+
 返回当前 HA 状态文本。无法稳定映射时返回 `unknown`。
 
-#### curl
+### curl
 
 ```bash
 curl "http://127.0.0.1:8000/ha_status"
 ```
 
-#### 请求参数
+### 请求参数
 
 无
 
-#### 成功示例
+### 成功示例
 
 `text/plain; charset=utf-8`：
 
@@ -669,7 +678,7 @@ serving
 |---|---|---|
 | `starting` / `standby` / `serving` / `unknown` | 当前 HA 状态文本 | HA 状态快照 |
 
-#### 错误示例
+### 错误示例
 
 `application/json; charset=utf-8`：
 
@@ -689,22 +698,23 @@ serving
 | `error_message` | 实际错误原因；此处仅为格式示例 | 全局错误返回格式规则 |
 | `timestamp` | 错误返回格式中的时间戳字段 | 全局错误返回格式规则 |
 
-### 10 `GET /leader`
+## 10 `GET /leader`
 
-#### 作用
+### 作用
+
 返回 leader 是否存在及其地址和视图版本。响应中不包含 `role` 字段；当前无法提供稳定值的字段允许返回默认值。
 
-#### curl
+### curl
 
 ```bash
 curl "http://127.0.0.1:8000/leader"
 ```
 
-#### 请求参数
+### 请求参数
 
 无
 
-#### 成功示例
+### 成功示例
 
 `application/json; charset=utf-8`：
 
@@ -724,7 +734,7 @@ curl "http://127.0.0.1:8000/leader"
 | `leader_address` | leader 地址；无稳定来源时固定 `unknown` | HA 状态快照 |
 | `view_version` | 视图版本；无稳定来源时固定 `0` | HA 状态快照 |
 
-#### 错误示例
+### 错误示例
 
 `application/json; charset=utf-8`：
 
@@ -744,24 +754,25 @@ curl "http://127.0.0.1:8000/leader"
 | `error_message` | 实际错误原因；此处仅为格式示例 | 全局错误返回格式规则 |
 | `timestamp` | 错误返回格式中的时间戳字段 | 全局错误返回格式规则 |
 
-### 11 `GET /query_key?key=...`
+## 11 `GET /query_key?key=...`
 
-#### 作用
+### 作用
+
 查询单个 key 的元数据信息，包括对象大小、访问属性和 blob 分布信息。
 
-#### curl
+### curl
 
 ```bash
 curl "http://127.0.0.1:8000/query_key?key=key_a"
 ```
 
-#### 请求参数
+### 请求参数
 
 | 参数名 | 类型 | 必填 | 描述 |
 |---|---|---|---|
 | `key` | String | 是 | 要查询的键名 |
 
-#### 成功示例
+### 成功示例
 
 `application/json; charset=utf-8`：
 
@@ -798,7 +809,7 @@ curl "http://127.0.0.1:8000/query_key?key=key_a"
 | `blobs[].rank` | blob 所在 rank | `MemObjQueryInfo::blobRanks_` |
 | `blobs[].medium` | blob 所在介质类型字符串 | `MemObjQueryInfo::blobTypes_` |
 
-#### 错误示例
+### 错误示例
 
 `application/json; charset=utf-8`：
 
@@ -818,24 +829,25 @@ curl "http://127.0.0.1:8000/query_key?key=key_a"
 | `error_message` | 实际错误原因；此处仅为格式示例 | 全局错误返回格式规则 |
 | `timestamp` | 错误返回格式中的时间戳字段 | 全局错误返回格式规则 |
 
-### 12 `GET /batch_query_keys?keys=...`
+## 12 `GET /batch_query_keys?keys=...`
 
-#### 作用
+### 作用
+
 批量查询多个 key 的元数据信息；单个 key 的字段定义与 `/query_key` 保持一致。
 
-#### curl
+### curl
 
 ```bash
 curl "http://127.0.0.1:8000/batch_query_keys?keys=key_a,key_b"
 ```
 
-#### 请求参数
+### 请求参数
 
 | 参数名 | 类型 | 必填 | 描述 |
 |---|---|---|---|
 | `keys` | String | 是 | 逗号分隔的 key 列表 |
 
-#### 成功示例
+### 成功示例
 
 `application/json; charset=utf-8`：
 
@@ -883,7 +895,7 @@ curl "http://127.0.0.1:8000/batch_query_keys?keys=key_a,key_b"
 | `data[].blobs[].rank` | blob 所在 rank | 与 `/query_key` 保持一致 |
 | `data[].blobs[].medium` | blob 所在介质类型字符串 | 与 `/query_key` 保持一致 |
 
-#### 错误示例
+### 错误示例
 
 `application/json; charset=utf-8`：
 
@@ -903,24 +915,25 @@ curl "http://127.0.0.1:8000/batch_query_keys?keys=key_a,key_b"
 | `error_message` | 实际错误原因；此处仅为格式示例 | 全局错误返回格式规则 |
 | `timestamp` | 错误返回格式中的时间戳字段 | 全局错误返回格式规则 |
 
-### 13 `DELETE /key?key=...`
+## 13 `DELETE /key?key=...`
 
-#### 作用
+### 作用
+
 删除指定业务 KVCache key 及其关联数据。
 
-#### curl
+### curl
 
 ```bash
 curl -X DELETE "http://127.0.0.1:8000/key?key=demo_key"
 ```
 
-#### 请求参数
+### 请求参数
 
 | 参数名 | 类型 | 必填 | 描述 |
 |---|---|---|---|
 | `key` | String | 是 | 要删除的业务 KVCache key |
 
-#### 成功示例
+### 成功示例
 
 `application/json; charset=utf-8`：
 
@@ -938,7 +951,7 @@ curl -X DELETE "http://127.0.0.1:8000/key?key=demo_key"
 | `success` | 请求是否成功；成功场景固定为 `true` | 接口成功返回约定 |
 | `message` | 成功提示信息 | 接口成功返回约定 |
 
-#### 错误示例
+### 错误示例
 
 `application/json; charset=utf-8`：
 
@@ -958,22 +971,23 @@ curl -X DELETE "http://127.0.0.1:8000/key?key=demo_key"
 | `error_message` | 实际错误原因；此处仅为格式示例 | 全局错误返回格式规则 |
 | `timestamp` | 错误返回格式中的时间戳字段 | 全局错误返回格式规则 |
 
-### 14 `DELETE /all_keys`
+## 14 `DELETE /all_keys`
 
-#### 作用
+### 作用
+
 删除所有业务 KVCache key 及其关联数据。
 
-#### curl
+### curl
 
 ```bash
 curl -X DELETE "http://127.0.0.1:8000/all_keys"
 ```
 
-#### 请求参数
+### 请求参数
 
 无
 
-#### 成功示例
+### 成功示例
 
 `application/json; charset=utf-8`：
 
@@ -991,7 +1005,7 @@ curl -X DELETE "http://127.0.0.1:8000/all_keys"
 | `success` | 请求是否成功；成功场景固定为 `true` | 接口成功返回约定 |
 | `message` | 成功提示信息 | 接口成功返回约定 |
 
-#### 错误示例
+### 错误示例
 
 `application/json; charset=utf-8`：
 
@@ -1011,22 +1025,23 @@ curl -X DELETE "http://127.0.0.1:8000/all_keys"
 | `error_message` | 实际错误原因；此处仅为格式示例 | 全局错误返回格式规则 |
 | `timestamp` | 错误返回格式中的时间戳字段 | 全局错误返回格式规则 |
 
-### 15 `GET /get_all_keys`
+## 15 `GET /get_all_keys`
 
-#### 作用
+### 作用
+
 列出全部对象 key 列表。
 
-#### curl
+### curl
 
 ```bash
 curl "http://127.0.0.1:8000/get_all_keys"
 ```
 
-#### 请求参数
+### 请求参数
 
 无
 
-#### 成功示例
+### 成功示例
 
 `text/plain; charset=utf-8`：
 
@@ -1041,7 +1056,7 @@ key_2
 |---|---|---|
 | 每行一个 key | 返回 key 列表；逐行拼接，末尾可带换行；列表为空时 body 也可为空 | 接口成功返回约定 |
 
-#### 错误示例
+### 错误示例
 
 `application/json; charset=utf-8`：
 
@@ -1061,22 +1076,23 @@ key_2
 | `error_message` | 实际错误原因；此处仅为格式示例 | 全局错误返回格式规则 |
 | `timestamp` | 错误返回格式中的时间戳字段 | 全局错误返回格式规则 |
 
-### 16 `GET /get_all_segments`
+## 16 `GET /get_all_segments`
 
-#### 作用
+### 作用
+
 列出全部 `segment_id`。当前版本逐行返回文本，不返回 JSON 数组。
 
-#### curl
+### curl
 
 ```bash
 curl "http://127.0.0.1:8000/get_all_segments"
 ```
 
-#### 请求参数
+### 请求参数
 
 无
 
-#### 成功示例
+### 成功示例
 
 `text/plain; charset=utf-8`：
 
@@ -1094,7 +1110,7 @@ rank-1-dram
 | 每行一个 `segment_id` | 成功时逐行返回 `segment_id` 文本 | 固定成功体形态 |
 | `segment_id` 命名 | 命名格式为 `rank-<rank>-<medium-lower>` | 全局字段规则 |
 
-#### 错误示例
+### 错误示例
 
 `application/json; charset=utf-8`：
 
@@ -1114,24 +1130,25 @@ rank-1-dram
 | `error_message` | 实际错误原因；此处仅为格式示例 | 全局错误返回格式规则 |
 | `timestamp` | 错误返回格式中的时间戳字段 | 全局错误返回格式规则 |
 
-### 17 `GET /query_segment?segment=...`
+## 17 `GET /query_segment?segment=...`
 
-#### 作用
+### 作用
+
 查询指定 segment 的容量占用信息。
 
-#### curl
+### curl
 
 ```bash
 curl "http://127.0.0.1:8000/query_segment?segment=rank-0-hbm"
 ```
 
-#### 请求参数
+### 请求参数
 
 | 参数名 | 类型 | 必填 | 描述 |
 |---|---|---|---|
 | `segment` | String | 是 | 目标 `segment_id` |
 
-#### 成功示例
+### 成功示例
 
 `application/json; charset=utf-8`：
 
@@ -1157,7 +1174,7 @@ curl "http://127.0.0.1:8000/query_segment?segment=rank-0-hbm"
 | `remaining_bytes` | 剩余容量，单位 `bytes` | 由总量与已用量计算 |
 | `remaining_ratio` | 剩余比例，范围 `[0,1]` | 由容量计算 |
 
-#### 错误示例
+### 错误示例
 
 `application/json; charset=utf-8`：
 
@@ -1177,26 +1194,27 @@ curl "http://127.0.0.1:8000/query_segment?segment=rank-0-hbm"
 | `error_message` | 实际错误原因；此处仅为格式示例 | 全局错误返回格式规则 |
 | `timestamp` | 错误返回格式中的时间戳字段 | 全局错误返回格式规则 |
 
-### 18 `POST /api/v1/drain_jobs`
+## 18 `POST /api/v1/drain_jobs`
 
-#### 作用
+### 作用
+
 目标契约为返回固定字段顺序的单行文本摘要；当前源码尚未按该契约实现。
 
-#### curl
+### curl
 
 ```bash
 curl -X POST "http://127.0.0.1:8000/api/v1/drain_jobs"
 ```
 
-#### 请求参数
+### 请求参数
 
 无
 
-#### 成功示例
+### 成功示例
 
 无；该接口当前版本不提供成功返回。
 
-#### 错误示例
+### 错误示例
 
 `application/json; charset=utf-8`：
 
@@ -1216,29 +1234,29 @@ curl -X POST "http://127.0.0.1:8000/api/v1/drain_jobs"
 | `error_message` | 实际错误原因；该接口当前为 `Not supported` | 未实现接口约定 |
 | `timestamp` | 错误返回格式中的时间戳字段 | 统一错误格式 |
 
-### 19 `GET /api/v1/drain_jobs/query?job_id=...`
+## 19 `GET /api/v1/drain_jobs/query?job_id=...`
 
-#### 作用
+### 作用
+
 目标契约为返回固定字段顺序的单行文本摘要；当前源码尚未按该契约实现。
 
-
-#### curl
+### curl
 
 ```bash
 curl "http://127.0.0.1:8000/api/v1/drain_jobs/query?job_id=job_1"
 ```
 
-#### 请求参数
+### 请求参数
 
 | 参数名 | 类型 | 必填 | 描述 |
 |---|---|---|---|
 | `job_id` | String | 是 | drain job 标识 |
 
-#### 成功示例
+### 成功示例
 
 无；该接口当前版本不提供成功返回。
 
-#### 错误示例
+### 错误示例
 
 `application/json; charset=utf-8`：
 
@@ -1258,28 +1276,29 @@ curl "http://127.0.0.1:8000/api/v1/drain_jobs/query?job_id=job_1"
 | `error_message` | 实际错误原因；该接口当前为 `Not supported` | 未实现接口约定 |
 | `timestamp` | 错误返回格式中的时间戳字段 | 统一错误格式 |
 
-### 20 `POST /api/v1/drain_jobs/cancel?job_id=...`
+## 20 `POST /api/v1/drain_jobs/cancel?job_id=...`
 
-#### 作用
+### 作用
+
 当前版本不实现该接口；返回统一错误格式，实际 `error_message` 为 `Not supported`。
 
-#### curl
+### curl
 
 ```bash
 curl -X POST "http://127.0.0.1:8000/api/v1/drain_jobs/cancel?job_id=job_1"
 ```
 
-#### 请求参数
+### 请求参数
 
 | 参数名 | 类型 | 必填 | 描述 |
 |---|---|---|---|
 | `job_id` | String | 是 | drain job 标识 |
 
-#### 成功示例
+### 成功示例
 
 无；该接口当前版本不提供成功返回。
 
-#### 错误示例
+### 错误示例
 
 `application/json; charset=utf-8`：
 
@@ -1299,24 +1318,25 @@ curl -X POST "http://127.0.0.1:8000/api/v1/drain_jobs/cancel?job_id=job_1"
 | `error_message` | 实际错误原因；该接口当前为 `Not supported` | 未实现接口约定 |
 | `timestamp` | 错误返回格式中的时间戳字段 | 统一错误格式 |
 
-### 21 `GET /api/v1/segments/status?segment=...`
+## 21 `GET /api/v1/segments/status?segment=...`
 
-#### 作用
+### 作用
+
 查询指定 segment 的状态。当前版本仅返回 `OK`。
 
-#### curl
+### curl
 
 ```bash
 curl "http://127.0.0.1:8000/api/v1/segments/status?segment=rank-0-hbm"
 ```
 
-#### 请求参数
+### 请求参数
 
 | 参数名 | 类型 | 必填 | 描述 |
 |---|---|---|---|
 | `segment` | String | 是 | 目标 `segment_id` |
 
-#### 成功示例
+### 成功示例
 
 `application/json; charset=utf-8`：
 
@@ -1338,7 +1358,7 @@ curl "http://127.0.0.1:8000/api/v1/segments/status?segment=rank-0-hbm"
 | `status` | 当前状态码；当前版本固定为 `1` | 当前接口行为 |
 | `status_name` | 当前状态名称；当前版本固定为 `OK` | 当前接口行为 |
 
-#### 错误示例
+### 错误示例
 
 `application/json; charset=utf-8`：
 
@@ -1358,22 +1378,23 @@ curl "http://127.0.0.1:8000/api/v1/segments/status?segment=rank-0-hbm"
 | `error_message` | 实际错误原因；此处仅为格式示例 | 全局错误返回格式规则 |
 | `timestamp` | 错误返回格式中的时间戳字段 | 全局错误返回格式规则 |
 
-### 22 `GET /api/v1/capacity/usage`
+## 22 `GET /api/v1/capacity/usage`
 
-#### 作用
+### 作用
+
 返回整体容量使用情况。介质映射关系为 `HBM -> npu`、`DRAM -> cpu`；无对应介质时返回 `0`，不视为错误。
 
-#### curl
+### curl
 
 ```bash
 curl "http://127.0.0.1:8000/api/v1/capacity/usage"
 ```
 
-#### 请求参数
+### 请求参数
 
 无
 
-#### 成功示例
+### 成功示例
 
 `application/json; charset=utf-8`：
 
@@ -1409,7 +1430,7 @@ curl "http://127.0.0.1:8000/api/v1/capacity/usage"
 | `*_bytes` | 容量字段单位均为 `bytes` | 全局单位规则 |
 | `usage_ratio` | 使用比例，范围 `[0,1]` | 全局单位规则 |
 
-#### 错误示例
+### 错误示例
 
 `application/json; charset=utf-8`：
 
@@ -1429,22 +1450,23 @@ curl "http://127.0.0.1:8000/api/v1/capacity/usage"
 | `error_message` | 实际错误原因；此处仅为格式示例 | 全局错误返回格式规则 |
 | `timestamp` | 错误返回格式中的时间戳字段 | 全局错误返回格式规则 |
 
-### 23 `GET /api/v1/capacity/segment_remaining`
+## 23 `GET /api/v1/capacity/segment_remaining`
 
-#### 作用
+### 作用
+
 返回各 segment 的剩余容量情况。
 
-#### curl
+### curl
 
 ```bash
 curl "http://127.0.0.1:8000/api/v1/capacity/segment_remaining"
 ```
 
-#### 请求参数
+### 请求参数
 
 无
 
-#### 成功示例
+### 成功示例
 
 `application/json; charset=utf-8`：
 
@@ -1478,7 +1500,7 @@ curl "http://127.0.0.1:8000/api/v1/capacity/segment_remaining"
 | `total_bytes` / `used_bytes` / `remaining_bytes` | 容量字段单位均为 `bytes` | 全局单位规则 |
 | `remaining_ratio` | 剩余比例，范围 `[0,1]` | 全局单位规则 |
 
-#### 错误示例
+### 错误示例
 
 `application/json; charset=utf-8`：
 
@@ -1498,22 +1520,23 @@ curl "http://127.0.0.1:8000/api/v1/capacity/segment_remaining"
 | `error_message` | 实际错误原因；此处仅为格式示例 | 全局错误返回格式规则 |
 | `timestamp` | 错误返回格式中的时间戳字段 | 全局错误返回格式规则 |
 
-### 24 `GET /api/v1/analysis/alloc_free_latency`
+## 24 `GET /api/v1/analysis/alloc_free_latency`
 
-#### 作用
+### 作用
+
 返回 alloc/free 延迟相关的 ptracer 文本结果。该接口展示 alloc/free 相关统计行，数据来源与 `/metrics/ptracer` 保持一致。
 
-#### curl
+### curl
 
 ```bash
 curl "http://127.0.0.1:8000/api/v1/analysis/alloc_free_latency"
 ```
 
-#### 请求参数
+### 请求参数
 
 无
 
-#### 成功示例
+### 成功示例
 
 `text/plain; charset=utf-8`：
 
@@ -1531,7 +1554,7 @@ TIME                   NAME                                    BEGIN          GO
 | `TP_MMC_META_ALLOC` / `TP_MMC_META_REMOVE` | 示例中的 ptracer 打点名称 | ptracer 输出 |
 | `MIN(us)` / `MAX(us)` / `AVG(us)` / `TOTAL(us)` | 延迟统计字段，单位均为 `us` | ptracer 输出 |
 
-#### 错误示例
+### 错误示例
 
 `application/json; charset=utf-8`：
 
@@ -1551,22 +1574,23 @@ TIME                   NAME                                    BEGIN          GO
 | `error_message` | 实际错误原因；此处仅为格式示例 | 全局错误返回格式规则 |
 | `timestamp` | 错误返回格式中的时间戳字段 | 全局错误返回格式规则 |
 
-### 25 `GET /kv_events/status`
+## 25 `GET /kv_events/status`
 
-#### 作用
+### 作用
+
 返回 KV Event Publisher 的运行状态和统计信息。
 
-#### curl
+### curl
 
 ```bash
 curl "http://127.0.0.1:8000/kv_events/status"
 ```
 
-#### 请求参数
+### 请求参数
 
 无
 
-#### 成功示例
+### 成功示例
 
 `application/json; charset=utf-8`：
 
@@ -1616,7 +1640,7 @@ curl "http://127.0.0.1:8000/kv_events/status"
 | `queue_size` | 当前队列中的事件数量 | 实时状态 |
 | `queue_capacity` | 队列最大容量（配置值） | 配置参数 |
 
-#### 错误示例
+### 错误示例
 
 `application/json; charset=utf-8`：
 

@@ -24,7 +24,7 @@ MemCache的UBS_IO功能是一种扩展存储能力的特性，允许系统在内
 
 MemCache的SSD功能基于UBS_IO（Unified Block Storage IO）子系统实现，整体架构如下：
 
-```
+```text
 ┌─────────────────┐
 │    应用层       │
 │ (MemCache API)  │
@@ -78,7 +78,8 @@ MemCache的SSD功能基于UBS_IO（Unified Block Storage IO）子系统实现，
 
 ### 3.3 环境检查
 
-在启用SSD功能前，确保：
+在启用SSD功能前，需要确保以下内容：
+
 1. SSD已正确安装并挂载
 2. UBS_IO KV Cache库已正确安装且可被系统找到
 3. MemCache已正确编译和安装

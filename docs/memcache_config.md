@@ -1,12 +1,12 @@
-## MemCache Configs
+# MemCache Configs
 
-#### MetaService Config
+## MetaService Config
 
 | key                                                  | value type | requirement | default                  | valid range                | description                                                                                                                                                             |
 |------------------------------------------------------|------------|-------------|--------------------------|----------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | ock.mmc.meta_service_url                             | string     | optional    | tcp://127.0.0.1:5000     | tcp://\<host>\<port>       | host supports ip and domain, port in [1025, 65535]                                                                                                                      |
 | ock.mmc.meta_service.config_store_url                | string     | optional    | tcp://127.0.0.1:6000     | tcp://\<host>\<port>       | host supports ip and domain, port in [1025, 65535]                                                                                                                      |
-| ock.mmc.meta_service.metrics_url                     | string     | optional    | http://127.0.0.1:8000    | <protocol>://<host>:<port> | protocol is http or https, host supports ip and domain, port in [1025, 65535]                                                                                           |
+| ock.mmc.meta_service.metrics_url                     | string     | optional    | http://127.0.0.1:8000    | \<protocol>://\<host>:\<port>| protocol is http or https, host supports ip and domain, port in [1025, 65535]                                                                                         |
 | ock.mmc.meta.ha.enable                               | bool       | optional    | false                    | true/false                 | enable meta service master/backup HA in k8s cluster                                                                                                                     |
 | ock.mmc.meta.backup.enable                           | bool       | optional    | false                    | true/false                 | enable meta service backup                                                                                                                                              |
 | ock.mmc.meta_service.metrics_report_interval_seconds | integer    | optional    | 30                       | [0, 86400]                 | metrics summary printing interval in seconds, 0 disables periodic metrics printing                                                                                      |
@@ -48,7 +48,7 @@
 | ock.mmc.metrics.tls.package.path                     | string     | optional    |                          | 0 <= len < 256             | openssl dynamic libraries path for metrics HTTP                                                                                                                         |
 | ock.mmc.metrics.tls.decrypter.path                   | string     | optional    |                          | 0 <= len < 256             | the keypass decrypter library path for metrics HTTP (leave empty if the password is not encrypted)                                                                      |
 
-#### LocalService Config
+## LocalService Config
 
 | key                                            | value type | requirement  | default              | valid range                                                                           | description                                                                                                                                                                                                                              |
 |------------------------------------------------|------------|--------------|----------------------|---------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -107,7 +107,7 @@
 | ock.mmc.dynamic_config.enable                  | bool       | optional     | false                | true/false                                                                            | Enable dynamic config polling. When enabled, LocalService periodically checks the config file for `meta_service_url` and `config_store_url` changes and lazily updates reconnection targets without restart                              |
 | ock.mmc.dynamic_config.interval                | integer    | optional     | 5                    | [1, 300]                                                                              | Polling interval in seconds for dynamic config file check                                                                                                                                                                                |
 
-#### KV Events Config
+## KV Events Config
 
 | key                              | value type | requirement | default | valid range          | description                                                               |
 |----------------------------------|------------|-------------|---------|----------------------|---------------------------------------------------------------------------|
