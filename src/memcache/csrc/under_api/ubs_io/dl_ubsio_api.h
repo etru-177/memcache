@@ -175,7 +175,6 @@ public:
     static inline Result UbsioGetResourceInfo(UbsioResourceInfo &info)
     {
         if (pUbsioGetResourceInfo == nullptr) {
-            MMC_LOG_WARN("UbsioGetResourceInfo not loaded");
             return MMC_NOT_INITIALIZED;
         }
         return pUbsioGetResourceInfo(&info);

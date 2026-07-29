@@ -108,61 +108,156 @@ void AppendOperationMetrics(std::ostringstream &oss, const std::string &metricNa
     }
 }
 
-void AppendBandwidthPrometheus(std::ostringstream &oss, const std::string &rank, const std::string &operation,
-                               const ock::mmc::BandwidthMetricData &data)
+void AppendClientStale(std::ostringstream &oss, const std::vector<ock::mmc::RankMetricView> &allViews,
+                       std::vector<ock::mmc::RankMetricView> &freshViews)
 {
-    // 窗口值 (gauge)
-    oss << "memcache_client_bandwidth_bytes{rank=\"" << rank << "\",operation=\"" << operation << "\"} "
-        << data.totalBytes << '\n';
-    oss << "memcache_client_bandwidth_duration_ms{rank=\"" << rank << "\",operation=\"" << operation << "\"} "
-        << data.totalDurationMs << '\n';
-
-    // 累计值 (counter)
-    oss << "memcache_client_bandwidth_bytes_cum_total{rank=\"" << rank << "\",operation=\"" << operation << "\"} "
-        << data.cumTotalBytes << '\n';
-    oss << "memcache_client_bandwidth_duration_ms_cum_total{rank=\"" << rank << "\",operation=\"" << operation << "\"} "
-        << data.cumTotalDurationMs << '\n';
-
-    oss << "memcache_client_bandwidth_latency_seconds{rank=\"" << rank << "\",operation=\"" << operation
-        << "\",quantile=\"P50\"} " << data.latencyP50 << '\n';
-    oss << "memcache_client_bandwidth_latency_seconds{rank=\"" << rank << "\",operation=\"" << operation
-        << "\",quantile=\"P90\"} " << data.latencyP90 << '\n';
-    oss << "memcache_client_bandwidth_latency_seconds{rank=\"" << rank << "\",operation=\"" << operation
-        << "\",quantile=\"P99\"} " << data.latencyP99 << '\n';
-    oss << "memcache_client_bandwidth_latency_seconds{rank=\"" << rank << "\",operation=\"" << operation
-        << "\",quantile=\"Avg\"} " << data.latencyAve << '\n';
-
-    oss << "memcache_client_bandwidth_bytes_per_sec{rank=\"" << rank << "\",operation=\"" << operation << "\"} "
-        << data.bytesPerSec << '\n';
+    AppendMetricHeader(oss, "memcache_metric_stale", "Client metric stale status (1 = stale, 0 = fresh)", "gauge");
+    for (const auto &view : allViews) {
+        if (view.rank == UINT32_MAX) {
+            continue;
+        }
+        oss << "memcache_metric_stale{rank=\"" << view.rank << "\"} " << (view.stale ? 1 : 0) << '\n';
+    }
+    for (const auto &view : allViews) {
+        if (view.rank != UINT32_MAX && !view.stale) {
+            freshViews.push_back(view);
+        }
+    }
 }
 
-void AppendUbsIoPrometheus(std::ostringstream &oss, const std::string &rank, const ock::mmc::UbsIoMetricData &data)
+void AppendBandwidthWindowGauges(std::ostringstream &oss, const std::vector<ock::mmc::RankMetricView> &freshViews)
 {
-    // WriteCache 容量/使用量
-    oss << "memcache_client_ubs_io_disk_capacity_bytes{rank=\"" << rank << "\"} " << data.diskCap << '\n';
-    oss << "memcache_client_ubs_io_disk_used_bytes{rank=\"" << rank << "\"} " << data.diskUsed << '\n';
-    oss << "memcache_client_ubs_io_mem_capacity_bytes{rank=\"" << rank << "\"} " << data.memCap << '\n';
-    oss << "memcache_client_ubs_io_mem_used_bytes{rank=\"" << rank << "\"} " << data.memUsed << '\n';
-
-    // 盘健康
-    oss << "memcache_client_ubs_io_disk_num{rank=\"" << rank << "\"} " << data.diskNum << '\n';
-    oss << "memcache_client_ubs_io_fault_disk_num{rank=\"" << rank << "\"} " << data.faultDiskNum << '\n';
-
-    // 每盘指标
-    uint32_t diskCount =
-        (data.perDiskCount < UBSIO_RESOURCE_MAX_DISK_NUM) ? data.perDiskCount : UBSIO_RESOURCE_MAX_DISK_NUM;
-    for (uint32_t i = 0; i < diskCount; ++i) {
-        const auto &disk = data.perDisk[i];
-        const std::string diskLabel(disk.path, strnlen(disk.path, sizeof(disk.path)));
-        oss << "memcache_client_ubs_io_disk_status{rank=\"" << rank << "\",disk_path=\"" << diskLabel << "\"} "
-            << disk.status << '\n';
-        oss << "memcache_client_ubs_io_disk_read_bandwidth_bytes_per_sec{rank=\"" << rank << "\",disk_path=\""
-            << diskLabel << "\"} " << disk.readBandwidth << '\n';
-        oss << "memcache_client_ubs_io_disk_write_bandwidth_bytes_per_sec{rank=\"" << rank << "\",disk_path=\""
-            << diskLabel << "\"} " << disk.writeBandwidth << '\n';
-        oss << "memcache_client_ubs_io_disk_total_bandwidth_bytes_per_sec{rank=\"" << rank << "\",disk_path=\""
-            << diskLabel << "\"} " << disk.totalBandwidth << '\n';
+    AppendMetricHeader(oss, "memcache_bandwidth_bytes", "Client bandwidth window bytes transferred", "gauge");
+    for (const auto &view : freshViews) {
+        const std::string r = std::to_string(view.rank);
+        for (size_t opIdx = 0; opIdx < static_cast<size_t>(ock::mmc::MetricOp::COUNT); ++opIdx) {
+            oss << "memcache_bandwidth_bytes{rank=\"" << r << "\",operation=\"" << ock::mmc::K_METRIC_OP_LABEL[opIdx]
+                << "\"} " << view.bandwidths[opIdx].totalBytes << '\n';
+        }
     }
+
+    AppendMetricHeader(oss, "memcache_bandwidth_duration_ms", "Client bandwidth window duration in milliseconds",
+                       "gauge");
+    for (const auto &view : freshViews) {
+        const std::string r = std::to_string(view.rank);
+        for (size_t opIdx = 0; opIdx < static_cast<size_t>(ock::mmc::MetricOp::COUNT); ++opIdx) {
+            oss << "memcache_bandwidth_duration_ms{rank=\"" << r << "\",operation=\""
+                << ock::mmc::K_METRIC_OP_LABEL[opIdx] << "\"} " << view.bandwidths[opIdx].totalDurationMs << '\n';
+        }
+    }
+}
+
+void AppendBandwidthCumulativeCounters(std::ostringstream &oss, const std::vector<ock::mmc::RankMetricView> &freshViews)
+{
+    AppendMetricHeader(oss, "memcache_bandwidth_bytes_cum_total", "Client bandwidth cumulative bytes transferred",
+                       "counter");
+    for (const auto &view : freshViews) {
+        const std::string r = std::to_string(view.rank);
+        for (size_t opIdx = 0; opIdx < static_cast<size_t>(ock::mmc::MetricOp::COUNT); ++opIdx) {
+            oss << "memcache_bandwidth_bytes_cum_total{rank=\"" << r << "\",operation=\""
+                << ock::mmc::K_METRIC_OP_LABEL[opIdx] << "\"} " << view.bandwidths[opIdx].cumTotalBytes << '\n';
+        }
+    }
+
+    AppendMetricHeader(oss, "memcache_bandwidth_duration_ms_cum_total",
+                       "Client bandwidth cumulative duration in milliseconds", "counter");
+    for (const auto &view : freshViews) {
+        const std::string r = std::to_string(view.rank);
+        for (size_t opIdx = 0; opIdx < static_cast<size_t>(ock::mmc::MetricOp::COUNT); ++opIdx) {
+            oss << "memcache_bandwidth_duration_ms_cum_total{rank=\"" << r << "\",operation=\""
+                << ock::mmc::K_METRIC_OP_LABEL[opIdx] << "\"} " << view.bandwidths[opIdx].cumTotalDurationMs << '\n';
+        }
+    }
+}
+
+void AppendBandwidthLatency(std::ostringstream &oss, const std::vector<ock::mmc::RankMetricView> &freshViews)
+{
+    AppendMetricHeader(oss, "memcache_bandwidth_latency_seconds", "Client bandwidth operation latency in seconds",
+                       "gauge");
+    for (const auto &view : freshViews) {
+        const std::string r = std::to_string(view.rank);
+        for (size_t opIdx = 0; opIdx < static_cast<size_t>(ock::mmc::MetricOp::COUNT); ++opIdx) {
+            const auto &bw = view.bandwidths[opIdx];
+            const char *op = ock::mmc::K_METRIC_OP_LABEL[opIdx];
+            oss << "memcache_bandwidth_latency_seconds{rank=\"" << r << "\",operation=\"" << op
+                << "\",quantile=\"P50\"} " << bw.latencyP50 << '\n';
+            oss << "memcache_bandwidth_latency_seconds{rank=\"" << r << "\",operation=\"" << op
+                << "\",quantile=\"P90\"} " << bw.latencyP90 << '\n';
+            oss << "memcache_bandwidth_latency_seconds{rank=\"" << r << "\",operation=\"" << op
+                << "\",quantile=\"P99\"} " << bw.latencyP99 << '\n';
+            oss << "memcache_bandwidth_latency_seconds{rank=\"" << r << "\",operation=\"" << op
+                << "\",quantile=\"Avg\"} " << bw.latencyAve << '\n';
+        }
+    }
+}
+
+void AppendBandwidthBytesPerSec(std::ostringstream &oss, const std::vector<ock::mmc::RankMetricView> &freshViews)
+{
+    AppendMetricHeader(oss, "memcache_bandwidth_bytes_per_sec", "Client bandwidth instantaneous bytes per second",
+                       "gauge");
+    for (const auto &view : freshViews) {
+        const std::string r = std::to_string(view.rank);
+        for (size_t opIdx = 0; opIdx < static_cast<size_t>(ock::mmc::MetricOp::COUNT); ++opIdx) {
+            oss << "memcache_bandwidth_bytes_per_sec{rank=\"" << r << "\",operation=\""
+                << ock::mmc::K_METRIC_OP_LABEL[opIdx] << "\"} " << view.bandwidths[opIdx].bytesPerSec << '\n';
+        }
+    }
+}
+
+void AppendUbsIoAggregate(std::ostringstream &oss, const std::vector<ock::mmc::RankMetricView> &freshViews)
+{
+    AppendMetricHeader(oss, "memcache_ubs_io_disk_capacity_bytes", "Client UBS IO SSD total capacity in bytes",
+                       "gauge");
+    for (const auto &view : freshViews) {
+        oss << "memcache_ubs_io_disk_capacity_bytes{rank=\"" << view.rank << "\"} " << view.ubsIo.diskCap << '\n';
+    }
+    AppendMetricHeader(oss, "memcache_ubs_io_disk_used_bytes", "Client UBS IO SSD used bytes", "gauge");
+    for (const auto &view : freshViews) {
+        oss << "memcache_ubs_io_disk_used_bytes{rank=\"" << view.rank << "\"} " << view.ubsIo.diskUsed << '\n';
+    }
+    AppendMetricHeader(oss, "memcache_ubs_io_mem_capacity_bytes", "Client UBS IO memory total capacity in bytes",
+                       "gauge");
+    for (const auto &view : freshViews) {
+        oss << "memcache_ubs_io_mem_capacity_bytes{rank=\"" << view.rank << "\"} " << view.ubsIo.memCap << '\n';
+    }
+    AppendMetricHeader(oss, "memcache_ubs_io_mem_used_bytes", "Client UBS IO memory used bytes", "gauge");
+    for (const auto &view : freshViews) {
+        oss << "memcache_ubs_io_mem_used_bytes{rank=\"" << view.rank << "\"} " << view.ubsIo.memUsed << '\n';
+    }
+    AppendMetricHeader(oss, "memcache_ubs_io_disk_num", "Client UBS IO total disk count", "gauge");
+    for (const auto &view : freshViews) {
+        oss << "memcache_ubs_io_disk_num{rank=\"" << view.rank << "\"} " << view.ubsIo.diskNum << '\n';
+    }
+    AppendMetricHeader(oss, "memcache_ubs_io_fault_disk_num", "Client UBS IO fault disk count", "gauge");
+    for (const auto &view : freshViews) {
+        oss << "memcache_ubs_io_fault_disk_num{rank=\"" << view.rank << "\"} " << view.ubsIo.faultDiskNum << '\n';
+    }
+}
+
+void AppendUbsIoPerDisk(std::ostringstream &oss, const std::vector<ock::mmc::RankMetricView> &freshViews)
+{
+    auto out = [&oss, &freshViews](const char *metric, const char *help,
+                                   uint64_t (*v)(const ock::mmc::UbsIoPerDiskMetric &)) {
+        AppendMetricHeader(oss, metric, help, "gauge");
+        for (const auto &view : freshViews) {
+            const std::string r = std::to_string(view.rank);
+            uint32_t n = (view.ubsIo.perDiskCount < UBSIO_RESOURCE_MAX_DISK_NUM) ? view.ubsIo.perDiskCount
+                                                                                 : UBSIO_RESOURCE_MAX_DISK_NUM;
+            for (uint32_t i = 0; i < n; ++i) {
+                const auto &d = view.ubsIo.perDisk[i];
+                const std::string p(d.path, strnlen(d.path, sizeof(d.path)));
+                oss << metric << "{rank=\"" << r << "\",disk_path=\"" << p << "\"} " << v(d) << '\n';
+            }
+        }
+    };
+    out("memcache_ubs_io_disk_status", "Client UBS IO per-disk status (0=normal, non-zero=fault)",
+        [](const auto &d) -> uint64_t { return d.status; });
+    out("memcache_ubs_io_disk_read_bandwidth_bytes_per_sec", "Client UBS IO per-disk read bandwidth",
+        [](const auto &d) -> uint64_t { return d.readBandwidth; });
+    out("memcache_ubs_io_disk_write_bandwidth_bytes_per_sec", "Client UBS IO per-disk write bandwidth",
+        [](const auto &d) -> uint64_t { return d.writeBandwidth; });
+    out("memcache_ubs_io_disk_total_bandwidth_bytes_per_sec", "Client UBS IO per-disk total bandwidth",
+        [](const auto &d) -> uint64_t { return d.totalBandwidth; });
 }
 
 } // namespace
@@ -769,31 +864,6 @@ Result MmcRestApiFacade::BuildPrometheusMetrics(bool serviceReady, std::string &
     AppendMetricHeader(oss, "memcache_stored_keys", "Current number of stored keys", "gauge");
     AppendMetricValue(oss, "memcache_stored_keys", keys.size());
 
-    AppendMetricHeader(oss, "memcache_segment_capacity_bytes", "Segment total capacity in bytes", "gauge");
-    for (size_t i = 0; i < segments.size(); ++i) {
-        AppendLabeledMetricValue(oss, "memcache_segment_capacity_bytes", "segment", segments[i].segmentName,
-                                 segments[i].totalBytes);
-    }
-    AppendMetricHeader(oss, "memcache_segment_allocated_bytes", "Segment allocated bytes", "gauge");
-    for (size_t i = 0; i < segments.size(); ++i) {
-        AppendLabeledMetricValue(oss, "memcache_segment_allocated_bytes", "segment", segments[i].segmentName,
-                                 segments[i].usedBytes);
-    }
-
-    AppendMetricHeader(oss, "memcache_total_capacity_bytes", "Total capacity by medium in bytes", "gauge");
-    AppendLabeledMetricValue(oss, "memcache_total_capacity_bytes", "medium", kLowerMediumHbm, hbmUsage.totalBytes);
-    AppendLabeledMetricValue(oss, "memcache_total_capacity_bytes", "medium", kLowerMediumDram, dramUsage.totalBytes);
-    if (ssdUsage.totalBytes > 0 || ssdUsage.usedBytes > 0) {
-        AppendLabeledMetricValue(oss, "memcache_total_capacity_bytes", "medium", kLowerMediumSsd, ssdUsage.totalBytes);
-    }
-
-    AppendMetricHeader(oss, "memcache_allocated_bytes", "Allocated bytes by medium", "gauge");
-    AppendLabeledMetricValue(oss, "memcache_allocated_bytes", "medium", kLowerMediumHbm, hbmUsage.usedBytes);
-    AppendLabeledMetricValue(oss, "memcache_allocated_bytes", "medium", kLowerMediumDram, dramUsage.usedBytes);
-    if (ssdUsage.totalBytes > 0 || ssdUsage.usedBytes > 0) {
-        AppendLabeledMetricValue(oss, "memcache_allocated_bytes", "medium", kLowerMediumSsd, ssdUsage.usedBytes);
-    }
-
     const kv_event::KvEventStats kvStats =
         metaService_ != nullptr ? metaService_->GetKvEventStats() : kv_event::KvEventStats{};
     AppendMetricHeader(oss, "memcache_kv_events_published_total", "Total KV cache events published", "counter");
@@ -837,66 +907,31 @@ Result MmcRestApiFacade::BuildPrometheusMetrics(bool serviceReady, std::string &
     AppendMetricValue(oss, "memcache_kv_events_publisher_active", kvStats.publisherActive ? 1 : 0);
     AppendMetricHeader(oss, "memcache_kv_events_last_sequence", "Last published KV event ZMQ sequence", "gauge");
     AppendMetricValue(oss, "memcache_kv_events_last_sequence", kvStats.lastSequence);
+    AppendClientMetrics(oss);
 
     result = oss.str();
     return MMC_OK;
 }
 
-Result MmcRestApiFacade::BuildClientMetricsPrometheus(std::string &result) const
+void MmcRestApiFacade::AppendClientMetrics(std::ostringstream &oss) const
 {
-    std::ostringstream oss;
     const auto clientViews = MmcClientMetricStore::GetInstance().GetAll(CLIENT_METRIC_STALE_THRESHOLD_SECONDS);
-    if (!clientViews.empty()) {
-        // 窗口值 (gauge): 每 30s 重置
-        AppendMetricHeader(oss, "memcache_client_bandwidth_bytes", "Client bandwidth window bytes transferred",
-                           "gauge");
-        AppendMetricHeader(oss, "memcache_client_bandwidth_duration_ms",
-                           "Client bandwidth window duration in milliseconds", "gauge");
-        // 累计值 (counter): 永不复位
-        AppendMetricHeader(oss, "memcache_client_bandwidth_bytes_cum_total",
-                           "Client bandwidth cumulative bytes transferred", "counter");
-        AppendMetricHeader(oss, "memcache_client_bandwidth_duration_ms_cum_total",
-                           "Client bandwidth cumulative duration in milliseconds", "counter");
-        AppendMetricHeader(oss, "memcache_client_bandwidth_latency_seconds",
-                           "Client bandwidth operation latency in seconds", "gauge");
-        AppendMetricHeader(oss, "memcache_client_bandwidth_bytes_per_sec",
-                           "Client bandwidth instantaneous bytes per second", "gauge");
-        AppendMetricHeader(oss, "memcache_client_metric_stale", "Client metric stale status (1 = stale, 0 = fresh)",
-                           "gauge");
-        AppendMetricHeader(oss, "memcache_client_ubs_io_disk_capacity_bytes",
-                           "Client UBS IO SSD total capacity in bytes", "gauge");
-        AppendMetricHeader(oss, "memcache_client_ubs_io_disk_used_bytes", "Client UBS IO SSD used bytes", "gauge");
-        AppendMetricHeader(oss, "memcache_client_ubs_io_mem_capacity_bytes",
-                           "Client UBS IO memory total capacity in bytes", "gauge");
-        AppendMetricHeader(oss, "memcache_client_ubs_io_mem_used_bytes", "Client UBS IO memory used bytes", "gauge");
-        AppendMetricHeader(oss, "memcache_client_ubs_io_disk_num", "Client UBS IO total disk count", "gauge");
-        AppendMetricHeader(oss, "memcache_client_ubs_io_fault_disk_num", "Client UBS IO fault disk count", "gauge");
-        AppendMetricHeader(oss, "memcache_client_ubs_io_disk_status",
-                           "Client UBS IO per-disk status (0=normal, non-zero=fault)", "gauge");
-        AppendMetricHeader(oss, "memcache_client_ubs_io_disk_read_bandwidth_bytes_per_sec",
-                           "Client UBS IO per-disk read bandwidth", "gauge");
-        AppendMetricHeader(oss, "memcache_client_ubs_io_disk_write_bandwidth_bytes_per_sec",
-                           "Client UBS IO per-disk write bandwidth", "gauge");
-        AppendMetricHeader(oss, "memcache_client_ubs_io_disk_total_bandwidth_bytes_per_sec",
-                           "Client UBS IO per-disk total bandwidth", "gauge");
+    if (clientViews.empty()) {
+        return;
     }
-    for (const auto &view : clientViews) {
-        if (view.rank == UINT32_MAX) {
-            continue;
-        }
-        const std::string rankStr = std::to_string(view.rank);
 
-        oss << "memcache_client_metric_stale{rank=\"" << rankStr << "\"} " << (view.stale ? 1 : 0) << '\n';
-        if (view.stale) {
-            continue; // 避免 Grafana 显示已退出 client 的旧数据
-        }
-        for (size_t opIdx = 0; opIdx < static_cast<size_t>(MetricOp::COUNT); ++opIdx) {
-            AppendBandwidthPrometheus(oss, rankStr, K_METRIC_OP_LABEL[opIdx], view.bandwidths[opIdx]);
-        }
-        AppendUbsIoPrometheus(oss, rankStr, view.ubsIo);
+    std::vector<RankMetricView> freshViews;
+    AppendClientStale(oss, clientViews, freshViews);
+    if (freshViews.empty()) {
+        return;
     }
-    result = oss.str();
-    return MMC_OK;
+
+    AppendBandwidthWindowGauges(oss, freshViews);
+    AppendBandwidthCumulativeCounters(oss, freshViews);
+    AppendBandwidthLatency(oss, freshViews);
+    AppendBandwidthBytesPerSec(oss, freshViews);
+    AppendUbsIoAggregate(oss, freshViews);
+    AppendUbsIoPerDisk(oss, freshViews);
 }
 
 nlohmann::json MmcRestApiFacade::BuildKvEventsStatus() const

@@ -14,6 +14,7 @@
 #define MMC_REST_API_FACADE_H
 
 #include <functional>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -85,7 +86,6 @@ public:
 
     Result BuildMetricsSummary(bool serviceReady, std::string &result) const;
     Result BuildPrometheusMetrics(bool serviceReady, std::string &result) const;
-    Result BuildClientMetricsPrometheus(std::string &result) const;
 
     Result GetPtracerText(std::string &result) const;
     Result GetAllocFreeLatencyText(std::string &result) const;
@@ -98,6 +98,7 @@ private:
     static std::string BuildSegmentId(uint32_t rank, const std::string &medium);
     static std::string JoinLines(const std::vector<std::string> &items);
     static uint64_t CurrentTimestamp();
+    void AppendClientMetrics(std::ostringstream &oss) const;
 
 private:
     MmcMetaService *metaService_{nullptr};

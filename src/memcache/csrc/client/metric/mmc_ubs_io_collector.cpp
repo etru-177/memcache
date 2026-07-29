@@ -21,7 +21,7 @@ namespace mmc {
 void UbsIoCollector::Collect(ClientMetricSnapshot &out) const
 {
     auto proxy = MmcUbsIoProxyFactory::GetInstance("ubsIoProxyDefault");
-    if (proxy == nullptr) {
+    if (proxy == nullptr || !proxy->IsReady()) {
         return;
     }
 

@@ -82,7 +82,7 @@
       },
       "targets": [
         {
-          "expr": "memcache_client_bandwidth_latency_seconds{rank=~\"$rank\", operation=\"get\", quantile=~\"$quantile\"}",
+          "expr": "memcache_bandwidth_latency_seconds{rank=~\"$rank\", operation=\"get\", quantile=~\"$quantile\"}",
           "legendFormat": "{{rank}} @ {{quantile}}",
           "refId": "A"
         }
@@ -119,7 +119,7 @@
       },
       "targets": [
         {
-          "expr": "memcache_client_bandwidth_latency_seconds{rank=~\"$rank\", operation=\"put\", quantile=~\"$quantile\"}",
+          "expr": "memcache_bandwidth_latency_seconds{rank=~\"$rank\", operation=\"put\", quantile=~\"$quantile\"}",
           "legendFormat": "{{rank}} @ {{quantile}}",
           "refId": "A"
         }
@@ -156,7 +156,7 @@
       },
       "targets": [
         {
-          "expr": "memcache_client_bandwidth_bytes{rank=~\"$rank\", operation=\"get\"}",
+          "expr": "memcache_bandwidth_bytes{rank=~\"$rank\", operation=\"get\"}",
           "legendFormat": "{{rank}}",
           "refId": "A"
         }
@@ -193,7 +193,7 @@
       },
       "targets": [
         {
-          "expr": "memcache_client_bandwidth_bytes{rank=~\"$rank\", operation=\"put\"}",
+          "expr": "memcache_bandwidth_bytes{rank=~\"$rank\", operation=\"put\"}",
           "legendFormat": "{{rank}}",
           "refId": "A"
         }
@@ -230,7 +230,7 @@
       },
       "targets": [
         {
-          "expr": "memcache_client_bandwidth_bytes_per_sec{rank=~\"$rank\", operation=\"get\"}",
+          "expr": "memcache_bandwidth_bytes_per_sec{rank=~\"$rank\", operation=\"get\"}",
           "legendFormat": "{{rank}}",
           "refId": "A"
         }
@@ -267,7 +267,7 @@
       },
       "targets": [
         {
-          "expr": "memcache_client_bandwidth_bytes_per_sec{rank=~\"$rank\", operation=\"put\"}",
+          "expr": "memcache_bandwidth_bytes_per_sec{rank=~\"$rank\", operation=\"put\"}",
           "legendFormat": "{{rank}}",
           "refId": "A"
         }
@@ -317,7 +317,7 @@
       },
       "targets": [
         {
-          "expr": "memcache_client_bandwidth_duration_ms_cum_total{rank=~\"$rank\"} / 1000",
+          "expr": "memcache_bandwidth_duration_ms_cum_total{rank=~\"$rank\"} / 1000",
           "legendFormat": "{{rank}} @ {{operation}}",
           "refId": "A"
         }
@@ -354,7 +354,7 @@
       },
       "targets": [
         {
-          "expr": "memcache_client_bandwidth_bytes_cum_total{rank=~\"$rank\"}",
+          "expr": "memcache_bandwidth_bytes_cum_total{rank=~\"$rank\"}",
           "legendFormat": "{{rank}} @ {{operation}}",
           "refId": "A"
         }
@@ -391,7 +391,7 @@
       },
       "targets": [
         {
-          "expr": "memcache_client_bandwidth_bytes_cum_total{rank=~\"$rank\"} / (memcache_client_bandwidth_duration_ms_cum_total{rank=~\"$rank\"} / 1000)",
+          "expr": "memcache_bandwidth_bytes_cum_total{rank=~\"$rank\"} / (memcache_bandwidth_duration_ms_cum_total{rank=~\"$rank\"} / 1000)",
           "legendFormat": "{{rank}} @ {{operation}}",
           "refId": "A"
         }
@@ -442,12 +442,12 @@
       },
       "targets": [
         {
-          "expr": "memcache_client_ubs_io_disk_capacity_bytes{rank=~\"$rank\"}",
+          "expr": "memcache_ubs_io_disk_capacity_bytes{rank=~\"$rank\"}",
           "legendFormat": "{{rank}} @ capacity",
           "refId": "A"
         },
         {
-          "expr": "memcache_client_ubs_io_disk_used_bytes{rank=~\"$rank\"}",
+          "expr": "memcache_ubs_io_disk_used_bytes{rank=~\"$rank\"}",
           "legendFormat": "{{rank}} @ used",
           "refId": "B"
         }
@@ -484,12 +484,12 @@
       },
       "targets": [
         {
-          "expr": "memcache_client_ubs_io_mem_capacity_bytes{rank=~\"$rank\"}",
+          "expr": "memcache_ubs_io_mem_capacity_bytes{rank=~\"$rank\"}",
           "legendFormat": "{{rank}} @ capacity",
           "refId": "A"
         },
         {
-          "expr": "memcache_client_ubs_io_mem_used_bytes{rank=~\"$rank\"}",
+          "expr": "memcache_ubs_io_mem_used_bytes{rank=~\"$rank\"}",
           "legendFormat": "{{rank}} @ used",
           "refId": "B"
         }
@@ -526,7 +526,7 @@
       },
       "targets": [
         {
-          "expr": "memcache_client_ubs_io_disk_read_bandwidth_bytes_per_sec{rank=~\"$rank\", disk_path=~\"$disk_path\"}",
+          "expr": "memcache_ubs_io_disk_read_bandwidth_bytes_per_sec{rank=~\"$rank\", disk_path=~\"$disk_path\"}",
           "legendFormat": "{{rank}} @ {{disk_path}}",
           "refId": "A"
         }
@@ -563,7 +563,7 @@
       },
       "targets": [
         {
-          "expr": "memcache_client_ubs_io_disk_write_bandwidth_bytes_per_sec{rank=~\"$rank\", disk_path=~\"$disk_path\"}",
+          "expr": "memcache_ubs_io_disk_write_bandwidth_bytes_per_sec{rank=~\"$rank\", disk_path=~\"$disk_path\"}",
           "legendFormat": "{{rank}} @ {{disk_path}}",
           "refId": "A"
         }
@@ -600,7 +600,7 @@
       },
       "targets": [
         {
-          "expr": "memcache_client_ubs_io_disk_total_bandwidth_bytes_per_sec{rank=~\"$rank\", disk_path=~\"$disk_path\"}",
+          "expr": "memcache_ubs_io_disk_total_bandwidth_bytes_per_sec{rank=~\"$rank\", disk_path=~\"$disk_path\"}",
           "legendFormat": "{{rank}} @ {{disk_path}}",
           "refId": "A"
         }
@@ -637,12 +637,12 @@
       },
       "targets": [
         {
-          "expr": "memcache_client_ubs_io_disk_num{rank=~\"$rank\"}",
+          "expr": "memcache_ubs_io_disk_num{rank=~\"$rank\"}",
           "legendFormat": "{{rank}} @ total",
           "refId": "A"
         },
         {
-          "expr": "memcache_client_ubs_io_fault_disk_num{rank=~\"$rank\"}",
+          "expr": "memcache_ubs_io_fault_disk_num{rank=~\"$rank\"}",
           "legendFormat": "{{rank}} @ fault",
           "refId": "B"
         }
@@ -683,7 +683,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(memcache_client_bandwidth_bytes_cum_total, rank)",
+        "definition": "label_values(memcache_bandwidth_bytes_cum_total, rank)",
         "hide": 0,
         "includeAll": true,
         "label": "Rank",
@@ -691,7 +691,7 @@
         "name": "rank",
         "options": [],
         "query": {
-          "query": "label_values(memcache_client_bandwidth_bytes_cum_total, rank)",
+          "query": "label_values(memcache_bandwidth_bytes_cum_total, rank)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 2,
@@ -710,7 +710,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(memcache_client_bandwidth_latency_seconds, quantile)",
+        "definition": "label_values(memcache_bandwidth_latency_seconds, quantile)",
         "hide": 0,
         "includeAll": true,
         "label": "Quantile",
@@ -718,7 +718,7 @@
         "name": "quantile",
         "options": [],
         "query": {
-          "query": "label_values(memcache_client_bandwidth_latency_seconds, quantile)",
+          "query": "label_values(memcache_bandwidth_latency_seconds, quantile)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 2,
@@ -737,7 +737,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(memcache_client_ubs_io_disk_read_bandwidth_bytes_per_sec, disk_path)",
+        "definition": "label_values(memcache_ubs_io_disk_read_bandwidth_bytes_per_sec, disk_path)",
         "hide": 0,
         "includeAll": true,
         "label": "Disk Path",
@@ -745,7 +745,7 @@
         "name": "disk_path",
         "options": [],
         "query": {
-          "query": "label_values(memcache_client_ubs_io_disk_read_bandwidth_bytes_per_sec, disk_path)",
+          "query": "label_values(memcache_ubs_io_disk_read_bandwidth_bytes_per_sec, disk_path)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 2,
