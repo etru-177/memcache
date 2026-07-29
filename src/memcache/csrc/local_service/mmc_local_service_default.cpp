@@ -630,15 +630,21 @@ void MmcLocalServiceDefault::StartConfigPolling()
             MMC_LOG_WARN("Failed to stat config file: " << options_.configFilePath);
             return;
         }
-        if (fileStat.st_mtime == lastConfigMtime_) {
+        const bool fileModified = (fileStat.st_mtime != lastConfigMtime_);
+        lastConfigMtime_ = fileStat.st_mtime;
+        if (fileModified) {
+            // Full reload: re-read the file, re-resolve all URL domains, apply changes.
+            MMC_LOG_INFO("Config file modified, reloading...");
+            auto ret = UpdateConfig();
+            if (ret != MMC_OK) {
+                MMC_LOG_WARN("Failed to update config, will retry next cycle");
+            }
             return;
         }
-        lastConfigMtime_ = fileStat.st_mtime;
-        MMC_LOG_INFO("Config file modified, reloading...");
-        auto ret = UpdateConfig();
-        if (ret != MMC_OK) {
-            MMC_LOG_WARN("Failed to update config, will retry next cycle");
-        }
+        // File unchanged: only re-resolve config_store_url from the preserved
+        // domain so a DNS repoint (no file change) is still picked up and fed to
+        // the BM via UpdateStoreUrl. Cheap: a single getaddrinfo, no file read.
+        ReResolveStoreUrl();
     });
     if (!ret) {
         MMC_LOG_ERROR("Failed to register config polling task");
@@ -688,6 +694,9 @@ Result MmcLocalServiceDefault::UpdateConfig()
     // Compare and update config_store_url (bmIpPort)
     std::string oldStoreUrl(options_.bmIpPort);
     std::string newStoreUrl(newServiceConfig.bmIpPort);
+    // Always refresh the preserved domain so subsequent ReResolveStoreUrl cycles
+    // re-resolve the latest configured domain (covers a domain change in the file).
+    SafeCopy(newServiceConfig.bmIpPortDomain, options_.bmIpPortDomain, DISCOVERY_URL_SIZE);
     if (oldStoreUrl != newStoreUrl) {
         MMC_LOG_INFO("config_store_url changed from " << oldStoreUrl << " to " << newStoreUrl);
         if (bmProxyPtr_ != nullptr) {
@@ -700,6 +709,27 @@ Result MmcLocalServiceDefault::UpdateConfig()
     }
 
     return MMC_OK;
+}
+
+void MmcLocalServiceDefault::ReResolveStoreUrl()
+{
+    // No domain preserved (config_store_url was a literal IP): nothing to re-resolve.
+    if (options_.bmIpPortDomain[0] == '\0') {
+        return;
+    }
+    const std::string domain(options_.bmIpPortDomain);
+    const std::string resolved = Configuration::ResolveUrlField(domain, "config_store_url");
+    // ResolveUrlField returns the original domain when resolution failed, or the
+    // same value when it is already a literal IP; in both cases there is no new IP.
+    if (resolved.empty() || resolved == domain || resolved == options_.bmIpPort) {
+        return;
+    }
+    MMC_LOG_INFO("config_store_url re-resolved from " << options_.bmIpPort << " to " << resolved);
+    if (bmProxyPtr_ == nullptr || bmProxyPtr_->UpdateStoreUrl(resolved) != MMC_OK) {
+        MMC_LOG_WARN("Failed to update bm store URL to " << resolved << ", will retry next cycle");
+        return;
+    }
+    SafeCopy(resolved, options_.bmIpPort, DISCOVERY_URL_SIZE);
 }
 
 } // namespace mmc

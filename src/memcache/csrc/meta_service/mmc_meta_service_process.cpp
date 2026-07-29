@@ -189,6 +189,8 @@ int MmcMetaServiceProcess::LoadConfig()
     }
     configManager.GetMetaServiceConfig(config_);
 
+    ResolveAllUrlDomains();
+
     if (ValidateConfig() != 0) {
         std::cerr << "Error, invalid config." << std::endl;
         return -1;

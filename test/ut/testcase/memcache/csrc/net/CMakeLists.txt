@@ -1,5 +1,5 @@
-file(GLOB_RECURSE net_engine_src
-        ${CMAKE_CURRENT_SOURCE_DIR}/net_engine.cpp
+file(GLOB net_engine_src
+        ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
 )
 ADD_UNIT_TEST(test_net_engine
         FILES ${net_engine_src} ${TEST_SRC_PATHS}/ut_main.cpp

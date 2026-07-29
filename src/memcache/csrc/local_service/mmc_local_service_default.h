@@ -107,6 +107,7 @@ private:
     void StartConfigPolling();
     void StopConfigPolling();
     Result UpdateConfig();
+    void ReResolveStoreUrl();
 };
 
 inline const std::string &MmcLocalServiceDefault::Name() const

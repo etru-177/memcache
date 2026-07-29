@@ -69,6 +69,8 @@ constexpr auto OCK_MMC_METRICS_TLS_DECRYPTER_PATH = std::make_pair("ock.mmc.metr
 constexpr auto OKC_MMC_LOCAL_SERVICE_WORLD_SIZE = std::make_pair("ock.mmc.local_service.world_size", 256);
 constexpr auto OKC_MMC_LOCAL_SERVICE_BM_IP_PORT =
     std::make_pair("ock.mmc.local_service.config_store_url", "tcp://127.0.0.1:6000");
+constexpr auto OKC_MMC_LOCAL_SERVICE_BM_IP_PORT_DOMAIN =
+    std::make_pair("ock.mmc.local_service.config_store_url_domain", "");
 
 constexpr auto OKC_MMC_LOCAL_SERVICE_PROTOCOL = std::make_pair("ock.mmc.local_service.protocol", "host_rdma");
 constexpr auto OKC_MMC_LOCAL_SERVICE_DRAM_SIZE = std::make_pair("ock.mmc.local_service.dram.size", "128MB");

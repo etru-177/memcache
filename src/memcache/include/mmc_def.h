@@ -102,6 +102,7 @@ typedef struct {
     bool dynamicConfigEnable;
     uint32_t dynamicConfigInterval;
     char configFilePath[PATH_MAX_SIZE];
+    char bmIpPortDomain[DISCOVERY_URL_SIZE]; // original (domain) form of config_store_url, for periodic re-resolution
 } mmc_local_service_config_t;
 
 typedef struct {

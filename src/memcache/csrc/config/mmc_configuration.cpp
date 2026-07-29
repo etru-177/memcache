@@ -766,13 +766,28 @@ std::string Configuration::ResolveUrlField(const std::string &url, const std::st
 void Configuration::ResolveAllUrlDomains()
 {
     MMC_LOG_INFO("start resolving all URL domains.");
-    static constexpr const char *kUrlKeys[] = {
+    // The meta service URL is the connect target for clients and may be a domain
+    // subject to DNS-based failover. Keep the original value so MetaNetClient can
+    // re-resolve on connect/reconnect and pick up a repointed DNS record. Pinning
+    // it to an IP here would discard the domain and break automatic failover.
+    static constexpr const char *kPreservedUrlKeys[] = {
         ConfConstant::OCK_MMC_META_SERVICE_URL.first,
+    };
+    static constexpr const char *kUrlKeys[] = {
         ConfConstant::OCK_MMC_META_SERVICE_CONFIG_STORE_URL.first,
         ConfConstant::OCK_MMC_META_SERVICE_HTTP_URL.first,
         ConfConstant::OKC_MMC_LOCAL_SERVICE_BM_IP_PORT.first,
         ConfConstant::OKC_MMC_LOCAL_SERVICE_BM_HCOM_URL.first,
     };
+    for (const char *key : kPreservedUrlKeys) {
+        const std::string url = GetString(std::make_pair(key, ""));
+        ResolveUrlField(url, key); // validate/log only, do NOT overwrite
+    }
+    // Preserve the original (domain) form of config_store_url so the local service
+    // can periodically re-resolve it without re-reading the config file. This is
+    // captured here, before the kUrlKeys loop overwrites the resolved IP below.
+    const std::string storeUrl = GetString(ConfConstant::OKC_MMC_LOCAL_SERVICE_BM_IP_PORT);
+    Set(ConfConstant::OKC_MMC_LOCAL_SERVICE_BM_IP_PORT_DOMAIN.first, storeUrl);
     for (const char *key : kUrlKeys) {
         const std::string url = GetString(std::make_pair(key, ""));
         const std::string resolvedUrl = ResolveUrlField(url, key);

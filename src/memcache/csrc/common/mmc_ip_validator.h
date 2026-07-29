@@ -344,6 +344,22 @@ private:
     IpAddressParserMgr() = default;
 };
 
+// Resolve a URL (domain or literal IP) to ip+port with a fresh UrlParser on every
+// call so DNS changes are picked up. Bypasses IpAddressParserMgr, whose cached
+// parsers short-circuit resolution and would return stale addresses on failover.
+inline bool ResolveUrlToIpPort(const std::string &url, std::string &ip, uint16_t &port)
+{
+    UrlParser resolver;
+    std::string resolved = resolver.ResolveDomainToIp(url);
+    UrlParser parser;
+    if (!parser.Initialize(resolved.empty() ? url : resolved)) {
+        return false;
+    }
+    ip = parser.GetIp();
+    port = parser.GetPort();
+    return !ip.empty();
+}
+
 } // namespace mmc
 } // namespace ock
 

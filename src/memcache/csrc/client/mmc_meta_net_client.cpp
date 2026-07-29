@@ -11,6 +11,7 @@
 */
 #include "mmc_meta_net_client.h"
 
+#include "mmc_ip_validator.h"
 #include "mmc_msg_base.h"
 #include "mmc_msg_client_meta.h"
 
@@ -22,7 +23,11 @@ std::mutex MetaNetClientFactory::instanceMutex_;
 MetaNetClient::~MetaNetClient() {}
 MetaNetClient::MetaNetClient(const std::string &serverUrl, const std::string &inputName)
     : serverUrl_(serverUrl), name_(inputName)
-{}
+{
+    resolver_ = [](const std::string &url, std::string &ip, uint16_t &port) {
+        return ResolveUrlToIpPort(url, ip, port);
+    };
+}
 
 Result MetaNetClient::Start(const NetEngineOptions &config)
 {
@@ -93,14 +98,55 @@ void MetaNetClient::Stop()
 
 Result MetaNetClient::Connect(const std::string &url)
 {
-    std::lock_guard<std::mutex> guard(mutex_);
-    NetEngineOptions options;
-    NetEngineOptions::ExtractIpPortFromUrl(url, options);
+    {
+        std::lock_guard<std::mutex> guard(mutex_);
+        serverUrl_ = url;
+    }
+    return ResolveAndConnect(false);
+}
+
+Result MetaNetClient::Reconnect()
+{
+    return ResolveAndConnect(true);
+}
+
+Result MetaNetClient::ResolveAndConnect(bool isForce)
+{
     MMC_ASSERT_LOG_AND_RETURN(engine_ != nullptr, "engine_ is nullptr", MMC_NOT_INITIALIZED);
-    MMC_RETURN_ERROR(engine_->ConnectToPeer(rankId_, options.ip, options.port, link2Index_, false),
-                     "MetaNetClient Connect " << url << " failed");
-    ip_ = options.ip;
-    port_ = options.port;
+    // Snapshot serverUrl_ under mutex_ (UpdateServerUrl may change it on the config
+    // polling thread). Resolve and ConnectToPeer outside the lock so that UpdateServerUrl
+    // can update serverUrl_ during the sleep in HandleLinkBroken.
+    std::string url;
+    {
+        std::lock_guard<std::mutex> guard(mutex_);
+        url = serverUrl_;
+    }
+    std::string ip;
+    uint16_t port = 0;
+    if (resolver_ == nullptr || !resolver_(url, ip, port)) {
+        MMC_LOG_ERROR("Failed to resolve server url: " << url);
+        return MMC_INVALID_PARAM;
+    }
+    // ResolveUrlToIpPort bypasses memfabric's SocketAddressParserMgr to pick up DNS
+    // changes, but AccTcpServer::ConnectToPeerServer looks the parser up by port via
+    // GetParser(port). Register the resolved ip:port here so that lookup succeeds,
+    // restoring the side-effect the old ExtractIpPortFromUrl-based Connect relied on.
+    NetEngineOptions peerOpt;
+    const std::string peerUrl = "tcp://" + ip + ":" + std::to_string(port);
+    if (NetEngineOptions::ExtractIpPortFromUrl(peerUrl, peerOpt) != MMC_OK) {
+        MMC_LOG_ERROR("Failed to register resolved peer url: " << peerUrl << ", serverUrl: " << url);
+        return MMC_INVALID_PARAM;
+    }
+    Result ret = engine_->ConnectToPeer(rankId_, ip, port, link2Index_, isForce);
+    if (ret != MMC_OK) {
+        MMC_LOG_ERROR("MetaNetClient connect " << ip << ", port " << port << " failed, ret: " << ret);
+        return ret;
+    }
+    {
+        std::lock_guard<std::mutex> guard(mutex_);
+        ip_ = ip;
+        port_ = port;
+    }
     return MMC_OK;
 }
 
@@ -112,22 +158,23 @@ Result MetaNetClient::UpdateServerUrl(const std::string &url)
         return MMC_NOT_STARTED;
     }
 
-    NetEngineOptions options;
-    if (NetEngineOptions::ExtractIpPortFromUrl(url, options) != MMC_OK) {
+    std::string ip;
+    uint16_t port = 0;
+    if (resolver_ == nullptr || !resolver_(url, ip, port)) {
         MMC_LOG_ERROR("Invalid url: " << url);
         return MMC_INVALID_PARAM;
     }
-    if (ip_ == options.ip && port_ == options.port) {
+    if (ip_ == ip && port_ == port) {
         MMC_LOG_INFO("server URL is the same, skip update: " << url);
         return MMC_OK;
     }
 
-    MMC_LOG_INFO("update server URL from " << ip_ << ":" << port_ << " to " << options.ip << ":" << options.port);
+    MMC_LOG_INFO("update server URL from " << ip_ << ":" << port_ << " to " << ip << ":" << port);
     serverUrl_ = url;
-    ip_ = options.ip;
-    port_ = options.port;
+    ip_ = ip;
+    port_ = port;
     // Lazy: do not disconnect current connection.
-    // When the connection breaks, HandleLinkBroken will use the new ip_/port_ to reconnect.
+    // When the connection breaks, HandleLinkBroken will re-resolve serverUrl_ and reconnect.
     return MMC_OK;
 }
 
@@ -184,22 +231,14 @@ Result MetaNetClient::HandleLinkBroken(const NetLinkPtr &link)
     MMC_LOG_INFO(name_ << " link broken");
     MMC_ASSERT_LOG_AND_RETURN(engine_ != nullptr, "engine_ is nullptr", MMC_NOT_INITIALIZED);
     for (uint32_t count = 0; count < retryCount_; count++) {
-        // Snapshot ip_/port_ under mutex_ to avoid data race with UpdateServerUrl.
-        // The lock is released before ConnectToPeer and sleep so that UpdateServerUrl
-        // can update ip_/port_ during the sleep; the next retry will pick up the new address.
-        std::string ip;
-        uint64_t port;
-        {
-            std::lock_guard<std::mutex> guard(mutex_);
-            ip = ip_;
-            port = port_;
-        }
-        Result ret = engine_->ConnectToPeer(rankId_, ip, port, link2Index_, false);
+        // Re-resolve serverUrl_ on every retry so a DNS record repointed to a
+        // new meta service IP (or an UpdateServerUrl change) is picked up automatically.
+        Result ret = ResolveAndConnect(true);
         if (ret != MMC_OK) {
-            MMC_LOG_ERROR("MetaNetClient Connect " << ip << ", port " << port << " failed");
+            MMC_LOG_ERROR("MetaNetClient reconnect attempt " << count << " failed, ret: " << ret);
         } else {
             if (retryHandler_ != nullptr) {
-                MMC_LOG_INFO("call retry handler when reconnect to " << ip << ", port " << port);
+                MMC_LOG_INFO("call retry handler when reconnect to " << ip_ << ", port " << port_);
                 return retryHandler_();
             }
             return MMC_OK;

@@ -143,7 +143,9 @@ TEST_F(TestMmcConfigurationUrlResolve, Setup_ResolvesConfiguredUrls)
     const std::string configStoreUrl = clientConfig.GetString(ConfConstant::OKC_MMC_LOCAL_SERVICE_BM_IP_PORT);
     const std::string hcomUrl = clientConfig.GetString(ConfConstant::OKC_MMC_LOCAL_SERVICE_BM_HCOM_URL);
 
-    ExpectResolvedUrl(metaUrl, "tcp://", 5000U);
+    // meta_service_url is preserved as the original domain to support DNS-based
+    // failover; other local URLs are still resolved to IP at setup time.
+    EXPECT_EQ(metaUrl, std::string(LOCAL_META_URL));
     ExpectResolvedUrl(configStoreUrl, "tcp://", 6000U);
     ExpectResolvedUrl(hcomUrl, "tcp://", 7000U);
 }
@@ -177,7 +179,8 @@ TEST_F(TestMmcConfigurationUrlResolve, Setup_LoadFromFile_ResolvesConfiguredUrls
     const bool ret = clientConfig.Setup(&config);
     ASSERT_TRUE(ret);
 
-    ExpectResolvedUrl(clientConfig.GetString(ConfConstant::OCK_MMC_META_SERVICE_URL), "tcp://", 5000U);
+    // meta_service_url is preserved (domain) for DNS failover; the rest are resolved.
+    EXPECT_EQ(clientConfig.GetString(ConfConstant::OCK_MMC_META_SERVICE_URL), std::string(LOCAL_META_URL));
     ExpectResolvedUrl(clientConfig.GetString(ConfConstant::OCK_MMC_META_SERVICE_CONFIG_STORE_URL), "tcp://", 6000U);
     ExpectResolvedUrl(clientConfig.GetString(ConfConstant::OKC_MMC_LOCAL_SERVICE_BM_IP_PORT), "tcp://", 6000U);
     ExpectResolvedUrl(clientConfig.GetString(ConfConstant::OKC_MMC_LOCAL_SERVICE_BM_HCOM_URL), "tcp://", 7000U);

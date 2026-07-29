@@ -37,6 +37,7 @@ using ClientBlobDeleteHandler = std::function<int32_t(const std::string &key, co
 using ClientBatchBlobCopyHandler =
     std::function<std::vector<Result>(const std::vector<std::string> &keys, const std::vector<MmcMemBlobDesc> &srcBlobs,
                                       const std::vector<MmcMemBlobDesc> &dstBlobs)>;
+using UrlResolver = std::function<bool(const std::string &url, std::string &ip, uint16_t &port)>;
 class MetaNetClient : public MmcReferable {
 public:
     explicit MetaNetClient(const std::string &serverUrl, const std::string &inputName = "");
@@ -63,6 +64,27 @@ public:
      * @return 0 if successful
      */
     Result Connect(const std::string &url);
+
+    /**
+     * @brief Force re-resolve the server URL and reconnect.
+     *
+     * Re-resolves serverUrl_ (so a repointed DNS record is picked up) and force
+     * re-establishes the peer link. Used for proactive DNS failover and by the
+     * link-broken retry path.
+     * @return 0 if successful
+     */
+    Result Reconnect();
+
+    /**
+     * @brief Override the URL->ip:port resolver (default uses getaddrinfo).
+     *
+     * Intended for tests that simulate DNS switching without real DNS, and for
+     * deployments that need a custom resolver.
+     */
+    void SetUrlResolver(const UrlResolver &resolver)
+    {
+        resolver_ = resolver;
+    }
 
     /**
      * @brief Update server URL for reconnection without disconnecting current connection.
@@ -150,6 +172,7 @@ private:
     Result HandleBlobCopy(const NetContextPtr &context);
     Result HandleBlobDelete(const NetContextPtr &context);
     Result HandleBatchBlobCopy(const NetContextPtr &context);
+    Result ResolveAndConnect(bool isForce);
 
 private:
     NetEnginePtr engine_;
@@ -164,6 +187,7 @@ private:
     ClientBlobDeleteHandler blobDeleteHandler_ = nullptr;
     ClientBatchBlobCopyHandler batchBlobCopyHandler_ = nullptr;
     std::string serverUrl_;
+    UrlResolver resolver_;
 
     /* Protects started_, ip_, port_, serverUrl_ from concurrent access between
      * UpdateServerUrl (config polling thread) and HandleLinkBroken (IO callback thread). */

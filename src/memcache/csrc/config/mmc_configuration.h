@@ -347,6 +347,7 @@ public:
         AddIntConf(OKC_MMC_LOCAL_SERVICE_WORLD_SIZE,
                    VIntRange::Create(OKC_MMC_LOCAL_SERVICE_WORLD_SIZE.first, MIN_WORLD_SIZE, MAX_WORLD_SIZE), 0);
         AddStrConf(OKC_MMC_LOCAL_SERVICE_BM_IP_PORT, VNoCheck::Create(), 0);
+        AddStrConf(OKC_MMC_LOCAL_SERVICE_BM_IP_PORT_DOMAIN, VNoCheck::Create(), 0);
 
         AddStrConf(OKC_MMC_LOCAL_SERVICE_PROTOCOL,
                    VStrEnum::Create(OKC_MMC_LOCAL_SERVICE_PROTOCOL.first, LOCAL_SERVER_PROTOCAL_ENUM_STR),
@@ -407,6 +408,8 @@ public:
 
         config.worldSize = static_cast<uint32_t>(GetInt(ConfConstant::OKC_MMC_LOCAL_SERVICE_WORLD_SIZE));
         SafeCopy(GetString(ConfConstant::OKC_MMC_LOCAL_SERVICE_BM_IP_PORT), config.bmIpPort, DISCOVERY_URL_SIZE);
+        SafeCopy(GetString(ConfConstant::OKC_MMC_LOCAL_SERVICE_BM_IP_PORT_DOMAIN), config.bmIpPortDomain,
+                 DISCOVERY_URL_SIZE);
         SafeCopy(GetString(ConfConstant::OKC_MMC_LOCAL_SERVICE_BM_HCOM_URL), config.bmHcomUrl, DISCOVERY_URL_SIZE);
         SafeCopy(GetString(ConfConstant::OKC_MMC_LOCAL_SERVICE_BACKEND_ID), config.backendId, DISCOVERY_URL_SIZE);
         config.createId = 0;
