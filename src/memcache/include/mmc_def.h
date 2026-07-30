@@ -76,6 +76,7 @@ typedef struct {
     mmc_kv_events_config_t kvEvents;
     uint16_t rewarmDramWatermark;
     bool prefetchEnabled;
+    uint64_t pendingWaitTimeoutMs;
 } mmc_meta_service_config_t;
 
 typedef struct {

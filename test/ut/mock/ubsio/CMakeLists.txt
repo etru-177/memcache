@@ -10,4 +10,8 @@
 
 add_library(mock_ubsio SHARED mock_ubsio_api.cpp)
 target_include_directories(mock_ubsio PRIVATE ${CMAKE_SOURCE_DIR}/src/memcache/csrc/under_api/ubs_io)
-set_target_properties(mock_ubsio PROPERTIES OUTPUT_NAME "ubsio_kvc")
+set_target_properties(mock_ubsio PROPERTIES
+    OUTPUT_NAME "ubsio_kvc"
+    VERSION 1.0.0
+    SOVERSION 1
+)

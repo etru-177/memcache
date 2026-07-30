@@ -110,6 +110,7 @@ constexpr uint16_t DEFAULT_REWARM_WATERMARK_VAL = 95U;
 constexpr auto OCK_MMC_REWARM_DRAM_WATERMARK =
     std::make_pair("ock.mmc.rewarm.dram_watermark", DEFAULT_REWARM_WATERMARK_VAL);
 constexpr auto OCK_MMC_PREFETCH_ENABLED = std::make_pair("ock.mmc.storage.prefetch.enabled", false);
+constexpr auto OCK_MMC_PENDING_WAIT_TIMEOUT_MS = std::make_pair("ock.mmc.storage.pending_wait.timeout", 300U);
 constexpr auto OCK_MMC_LOCAL_SERVICE_STORAGE_ENABLED = std::make_pair("ock.mmc.local_service.storage.enabled", false);
 constexpr auto OCK_MMC_LOCAL_SERVICE_DRAM_BEST_EFFORT =
     std::make_pair("ock.mmc.local_service.dram.best_effort.enabled", false);

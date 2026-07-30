@@ -82,6 +82,16 @@ struct MmcMemMetaDesc {
         }
     }
 
+    void FillFrom(const MmcMemObjMetaPtr &memObj, const MmcMemBlobPtr &blob)
+    {
+        prot_ = memObj->Prot();
+        priority_ = memObj->Priority();
+        size_ = memObj->Size();
+        blobs_.clear();
+        blobs_.push_back(blob->GetDesc());
+        numBlobs_ = static_cast<uint8_t>(blobs_.size());
+    }
+
     uint16_t Prot()
     {
         return prot_;
@@ -105,6 +115,7 @@ struct MmcMemMetaDesc {
 
 struct MmcMetaExtConfig {
     bool prefetchEnabled = false;
+    uint64_t pendingWaitTimeoutMs = 300U;
 };
 
 class MmcMetaManager : public MmcReferable {
@@ -425,6 +436,11 @@ private:
         MmcMemBlobPtr pendingBlob;
     };
 
+    struct DeferredLockEntry {
+        size_t index;
+        MmcMemObjMetaPtr memObj;
+    };
+
     struct BatchRpcData {
         std::vector<std::string> keys;
         std::vector<MmcMemBlobDesc> srcBlobs;
@@ -442,10 +458,14 @@ private:
     void ClassifyAndGroupKeys(const std::vector<std::string> &keys, uint32_t opRankId, uint32_t opSeq,
                               std::vector<MmcMemMetaDesc> &objMetas,
                               std::map<uint32_t, std::vector<RewarmEntry>> &rankGroups,
-                              std::vector<PendingRewarmWait> &pendingWaitList);
+                              std::vector<PendingRewarmWait> &pendingWaitList,
+                              std::vector<DeferredLockEntry> &deferredLockList);
 
     void RewarmRankGroup(uint32_t rank, std::vector<RewarmEntry> &group, const std::vector<std::string> &keys,
                          uint32_t opRankId, uint32_t opSeq, std::vector<MmcMemMetaDesc> &objMetas);
+
+    void AttachReadLocks(const std::vector<std::string> &keys, uint32_t opRankId, uint32_t opSeq,
+                         std::vector<MmcMemMetaDesc> &objMetas, std::vector<DeferredLockEntry> &deferredLockList);
 
     void PendingWaitAndFill(const std::vector<std::string> &keys, uint32_t opRankId, uint32_t opSeq,
                             std::vector<MmcMemMetaDesc> &objMetas, PendingRewarmWait &w);

@@ -20,7 +20,7 @@ namespace mmc {
 bool DlUbsioApi::gLoaded = false;
 std::mutex DlUbsioApi::gMutex;
 void *DlUbsioApi::ubsioHandle = nullptr;
-const std::string DlUbsioApi::gUbsioLibName = "libubsio_kvc.so";
+const std::string DlUbsioApi::gUbsioLibName = "libubsio_kvc.so.1";
 
 ubsio_client_initFunc DlUbsioApi::pUbsioClientInit = nullptr;
 ubsio_putFunc DlUbsioApi::pUbsioPut = nullptr;
@@ -36,6 +36,7 @@ ubsio_batch_deleteFunc DlUbsioApi::pUbsioBatchDelete = nullptr;
 ubsio_batch_get_lengthFunc DlUbsioApi::pUbsioBatchGetLength = nullptr;
 ubsio_batch_free_addressFunc DlUbsioApi::pUbsioBatchFreeAddress = nullptr;
 ubsio_register_meta_event_callbackFunc DlUbsioApi::pUbsioRegisterMetaEventCallback = nullptr;
+ubsio_kv_cache_exitFunc DlUbsioApi::pUbsioKvCacheExit = nullptr;
 ubsio_get_resource_infoFunc DlUbsioApi::pUbsioGetResourceInfo = nullptr;
 
 Result DlUbsioApi::UbsioClientInit(int32_t deviceId, const std::string &confPath)
@@ -83,6 +84,7 @@ Result DlUbsioApi::LoadLibrary()
     DL_LOAD_SYM(pUbsioBatchFreeAddress, ubsio_batch_free_addressFunc, ubsioHandle, "UbsioKvCacheBatchFree");
     DL_LOAD_SYM(pUbsioRegisterMetaEventCallback, ubsio_register_meta_event_callbackFunc, ubsioHandle,
                 "UbsioKvCacheRegisterMetaEventCallback");
+    DL_LOAD_SYM(pUbsioKvCacheExit, ubsio_kv_cache_exitFunc, ubsioHandle, "UbsioKvCacheExit");
     DlLoadSymOptional(pUbsioGetResourceInfo, ubsioHandle, "UbsioGetResourceInfo");
 
     gLoaded = true;
@@ -112,6 +114,10 @@ void DlUbsioApi::CleanupLibrary()
     pUbsioRegisterMetaEventCallback = nullptr;
     pUbsioGetResourceInfo = nullptr;
 
+    if (pUbsioKvCacheExit != nullptr) {
+        pUbsioKvCacheExit();
+        pUbsioKvCacheExit = nullptr;
+    }
     if (ubsioHandle != nullptr) {
         dlclose(ubsioHandle);
         ubsioHandle = nullptr;

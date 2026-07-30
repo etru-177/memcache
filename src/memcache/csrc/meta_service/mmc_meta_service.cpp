@@ -81,6 +81,7 @@ Result MmcMetaService::Start(const mmc_meta_service_config_t &options)
     metaMgrProxy_ = MmcMakeRef<MmcMetaMgrProxy>(metaNetServer_).Get();
     MmcMetaExtConfig extConfig{};
     extConfig.prefetchEnabled = options.prefetchEnabled;
+    extConfig.pendingWaitTimeoutMs = options.pendingWaitTimeoutMs;
     MMC_RETURN_ERROR(metaMgrProxy_->Start(options_.leaseTtlMs, options.evictThresholdHigh, options.evictThresholdLow,
                                           options.rewarmDramWatermark, extConfig),
                      "Failed to start meta mgr proxy of meta service " << name_);

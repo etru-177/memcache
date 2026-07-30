@@ -45,7 +45,7 @@ lib_dir = os.path.join(current_dir, "lib")
 # Preload with absolute paths so that subsequent dlopen can resolve without LD_LIBRARY_PATH.
 _preload_list = [
     "libmf_memcache.so",
-    "libubsio_kvc.so",
+    "libubsio_kvc.so.1",
 ]
 for lib_name in _preload_list:
     so_path = os.path.join(lib_dir, lib_name)

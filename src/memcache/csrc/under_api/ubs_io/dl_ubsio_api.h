@@ -55,6 +55,7 @@ typedef struct {
 typedef void (*UbsioMetaEventCallbackC)(void *context, const UbsioMetaEventC *events, uint32_t count);
 
 using ubsio_register_meta_event_callbackFunc = int32_t (*)(UbsioMetaEventCallbackC callback, void *context);
+using ubsio_kv_cache_exitFunc = void (*)();
 
 class DlUbsioApi {
 public:
@@ -200,6 +201,7 @@ private:
     static ubsio_batch_get_lengthFunc pUbsioBatchGetLength;
     static ubsio_batch_free_addressFunc pUbsioBatchFreeAddress;
     static ubsio_register_meta_event_callbackFunc pUbsioRegisterMetaEventCallback;
+    static ubsio_kv_cache_exitFunc pUbsioKvCacheExit;
     static ubsio_get_resource_infoFunc pUbsioGetResourceInfo;
 };
 } // namespace mmc

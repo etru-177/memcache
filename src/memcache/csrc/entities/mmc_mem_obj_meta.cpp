@@ -22,13 +22,17 @@ static const uint16_t MAX_NUM_BLOB_CHAINS = 5; // to make sure MmcMemObjMeta <= 
 
 Result MmcMemObjMeta::AddBlob(const MmcMemBlobPtr &blob)
 {
+    if (blob == nullptr) {
+        MMC_LOG_ERROR("add blob: blob is nullptr");
+        return MMC_ERROR;
+    }
     if (numBlobs_ != 0 && size_ != blob->Size()) {
         MMC_LOG_ERROR("add blob size:" << blob->Size() << " != meta size:" << size_);
         return MMC_ERROR;
     }
     for (const auto &old : blobs_) {
-        if (old == nullptr || blob == nullptr) {
-            MMC_LOG_ERROR("null ptr find: " << (old == nullptr));
+        if (old == nullptr) {
+            MMC_LOG_ERROR("null ptr find in blobs_");
             return MMC_ERROR;
         }
         if (old->GetDesc() == blob->GetDesc()) {

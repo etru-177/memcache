@@ -218,6 +218,8 @@ public:
         AddIntConf(OCK_MMC_REWARM_DRAM_WATERMARK,
                    VIntRange::Create(OCK_MMC_REWARM_DRAM_WATERMARK.first, MIN_PERCENT, MAX_PERCENT), 0);
         AddBoolConf(OCK_MMC_PREFETCH_ENABLED, VStrEnum::Create(OCK_MMC_PREFETCH_ENABLED.first, BOOL_ENUM_STR), 0);
+        AddIntConf(OCK_MMC_PENDING_WAIT_TIMEOUT_MS, VIntRange::Create(OCK_MMC_PENDING_WAIT_TIMEOUT_MS.first, 1, 60000U),
+                   0);
         AddIntConf(OCK_MMC_META_LEASE_TTL_MS,
                    VIntRange::Create(OCK_MMC_META_LEASE_TTL_MS.first, MIN_LEASE_TTL_MS, MAX_LEASE_TTL_MS), 0);
 
@@ -287,6 +289,7 @@ public:
         config.evictThresholdLow = GetInt(ConfConstant::OKC_MMC_EVICT_THRESHOLD_LOW);
         config.rewarmDramWatermark = GetInt(ConfConstant::OCK_MMC_REWARM_DRAM_WATERMARK);
         config.prefetchEnabled = GetBool(ConfConstant::OCK_MMC_PREFETCH_ENABLED);
+        config.pendingWaitTimeoutMs = static_cast<uint64_t>(GetInt(ConfConstant::OCK_MMC_PENDING_WAIT_TIMEOUT_MS));
         config.leaseTtlMs = static_cast<uint64_t>(GetInt(ConfConstant::OCK_MMC_META_LEASE_TTL_MS));
         config.logRotationFileSize = GetInt(ConfConstant::OCK_MMC_LOG_ROTATION_FILE_SIZE) * MB_NUM;
         config.logRotationFileCount = GetInt(ConfConstant::OCK_MMC_LOG_ROTATION_FILE_COUNT);

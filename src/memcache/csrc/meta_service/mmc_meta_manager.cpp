@@ -146,11 +146,13 @@ static BlobClassification ClassifyBlobs(const MmcMemObjMetaPtr &objMeta, MmcBlob
 }
 
 static Result WaitPendingRewarm(const std::string &key, MmcMemBlobPtr &selectedBlob, const MmcMemBlobPtr &pendingBlob,
-                                const MmcMemBlobPtr &lowerBlob, std::unique_lock<std::mutex> &guard, int waitMs)
+                                const MmcMemBlobPtr &lowerBlob, std::unique_lock<std::mutex> &guard,
+                                const MmcMetaExtConfig &extConfig)
 {
-    MMC_LOG_DEBUG("rewarm in progress for key " << key << ", waiting " << waitMs << "ms");
+    auto timeout = std::chrono::milliseconds(extConfig.pendingWaitTimeoutMs);
+    MMC_LOG_DEBUG("rewarm in progress for key " << key << ", waiting " << timeout.count() << "ms");
     TP_TRACE_BEGIN(TP_MMC_META_GET_WAIT_REWARM);
-    bool waitOk = pendingBlob->WaitUntilReadable(guard, std::chrono::milliseconds(waitMs));
+    bool waitOk = pendingBlob->WaitUntilReadable(guard, timeout);
     TP_TRACE_END(TP_MMC_META_GET_WAIT_REWARM, waitOk ? MMC_OK : MMC_TIMEOUT);
     if (!waitOk) {
         MMC_LOG_ERROR("rewarm wait timeout for key " << key);
@@ -207,8 +209,6 @@ Result MmcMetaManager::TryRewarmForGet(const std::string &key, uint64_t operateI
 Result MmcMetaManager::ResolveAndFillMetaDesc(const std::string &key, uint64_t operateId, MmcBlobFilterPtr filterPtr,
                                               const MmcMemObjMetaPtr &memObj, MmcMemMetaDesc &objMeta)
 {
-    constexpr int rewarmWaitMs = 500;
-
     MMC_LOG_DEBUG("ResolveAndFillMetaDesc key=" << key);
 
     std::unique_lock<std::mutex> guard(memObj->Mutex());
@@ -222,7 +222,7 @@ Result MmcMetaManager::ResolveAndFillMetaDesc(const std::string &key, uint64_t o
     }
 
     if (selectedBlob == nullptr && pendingBlob != nullptr && lowerBlob != nullptr) {
-        auto waitRet = WaitPendingRewarm(key, selectedBlob, pendingBlob, lowerBlob, guard, rewarmWaitMs);
+        auto waitRet = WaitPendingRewarm(key, selectedBlob, pendingBlob, lowerBlob, guard, extConfig_);
         if (waitRet != MMC_OK) {
             return waitRet;
         }
@@ -243,6 +243,15 @@ Result MmcMetaManager::ResolveAndFillMetaDesc(const std::string &key, uint64_t o
             MMC_LOG_ERROR("rewarm failed for key=" << key << ", ret=" << ret);
             return ret;
         }
+    }
+
+    if (selectedBlob == nullptr) {
+        MMC_LOG_WARN("Get: no blob available for key " << key);
+        objMeta.prot_ = memObj->Prot();
+        objMeta.priority_ = memObj->Priority();
+        objMeta.size_ = memObj->Size();
+        objMeta.numBlobs_ = 0;
+        return MMC_OK;
     }
 
     objMeta.prot_ = memObj->Prot();
@@ -274,74 +283,37 @@ Result MmcMetaManager::GetByRank(const std::vector<std::string> &keys, uint64_t 
     uint32_t opRankId = GetRankIdByOperateId(operateId);
     uint32_t opSeq = GetSequenceByOperateId(operateId);
 
+    CheckAndEvict(MEDIA_DRAM, 0);
+
     std::map<uint32_t, std::vector<RewarmEntry>> rankGroups;
     std::vector<PendingRewarmWait> pendingWaitList;
+    std::vector<DeferredLockEntry> deferredLockList;
     TP_TRACE_BEGIN(TP_MMC_META_BATCH_GET_CLASSIFY);
-    ClassifyAndGroupKeys(keys, opRankId, opSeq, objMetas, rankGroups, pendingWaitList);
+    ClassifyAndGroupKeys(keys, opRankId, opSeq, objMetas, rankGroups, pendingWaitList, deferredLockList);
     TP_TRACE_END(TP_MMC_META_BATCH_GET_CLASSIFY, MMC_OK);
 
+    // 先异步提交 rewarm/pendingWait，后台启动 RPC；主线程同步给 selectedBlob 加读锁，两者并行缩小时隙
     std::vector<std::future<void>> futures;
-    if (!rankGroups.empty() || !pendingWaitList.empty()) {
-        TP_TRACE_BEGIN(TP_MMC_META_BATCH_GET_REWARM_WAIT);
-        for (auto &[rank, group] : rankGroups) {
-            futures.push_back(rewarmThreadPool_->Enqueue([this, rank, &group, &keys, opRankId, opSeq, &objMetas]() {
-                RewarmRankGroup(rank, group, keys, opRankId, opSeq, objMetas);
-            }));
-        }
-
-        for (auto &w : pendingWaitList) {
-            futures.push_back(rewarmThreadPool_->Enqueue([this, &keys, opRankId, opSeq, &objMetas, &w]() {
-                PendingWaitAndFill(keys, opRankId, opSeq, objMetas, w);
-            }));
-        }
-
-        for (auto &f : futures) {
-            try {
-                f.get();
-            } catch (const std::exception &e) {
-                MMC_LOG_WARN("GetByRank future failed: " << e.what());
-            }
-        }
-        TP_TRACE_END(TP_MMC_META_BATCH_GET_REWARM_WAIT, MMC_OK);
+    for (auto &[rank, group] : rankGroups) {
+        futures.push_back(rewarmThreadPool_->Enqueue([this, rank, &group, &keys, opRankId, opSeq, &objMetas]() {
+            RewarmRankGroup(rank, group, keys, opRankId, opSeq, objMetas);
+        }));
+    }
+    for (auto &w : pendingWaitList) {
+        futures.push_back(rewarmThreadPool_->Enqueue([this, &keys, opRankId, opSeq, &objMetas, &w]() {
+            PendingWaitAndFill(keys, opRankId, opSeq, objMetas, w);
+        }));
     }
 
-    size_t metaCount = objMetas.size();
-    TP_TRACE_BEGIN(TP_MMC_META_BATCH_GET_READ_START);
-    for (size_t i = 0; i < keys.size() && i < metaCount; ++i) {
-        auto &objMeta = objMetas[i];
-        if (objMeta.numBlobs_ == 0 || objMeta.blobs_.empty()) {
-            continue;
-        }
-        MmcMemObjMetaPtr memObj;
-        if (metaContainer_->Get(keys[i], memObj) != MMC_OK || memObj == nullptr) {
-            MMC_LOG_WARN("GetByRank: deferred READ_START memObj not found for key=" << keys[i]);
-            objMeta.blobs_.clear();
-            objMeta.numBlobs_ = 0;
-            continue;
-        }
-        {
-            std::unique_lock<std::mutex> guard(memObj->Mutex());
-            for (auto &desc : objMeta.blobs_) {
-                MmcBlobFilterPtr filter =
-                    MmcMakeRef<MmcBlobFilter>(desc.rank_, static_cast<MediaType>(desc.mediaType_), READABLE);
-                auto blobs = memObj->GetBlobs(filter);
-                if (blobs.empty()) {
-                    MMC_LOG_WARN("GetByRank: deferred READ_START blob not found for key=" << keys[i]);
-                    objMeta.blobs_.clear();
-                    objMeta.numBlobs_ = 0;
-                    break;
-                }
-                auto ret = blobs[0]->UpdateState(keys[i], opRankId, opSeq, MMC_READ_START);
-                if (ret != MMC_OK) {
-                    MMC_LOG_WARN("GetByRank: deferred READ_START failed for key=" << keys[i] << ", ret=" << ret);
-                    objMeta.blobs_.clear();
-                    objMeta.numBlobs_ = 0;
-                    break;
-                }
-            }
+    AttachReadLocks(keys, opRankId, opSeq, objMetas, deferredLockList);
+
+    for (auto &f : futures) {
+        try {
+            f.get();
+        } catch (const std::exception &e) {
+            MMC_LOG_WARN("GetByRank future failed: " << e.what());
         }
     }
-    TP_TRACE_END(TP_MMC_META_BATCH_GET_READ_START, MMC_OK);
 
     return MMC_OK;
 }
@@ -349,7 +321,8 @@ Result MmcMetaManager::GetByRank(const std::vector<std::string> &keys, uint64_t 
 void MmcMetaManager::ClassifyAndGroupKeys(const std::vector<std::string> &keys, uint32_t opRankId, uint32_t opSeq,
                                           std::vector<MmcMemMetaDesc> &objMetas,
                                           std::map<uint32_t, std::vector<RewarmEntry>> &rankGroups,
-                                          std::vector<PendingRewarmWait> &pendingWaitList)
+                                          std::vector<PendingRewarmWait> &pendingWaitList,
+                                          std::vector<DeferredLockEntry> &deferredLockList)
 {
     size_t keyCount = keys.size();
 
@@ -395,11 +368,8 @@ void MmcMetaManager::ClassifyAndGroupKeys(const std::vector<std::string> &keys, 
 
         if (selectedBlob != nullptr) {
             MmcMetaMetricManager::GetInstance().IncrementGetHitDramCounter(selectedBlob->GetDesc().rank_);
-            objMetas[i].prot_ = memObj->Prot();
-            objMetas[i].priority_ = memObj->Priority();
-            objMetas[i].size_ = memObj->Size();
-            objMetas[i].blobs_.push_back(selectedBlob->GetDesc());
-            objMetas[i].numBlobs_ = 1;
+            objMetas[i].FillFrom(memObj, selectedBlob);
+            deferredLockList.push_back({i, memObj});
         } else if (pendingBlob != nullptr) {
             // rewarm already in progress by another thread, wait concurrently
             pendingWaitList.push_back({i, memObj, pendingBlob});
@@ -408,11 +378,8 @@ void MmcMetaManager::ClassifyAndGroupKeys(const std::vector<std::string> &keys, 
             MediaType dstMedia = MoveUp(srcMedia);
             if (dstMedia == MEDIA_HBM || dstMedia == MEDIA_NONE) {
                 MmcMetaMetricManager::GetInstance().IncrementGetHitDramCounter(lowerBlob->GetDesc().rank_);
-                objMetas[i].prot_ = memObj->Prot();
-                objMetas[i].priority_ = memObj->Priority();
-                objMetas[i].size_ = memObj->Size();
-                objMetas[i].blobs_.push_back(lowerBlob->GetDesc());
-                objMetas[i].numBlobs_ = 1;
+                objMetas[i].FillFrom(memObj, lowerBlob);
+                deferredLockList.push_back({i, memObj});
             } else {
                 auto readRet = lowerBlob->UpdateState(keys[i], opRankId, opSeq, MMC_READ_START);
                 if (readRet != MMC_OK) {
@@ -438,6 +405,18 @@ void MmcMetaManager::ClassifyAndGroupKeys(const std::vector<std::string> &keys, 
                     continue;
                 }
                 newBlobs[0]->SetRewarmOrigin();
+                auto statusRet = newBlobs[0]->UpdateState(keys[i], lowerBlob->GetDesc().rank_, 0, MMC_ALLOCATED_OK);
+                if (statusRet != MMC_OK) {
+                    MMC_LOG_WARN("key: " << keys[i] << " rewarm ALLOCATED_OK failed, ret: " << statusRet);
+                    globalAllocator_->Free(newBlobs);
+                    auto finishRet = lowerBlob->UpdateState(keys[i], opRankId, opSeq, MMC_READ_FINISH);
+                    if (finishRet != MMC_OK) {
+                        MMC_LOG_WARN("key: " << keys[i]
+                                             << " READ_FINISH rollback after ALLOCATED_OK fail, ret: " << finishRet);
+                    }
+                    MmcMetaMetricManager::GetInstance().IncrementRewarmFailCounter(lowerBlob->GetDesc().rank_);
+                    continue;
+                }
                 auto addRet = memObj->AddBlob(newBlobs[0]);
                 if (addRet != MMC_OK) {
                     MMC_LOG_WARN("key: " << keys[i] << " rewarm AddBlob failed, ret: " << addRet);
@@ -450,7 +429,6 @@ void MmcMetaManager::ClassifyAndGroupKeys(const std::vector<std::string> &keys, 
                     MmcMetaMetricManager::GetInstance().IncrementRewarmFailCounter(lowerBlob->GetDesc().rank_);
                     continue;
                 }
-                // 与 FreeBlobs 的 DecrementRewarmBytesCurrent 配对，否则量表下溢
                 MmcMetaMetricManager::GetInstance().IncrementRewarmBytesCurrent(newBlobs[0]->Size(),
                                                                                 newBlobs[0]->GetDesc().rank_);
                 RewarmEntry entry;
@@ -539,6 +517,19 @@ Result MmcMetaManager::ApplyRewarm(const std::string &key, RewarmEntry &entry, M
         return ret;
     }
 
+    auto readStartRet = dstBlob->UpdateState(key, ctx.opRankId, ctx.opSeq, MMC_READ_START);
+    if (readStartRet != MMC_OK) {
+        MMC_LOG_WARN("READ_START failed after rewarm, key=" << key << ", ret=" << readStartRet);
+        MmcBlobFilterPtr rbFilter = MmcMakeRef<MmcBlobFilter>(dstBlob->GetDesc().rank_, ctx.dstMedia, NONE);
+        entry.memObj->FreeBlobs(key, globalAllocator_, rbFilter, false);
+        auto finishRet = entry.ssdBlob->UpdateState(key, entry.opRankId, entry.opSeq, MMC_READ_FINISH);
+        if (finishRet != MMC_OK) {
+            MMC_LOG_WARN("Failed to release SSD read lease after READ_START failed, key=" << key
+                                                                                          << ", ret=" << finishRet);
+        }
+        return readStartRet;
+    }
+
     // 保留源 SSD blob 作为冗余副本，若 DRAM 被淘汰则无需重复 CopyBlob
     objMeta.prot_ = entry.memObj->Prot();
     objMeta.priority_ = entry.memObj->Priority();
@@ -615,21 +606,55 @@ void MmcMetaManager::RewarmRankGroup(uint32_t rank, std::vector<RewarmEntry> &gr
     MMC_LOG_DEBUG("finalized " << okCnt << "/" << groupSize << " keys for rank=" << rank);
 }
 
+void MmcMetaManager::AttachReadLocks(const std::vector<std::string> &keys, uint32_t opRankId, uint32_t opSeq,
+                                     std::vector<MmcMemMetaDesc> &objMetas,
+                                     std::vector<DeferredLockEntry> &deferredLockList)
+{
+    TP_TRACE_BEGIN(TP_MMC_META_BATCH_GET_READ_START);
+    for (auto &entry : deferredLockList) {
+        auto &objMeta = objMetas[entry.index];
+        if (objMeta.numBlobs_ == 0 || objMeta.blobs_.empty()) {
+            continue;
+        }
+        std::unique_lock<std::mutex> guard(entry.memObj->Mutex());
+        for (auto &desc : objMeta.blobs_) {
+            MmcBlobFilterPtr filter =
+                MmcMakeRef<MmcBlobFilter>(desc.rank_, static_cast<MediaType>(desc.mediaType_), READABLE);
+            auto blobs = entry.memObj->GetBlobs(filter);
+            if (blobs.empty()) {
+                MMC_LOG_WARN("GetByRank: deferred READ_START blob not found for key=" << keys[entry.index]);
+                objMeta.blobs_.clear();
+                objMeta.numBlobs_ = 0;
+                break;
+            }
+            auto ret = blobs[0]->UpdateState(keys[entry.index], opRankId, opSeq, MMC_READ_START);
+            if (ret != MMC_OK) {
+                MMC_LOG_WARN("GetByRank: deferred READ_START failed for key=" << keys[entry.index] << ", ret=" << ret);
+                objMeta.blobs_.clear();
+                objMeta.numBlobs_ = 0;
+                break;
+            }
+        }
+    }
+    TP_TRACE_END(TP_MMC_META_BATCH_GET_READ_START, MMC_OK);
+}
+
 void MmcMetaManager::PendingWaitAndFill(const std::vector<std::string> &keys, uint32_t opRankId, uint32_t opSeq,
                                         std::vector<MmcMemMetaDesc> &objMetas, PendingRewarmWait &w)
 {
-    static constexpr auto kPendingWaitTimeout = std::chrono::milliseconds(300);
+    auto timeout = std::chrono::milliseconds(extConfig_.pendingWaitTimeoutMs);
     std::unique_lock<std::mutex> guard(w.memObj->Mutex());
     if (w.pendingBlob->State() != READABLE) {
-        w.pendingBlob->WaitUntilReadable(guard, kPendingWaitTimeout);
+        w.pendingBlob->WaitUntilReadable(guard, timeout);
     }
 
     if (w.pendingBlob->State() == READABLE) {
-        objMetas[w.index].prot_ = w.memObj->Prot();
-        objMetas[w.index].priority_ = w.memObj->Priority();
-        objMetas[w.index].size_ = w.memObj->Size();
-        objMetas[w.index].blobs_.push_back(w.pendingBlob->GetDesc());
-        objMetas[w.index].numBlobs_ = 1;
+        auto readStartRet = w.pendingBlob->UpdateState(keys[w.index], opRankId, opSeq, MMC_READ_START);
+        if (readStartRet != MMC_OK) {
+            MMC_LOG_WARN("key: " << keys[w.index] << " READ_START failed after pending rewarm, ret=" << readStartRet);
+            return;
+        }
+        objMetas[w.index].FillFrom(w.memObj, w.pendingBlob);
         MmcMetaMetricManager::GetInstance().IncrementGetHitDramCounter(w.pendingBlob->GetDesc().rank_);
     } else {
         MMC_LOG_WARN("key: " << keys[w.index] << " pending rewarm timeout or state not readable, state="

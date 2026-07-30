@@ -86,6 +86,10 @@ Result MmcLocalServiceDefault::Start(const mmc_local_service_config_t &config)
 
     if (RegisterBm() != MMC_OK) {
         MMC_LOG_ERROR("Failed to register bm, name=" << name_ << ", bmRankId=" << options_.rankId);
+        if (ubsIoProxyPtr_ != nullptr) {
+            ubsIoProxyPtr_->SetMetaEventCallback(nullptr);
+            ubsIoProxyPtr_->DestroyUbsIo();
+        }
         ubsioEventPool_->Destroy();
         DestroyBm();
         metaNetClient_->Stop();
@@ -116,20 +120,34 @@ void MmcLocalServiceDefault::Stop()
         MMC_LOG_WARN("MmcLocalServiceDefault has not been started" << ", rank: " << options_.rankId);
         return;
     }
+    started_ = false;
     StopConfigPolling();
+
+    // 先解绑 UBSIO callback，防止 UBSIO 线程继续投递新事件
+    if (ubsIoProxyPtr_ != nullptr) {
+        ubsIoProxyPtr_->SetMetaEventCallback(nullptr);
+    }
+
+    // 排空已入队的事件
+    if (ubsioEventPool_ != nullptr) {
+        ubsioEventPool_->Destroy();
+    }
+
+    // 回调已解绑、事件已排空，安全停止 UBSIO
+    if (ubsIoProxyPtr_ != nullptr) {
+        ubsIoProxyPtr_->DestroyUbsIo();
+        ubsIoProxyPtr_ = nullptr;
+    }
+
     DestroyBm();
     if (metaNetClient_ != nullptr) {
         metaNetClient_->Stop();
         metaNetClient_ = nullptr;
     }
-    if (ubsioEventPool_ != nullptr) {
-        ubsioEventPool_->Destroy();
-    }
     std::lock_guard<std::mutex> guardBlob(blobMutex_);
     blobMap_.clear();
     MMC_LOG_INFO("Stop MmcLocalServiceDefault (" << name_ << ") server " << options_.discoveryURL
                                                  << ", rank: " << options_.rankId);
-    started_ = false;
 }
 
 Result MmcLocalServiceDefault::InitBm()
@@ -234,15 +252,17 @@ Result MmcLocalServiceDefault::RegisterBm()
             }
         }
 
-        for (auto &desc : descs) {
-            if (desc.mediaType_ == MEDIA_SSD) {
+        for (auto descIt = descs.begin(); descIt != descs.end();) {
+            if (descIt->mediaType_ == MEDIA_SSD) {
                 if (ubsIoProxyPtr_ != nullptr && !ubsIoProxyPtr_->Exist(key)) {
                     MMC_LOG_WARN("SSD blob " << key << " no longer exists on SSD, removing from rebuild");
+                    descIt = descs.erase(descIt);
                     continue;
                 }
             }
-            req.blobList_.push_back({key, desc});
+            req.blobList_.push_back({key, *descIt});
             ++count;
+            ++descIt;
         }
 
         if (!hasSsdInMap && ubsIoProxyPtr_ != nullptr && ubsIoProxyPtr_->Exist(key)) {
@@ -257,7 +277,11 @@ Result MmcLocalServiceDefault::RegisterBm()
                 }
             }
         }
-        ++it;
+        if (descs.empty()) {
+            it = blobMap_.erase(it);
+        } else {
+            ++it;
+        }
 
         if (count >= blobRebuildSendMaxCount || it == end) {
             MMC_LOG_INFO("mmc meta blob rebuild count " << req.blobList_.size());
@@ -282,12 +306,15 @@ Result MmcLocalServiceDefault::InitUbsIo(int32_t deviceId, const std::string &co
                               "metaNetClient_ not ready when registering UBS IO callback", MMC_NOT_INITIALIZED);
     ubsIoProxyPtr_ = ubsIoProxy;
 
-    // Register UBS IO metadata event callback (before InitUbsIo to avoid missing recovery events)
     ubsIoProxy->SetMetaEventCallback([this](int type, const std::vector<std::string> &keys) {
         ubsioEventPool_->Enqueue([this, type, keys]() { HandleUbsIoMetaEvents(type, keys); });
     });
 
-    return ubsIoProxy->InitUbsIo(deviceId, confPath);
+    auto ret = ubsIoProxy->InitUbsIo(deviceId, confPath);
+    if (ret != MMC_OK) {
+        ubsIoProxy->SetMetaEventCallback(nullptr);
+    }
+    return ret;
 }
 
 Result MmcLocalServiceDefault::UpdateMetaBackup(const std::vector<uint32_t> &ops, const std::vector<std::string> &keys,

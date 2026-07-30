@@ -914,6 +914,10 @@ std::vector<mmc_buffer> MmcacheStore::GetBatch(const std::vector<std::string> &k
 
     // 1. Query KeyInfo for all keys
     auto keyInfos = BatchGetKeyInfo(keys);
+    if (keyInfos.size() != count) {
+        MMC_LOG_ERROR("BatchGetKeyInfo returned " << keyInfos.size() << " results, expected " << count);
+        return {};
+    }
 
     // 2. alloc memory and assign value to the buffers
     for (size_t i = 0; i < count; ++i) {
@@ -929,7 +933,7 @@ std::vector<mmc_buffer> MmcacheStore::GetBatch(const std::vector<std::string> &k
                 buffers[j].len = 0;
             }
             MMC_LOG_ERROR("Failed to allocate dynamic memory for key: " << keys[i].c_str());
-            return buffers;
+            return {};
         }
         buffers[i] = {
             .addr = reinterpret_cast<uint64_t>(dataPtr),
@@ -942,7 +946,23 @@ std::vector<mmc_buffer> MmcacheStore::GetBatch(const std::vector<std::string> &k
     TP_TRACE_BEGIN(TP_MMC_PY_BATCH_GET);
     auto ret = mmcc_batch_get(keyArray.data(), count, buffers.data(), 0, results.data());
     TP_TRACE_END(TP_MMC_PY_BATCH_GET, ret);
-    (void)ret;
+    if (ret != MMC_OK) {
+        for (size_t i = 0; i < count; ++i) {
+            auto tmpPtr = reinterpret_cast<char *>(buffers[i].addr);
+            delete[] tmpPtr;
+            buffers[i] = {0, 0, 0, 0};
+        }
+        MMC_LOG_ERROR("mmcc_batch_get failed, ret=" << ret);
+        return {};
+    }
+    // 4. zero out buffers for individually failed keys
+    for (size_t i = 0; i < count; ++i) {
+        if (results[i] != MMC_OK) {
+            auto tmpPtr = reinterpret_cast<char *>(buffers[i].addr);
+            delete[] tmpPtr;
+            buffers[i] = {0, 0, 0, 0};
+        }
+    }
     return buffers;
 }
 

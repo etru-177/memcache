@@ -301,6 +301,12 @@ extern "C" int32_t UbsioKvCacheBatchFree(void **bufs, uint32_t keys_count)
     return 0;
 }
 
+// 退出清理函数
+extern "C" int32_t UbsioKvCacheExit()
+{
+    return 0;
+}
+
 // 批量直接读取函数（带HBM）
 extern "C" int32_t UbsioKvCacheBatchGetDirect(const char **keys, uint32_t keys_count, void ***bufs, size_t **lengths,
                                               uint32_t lengths_rows, uint32_t lengths_cols, int *results,
