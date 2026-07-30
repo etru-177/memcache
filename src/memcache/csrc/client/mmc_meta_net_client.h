@@ -13,6 +13,7 @@
 #ifndef SMEM_MMC_META_NET_CLIENT_H
 #define SMEM_MMC_META_NET_CLIENT_H
 
+#include <atomic>
 #include <chrono>
 #include <thread>
 
@@ -193,6 +194,7 @@ private:
      * UpdateServerUrl (config polling thread) and HandleLinkBroken (IO callback thread). */
     std::mutex mutex_;
     bool started_ = false;
+    std::atomic<bool> stopping_ = false;
     std::string name_;
 };
 

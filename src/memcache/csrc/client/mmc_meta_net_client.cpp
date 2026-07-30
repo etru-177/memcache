@@ -76,24 +76,37 @@ Result MetaNetClient::Start(const NetEngineOptions &config)
     engine_ = client;
     rankId_ = config.rankId;
     started_ = true;
+    stopping_ = false;
     MMC_LOG_INFO("initialize meta net server success [" << name_ << "]");
     return MMC_OK;
 }
 
 void MetaNetClient::Stop()
 {
-    std::lock_guard<std::mutex> guard(mutex_);
-    if (!started_) {
-        MMC_LOG_WARN("MetaNetClient has not been started" << ", rank: " << rankId_);
-        return;
-    }
+    // Don't hold mutex_ while calling engine_->Stop(), because HandleLinkBroken
+    // (running on the engine's IO thread) needs mutex_ to snapshot ip_/port_.
+    // Holding mutex_ during engine_->Stop() -> epollThread_.join() causes a deadlock:
+    // Stop() holds mutex_ waiting for the IO thread, while the IO thread waits for mutex_.
+    NetEnginePtr engine;
+    {
+        std::lock_guard<std::mutex> guard(mutex_);
+        if (!started_) {
+            MMC_LOG_WARN("MetaNetClient has not been started" << ", rank: " << rankId_);
+            return;
+        }
 
-    link2Index_ = nullptr;
-    if (engine_ != nullptr) {
-        engine_->Stop();
+        link2Index_ = nullptr;
+        engine = engine_;
+        started_ = false;
+        stopping_ = true;
+    }
+    if (engine != nullptr) {
+        engine->Stop();
+    }
+    {
+        std::lock_guard<std::mutex> guard(mutex_);
         engine_ = nullptr;
     }
-    started_ = false;
 }
 
 Result MetaNetClient::Connect(const std::string &url)
@@ -231,6 +244,10 @@ Result MetaNetClient::HandleLinkBroken(const NetLinkPtr &link)
     MMC_LOG_INFO(name_ << " link broken");
     MMC_ASSERT_LOG_AND_RETURN(engine_ != nullptr, "engine_ is nullptr", MMC_NOT_INITIALIZED);
     for (uint32_t count = 0; count < retryCount_; count++) {
+        if (stopping_) {
+            MMC_LOG_INFO(name_ << " stopping, abort reconnect");
+            return MMC_ERROR;
+        }
         // Re-resolve serverUrl_ on every retry so a DNS record repointed to a
         // new meta service IP (or an UpdateServerUrl change) is picked up automatically.
         Result ret = ResolveAndConnect(true);

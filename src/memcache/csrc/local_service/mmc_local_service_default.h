@@ -27,6 +27,9 @@ namespace ock {
 namespace mmc {
 constexpr int TIMEOUT_THOUSAND = 1000;
 constexpr int UBSIO_EVENT_POOL_SIZE = 2;
+// Best-effort timeout for BM unregister during shutdown. MetaService auto-cleans
+// registration on link break (ClearResource), so a short timeout suffices.
+constexpr int BM_UNREGISTER_TIMEOUT_SECOND = 1;
 class MmcLocalServiceDefault : public MmcLocalService {
 public:
     explicit MmcLocalServiceDefault(const std::string &name) : name_(name), options_() {}

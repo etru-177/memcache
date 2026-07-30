@@ -182,8 +182,8 @@ Result MmcLocalServiceDefault::DestroyBm()
         type = MoveDown(type);
     }
     Response resp;
-    // Reverse the initialization order
-    Result ret = SyncCallMeta(req, resp, 30);
+    // Best-effort unregister: MetaService auto-cleans on link break, so don't block shutdown.
+    Result ret = SyncCallMeta(req, resp, BM_UNREGISTER_TIMEOUT_SECOND);
     bmProxyPtr_->DestroyBm();
     bmProxyPtr_ = nullptr;
     if (ret || resp.ret_) {
