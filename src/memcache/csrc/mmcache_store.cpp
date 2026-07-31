@@ -776,7 +776,8 @@ int MmcacheStore::CheckInput(const size_t batchSize, const std::vector<std::vect
     for (size_t i = 0; i < batchSize; i += 1) {
         const auto layerNum = buffers[i].size();
         if (layerNum == 0 || layerNum > MAX_BUFFER_NUM) {
-            MMC_LOG_ERROR("Layer number is 0 or exceeds the limit of " << MAX_BUFFER_NUM);
+            MMC_LOG_ERROR("Layer number is 0 or exceeds the limit of " << MAX_BUFFER_NUM << " for layerNum "
+                                                                       << layerNum);
             return MMC_INVALID_PARAM;
         }
         if (sizes[i].size() != layerNum) {
