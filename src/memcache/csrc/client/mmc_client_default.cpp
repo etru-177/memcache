@@ -454,7 +454,7 @@ Result MmcClientDefault::BatchGet(const std::vector<std::string> &keys, const st
         }
         if (bufArr.TotalSize() != blobs[0].size_) {
             MMC_LOG_ERROR("client " << name_ << " batch get failed for key " << keys[i]
-                                    << ", blob:" << std::to_string(numBlobs) << ", size:" << blobs.size()
+                                    << ", blob:" << std::to_string(numBlobs) << ", size:" << blobs[0].size_
                                     << " key size:" << bufArr.TotalSize());
             continue;
         }
