@@ -140,7 +140,8 @@ Result MmcMetaMgrProxy::BatchUpdateState(const BatchUpdateRequest &req, BatchUpd
         metricManager.IncrementFailureCounter(RestMetricType::BATCH_UPDATE_STATE);
         MMC_LOG_ERROR("BatchUpdateState: Input vectors size mismatch {keyNum:"
                       << req.keys_.size() << ", rankNum:" << req.ranks_.size()
-                      << ", mediaNum:" << req.mediaTypes_.size() << ", operateIdNum:" << req.operateIds_.size() << "}");
+                      << ", mediaNum:" << req.mediaTypes_.size() << ", actionResultNum:" << req.actionResults_.size()
+                      << ", operateIdNum:" << req.operateIds_.size() << "}");
         return MMC_ERROR;
     }
 
@@ -219,7 +220,10 @@ Result MmcMetaMgrProxy::BatchUpdateLease(const BatchUpdateLeaseRequest &req, Bat
         }
 
         if (!queryInfo.valid_ || queryInfo.numBlobs_ != singleBlobCount || queryInfo.blobs_.size() != singleBlobCount) {
-            MMC_LOG_ERROR("BatchUpdateLease got invalid query info for key:" << key);
+            MMC_LOG_ERROR("BatchUpdateLease got invalid query info for key:"
+                          << key << ", valid=" << queryInfo.valid_
+                          << ", numBlobs=" << static_cast<uint32_t>(queryInfo.numBlobs_)
+                          << ", blobsSize=" << queryInfo.blobs_.size() << ", singleBlobCount=" << singleBlobCount);
             resp.results_[i] = MMC_ERROR;
             continue;
         }

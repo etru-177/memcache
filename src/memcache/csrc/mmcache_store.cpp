@@ -564,7 +564,7 @@ int MmcacheStore::PutFromLayers(const std::string &key, const std::vector<void *
 
     auto layerNum = buffers.size();
     if (layerNum == 0 || layerNum > MAX_LAYER_NUM) {
-        MMC_LOG_ERROR("Layer number is 0 or exceeds the limit of " << MAX_LAYER_NUM);
+        MMC_LOG_ERROR("Layer number is 0 or exceeds the limit of " << MAX_LAYER_NUM << ", layerNum=" << layerNum);
         return MMC_INVALID_PARAM;
     }
 
@@ -638,7 +638,7 @@ std::vector<int> MmcacheStore::BatchPutFromLayers(const std::vector<std::string>
 
     auto res = CheckInput(batchSize, buffers, sizes);
     if (res != MMC_OK) {
-        MMC_LOG_ERROR("Failed to check if all layers are 2D");
+        MMC_LOG_ERROR("Failed to check if all layers are 2D, ret=" << res);
         return results;
     }
 
@@ -689,7 +689,7 @@ int MmcacheStore::GetIntoLayers(const std::string &key, const std::vector<void *
 
     auto layerNum = buffers.size();
     if (layerNum == 0 || layerNum > MAX_LAYER_NUM) {
-        MMC_LOG_ERROR("Layer number is 0 or exceeds the limit of " << MAX_LAYER_NUM);
+        MMC_LOG_ERROR("Layer number is 0 or exceeds the limit of " << MAX_LAYER_NUM << ", layerNum=" << layerNum);
         return MMC_INVALID_PARAM;
     }
 
@@ -757,7 +757,7 @@ std::vector<int> MmcacheStore::BatchGetIntoLayers(const std::vector<std::string>
 
     auto res = CheckInput(batchSize, buffers, sizes);
     if (res != MMC_OK) {
-        MMC_LOG_ERROR("Failed to check if all layers are 2D");
+        MMC_LOG_ERROR("Failed to check if all layers are 2D, ret=" << res);
         return results;
     }
 
@@ -884,7 +884,7 @@ mmc_buffer MmcacheStore::Get(const std::string &key)
 
     const auto dataPtr = new (std::nothrow) char[info.size];
     if (dataPtr == nullptr) {
-        MMC_LOG_ERROR("Failed to allocate dynamic memory. ");
+        MMC_LOG_ERROR("Failed to allocate dynamic memory.");
         return {};
     }
     mmc_buffer buffer = {

@@ -181,7 +181,7 @@ Result MmcClientDefault::Put(const char *key, mmc_buffer *buf, mmc_put_options &
     MMC_VALIDATE_RETURN(metaNetClient_ != nullptr, "MetaNetClient is null", MMC_CLIENT_NOT_INIT);
 
     if (buf == nullptr || key == nullptr || key[0] == '\0' || strnlen(key, KEY_MAX_LENTH + 1) == KEY_MAX_LENTH + 1) {
-        MMC_LOG_ERROR("Invalid arguments");
+        MMC_LOG_ERROR("Invalid arguments, buf=" << buf << ", key=" << static_cast<const void *>(key));
         return MMC_ERROR;
     }
 
@@ -312,7 +312,9 @@ Result MmcClientDefault::BatchPut(const std::vector<std::string> &keys, const st
     // check alloc result
     if (keys.size() != allocResponse.blobs_.size() || keys.size() != allocResponse.numBlobs_.size() ||
         keys.size() != allocResponse.results_.size()) {
-        MMC_LOG_ERROR("Mismatch in number of keys and allocated blobs");
+        MMC_LOG_ERROR("Mismatch in number of keys and allocated blobs, keys="
+                      << keys.size() << ", blobs=" << allocResponse.blobs_.size() << ", numBlobs="
+                      << allocResponse.numBlobs_.size() << ", results=" << allocResponse.results_.size());
         return MMC_ERROR;
     }
 
@@ -343,7 +345,7 @@ Result MmcClientDefault::BatchPut(const std::vector<std::string> &keys, const st
 Result MmcClientDefault::Get(const char *key, mmc_buffer *buf, uint32_t flags)
 {
     if (buf == nullptr || key == nullptr || key[0] == '\0' || strnlen(key, KEY_MAX_LENTH + 1) == KEY_MAX_LENTH + 1) {
-        MMC_LOG_ERROR("Invalid arguments");
+        MMC_LOG_ERROR("Invalid arguments, buf=" << buf << ", key=" << static_cast<const void *>(key));
         return MMC_ERROR;
     }
 
@@ -432,8 +434,9 @@ Result MmcClientDefault::BatchGet(const std::vector<std::string> &keys, const st
                      "client " << name_ << " batch get failed");
     // check rsp meta
     if (response.blobs_.size() != keys.size() || response.numBlobs_.size() != keys.size()) {
-        MMC_LOG_ERROR("client " << name_ << " batch get response size mismatch: expected " << keys.size() << ", got "
-                                << response.blobs_.size());
+        MMC_LOG_ERROR("client " << name_ << " batch get response size mismatch: expected " << keys.size()
+                                << ", got blobs=" << response.blobs_.size()
+                                << ", numBlobs=" << response.numBlobs_.size());
         return MMC_ERROR;
     }
     // read data — 从此时开始计时, alloc 失败不会产生虚假指标
@@ -462,7 +465,8 @@ Result MmcClientDefault::BatchGet(const std::vector<std::string> &keys, const st
         BatchCopyDesc keyCopyDesc{};
         batchResult[i] = PrepareBlob(bufArr, blobs[0], mediaType, keyCopyDesc, true);
         if (batchResult[i] != MMC_OK) {
-            MMC_LOG_ERROR("client " << name_ << " prepare blob failed for key " << keys[i]);
+            MMC_LOG_ERROR("client " << name_ << " prepare blob failed for key " << keys[i]
+                                    << ", ret=" << batchResult[i]);
             continue;
         }
         copyDesc.Append(keyCopyDesc);
@@ -734,7 +738,10 @@ Result MmcClientDefault::BatchAddLease(const std::vector<std::string> &keys, uin
         }
         const auto &queryInfo = response.batchQueryInfos_[i];
         if (!queryInfo.valid_ || queryInfo.numBlobs_ != 1U || queryInfo.blobs_.size() != 1U) {
-            MMC_LOG_ERROR("client " << name_ << " batch add lease got invalid query info for key " << keys[i]);
+            MMC_LOG_ERROR("client " << name_ << " batch add lease got invalid query info for key " << keys[i]
+                                    << ", valid=" << queryInfo.valid_
+                                    << ", numBlobs=" << static_cast<uint32_t>(queryInfo.numBlobs_)
+                                    << ", blobsSize=" << queryInfo.blobs_.size());
             results[i] = MMC_ERROR;
             continue;
         }
@@ -1095,7 +1102,7 @@ Result MmcClientDefault::PutData2Blobs(const std::vector<std::string> &keys, con
         BatchCopyDesc keyCopyDesc{};
         batchResult[i] = PrepareMultiBlobs(bufArr, blobs, mediaType, keyCopyDesc, false);
         if (batchResult[i] != MMC_OK) {
-            MMC_LOG_ERROR("Prepare multi blobs failed for key " << key);
+            MMC_LOG_ERROR("Prepare multi blobs failed for key " << key << ", ret=" << batchResult[i]);
             continue;
         }
 
@@ -1162,7 +1169,9 @@ Result MmcClientDefault::BatchMalloc(const std::vector<std::string> &keys, const
     // check alloc result
     if (keys.size() != allocResponse.blobs_.size() || keys.size() != allocResponse.numBlobs_.size() ||
         keys.size() != allocResponse.results_.size()) {
-        MMC_LOG_ERROR("Mismatch in number of keys and allocated blobs");
+        MMC_LOG_ERROR("Mismatch in number of keys and allocated blobs, keys="
+                      << keys.size() << ", blobs=" << allocResponse.blobs_.size() << ", numBlobs="
+                      << allocResponse.numBlobs_.size() << ", results=" << allocResponse.results_.size());
         return MMC_ERROR;
     }
 

@@ -664,7 +664,7 @@ void MmcLocalServiceDefault::StartConfigPolling()
             MMC_LOG_INFO("Config file modified, reloading...");
             auto ret = UpdateConfig();
             if (ret != MMC_OK) {
-                MMC_LOG_WARN("Failed to update config, will retry next cycle");
+                MMC_LOG_WARN("Failed to update config, will retry next cycle, ret=" << ret);
             }
             return;
         }
@@ -713,7 +713,7 @@ Result MmcLocalServiceDefault::UpdateConfig()
             if (auto ret = metaNetClient_->UpdateServerUrl(newMetaUrl); ret == MMC_OK) {
                 SafeCopy(newMetaUrl, options_.discoveryURL, DISCOVERY_URL_SIZE);
             } else {
-                MMC_LOG_ERROR("Failed to update meta net client server URL");
+                MMC_LOG_ERROR("Failed to update meta net client server URL, ret=" << ret << ", url=" << newMetaUrl);
             }
         }
     }
@@ -730,7 +730,7 @@ Result MmcLocalServiceDefault::UpdateConfig()
             if (auto ret = bmProxyPtr_->UpdateStoreUrl(newStoreUrl); ret == MMC_OK) {
                 SafeCopy(newStoreUrl, options_.bmIpPort, DISCOVERY_URL_SIZE);
             } else {
-                MMC_LOG_ERROR("Failed to update bm store URL");
+                MMC_LOG_ERROR("Failed to update bm store URL, ret=" << ret << ", url=" << newStoreUrl);
             }
         }
     }
