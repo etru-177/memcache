@@ -46,5 +46,15 @@ int SPDLOG_ResetLogLevel(int logLevel)
 {
     return ock::mmc::log::SpdLogger::GetInstance().SetLogMinLevel(logLevel);
 }
+
+void SPDLOG_CheckAndReopen()
+{
+    ock::mmc::log::SpdLogger::GetInstance().CheckAndReopen();
+}
+
+void SPDLOG_AuditCheckAndReopen()
+{
+    ock::mmc::log::SpdLogger::GetAuditInstance().CheckAndReopen();
+}
 } // namespace mmc
 } // namespace ock

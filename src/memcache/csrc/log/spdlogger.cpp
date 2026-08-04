@@ -10,9 +10,9 @@
  * See the Mulan PSL v2 for more details.
 */
 #include "spdlogger.h"
+#include <sys/stat.h>
 #include <vector>
 #include "spdlog/sinks/stdout_color_sinks.h"
-#include "spdlog/sinks/rotating_file_sink.h"
 
 namespace ock::mmc::log {
 thread_local std::string SpdLogger::gLastErrorMessage;
@@ -103,8 +103,9 @@ void SpdLogger::BuildSinks(const InitOptions &options, bool needFile, bool needS
         handlers.before_open = &BeforeOpenCallback;
         handlers.after_open = &AfterOpenCallback;
         handlers.after_close = &AfterCloseCallback;
-        sinks.push_back(std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
-            options.path, options.rotationFileSize, options.rotationFileCount, true, handlers));
+        mFileSink = std::make_shared<ReopenableRotatingFileSinkMt>(options.path, options.rotationFileSize,
+                                                                   options.rotationFileCount, true, handlers);
+        sinks.push_back(mFileSink);
     }
 }
 
@@ -119,6 +120,12 @@ void SpdLogger::ConfigureLogger(int minLogLevel)
     spdlog::flush_every(std::chrono::seconds(1));
     mSPDLogger->set_level(static_cast<spdlog::level::level_enum>(minLogLevel));
     mSPDLogger->flush_on(spdlog::level::err);
+    mSPDLogger->set_error_handler(&HandleSinkError);
+}
+
+void SpdLogger::HandleSinkError(const std::string &msg)
+{
+    gLastErrorMessage = msg;
 }
 
 int SpdLogger::Initialize(const std::string &path, int minLogLevel, int rotationFileSize, int rotationFileCount,
@@ -137,12 +144,16 @@ int SpdLogger::Initialize(const std::string &path, int minLogLevel, int rotation
         if (ValidateInitialize(options, needFile, needStdout) != 0) {
             return -1;
         }
+        mFileSink.reset();
         std::vector<spdlog::sink_ptr> sinks;
         BuildSinks(options, needFile, needStdout, sinks);
         mSPDLogger = std::make_shared<spdlog::logger>("log:" + path, sinks.begin(), sinks.end());
         if (mSPDLogger == nullptr) {
             gLastErrorMessage = "spdlog logger is not created yet";
             return -1;
+        }
+        if (needFile) {
+            mFilePath = path;
         }
         ConfigureLogger(minLogLevel);
         started_ = true;
@@ -173,6 +184,23 @@ void SpdLogger::Flush(void)
 {
     if (mSPDLogger != nullptr) {
         mSPDLogger->flush();
+    }
+}
+
+void SpdLogger::CheckAndReopen()
+{
+    if (mFileSink == nullptr || mFilePath.empty()) {
+        return;
+    }
+    if (!mFileSink->NeedReopen()) {
+        return;
+    }
+    try {
+        mFileSink->ReopenCurrentOnly();
+    } catch (const spdlog::spdlog_ex &ex) {
+        gLastErrorMessage = std::string("Failed to reopen log file: ") + ex.what();
+    } catch (...) {
+        gLastErrorMessage = "Unknown exception when reopening log file";
     }
 }
 

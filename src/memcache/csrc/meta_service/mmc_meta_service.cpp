@@ -255,7 +255,7 @@ void MmcMetaService::Stop()
         MMC_LOG_WARN("MmcMetaService has not been started");
         return;
     }
-    StopPeriodicTask();
+    UnregisterPeriodicTask("metrics_report");
     PublishClearedForRanks(CollectRanks(rankMediaTypeMap_));
     kvEventsPublishActive_ = false;
     MmcMetaManager *metaManager = nullptr;
@@ -290,41 +290,6 @@ std::string MmcMetaService::GetBackendIdForRank(uint32_t rank)
     return (it != rankBackendIdMap_.end()) ? it->second : std::string();
 }
 
-bool MmcMetaService::StartPeriodicTask(const std::string &taskName, uint32_t intervalSeconds,
-                                       MmcPeriodicTask::Task task)
-{
-    if (intervalSeconds == 0 || !task) {
-        MMC_LOG_ERROR("Failed to start periodic task in meta service, invalid param: taskName="
-                      << taskName << ", intervalSeconds=" << intervalSeconds);
-        return false;
-    }
-    if (periodicTask_ == nullptr) {
-        periodicTask_ = std::make_unique<MmcPeriodicTask>(name_);
-    }
-
-    if (!periodicTask_->RegisterTask(taskName, intervalSeconds, std::move(task))) {
-        MMC_LOG_ERROR("Failed to register periodic task: " << taskName << ", intervalSeconds=" << intervalSeconds);
-        return false;
-    }
-
-    if (!periodicTask_->IsRunning() && !periodicTask_->Start()) {
-        MMC_LOG_ERROR("Failed to start periodic task scheduler");
-        return false;
-    }
-
-    MMC_LOG_INFO("Registered periodic task in meta service: " << taskName << ", intervalSeconds=" << intervalSeconds);
-    return true;
-}
-
-void MmcMetaService::StopPeriodicTask()
-{
-    if (periodicTask_ != nullptr) {
-        periodicTask_->Stop();
-        periodicTask_.reset();
-    }
-    MMC_LOG_INFO("Stopped periodic task worker in meta service");
-}
-
 void MmcMetaService::StartMetricsReportTask()
 {
     if (options_.metricsReportIntervalSeconds == 0) {
@@ -332,7 +297,7 @@ void MmcMetaService::StartMetricsReportTask()
         return;
     }
     const uint32_t intervalSeconds = options_.metricsReportIntervalSeconds;
-    const bool started = StartPeriodicTask("metrics_report", intervalSeconds, [this]() {
+    const Result ret = RegisterPeriodicTask("metrics_report", intervalSeconds, [this]() {
         if (metaMgrProxy_ == nullptr) {
             MMC_LOG_WARN("Skip metrics report task because metaMgrProxy is null");
             return;
@@ -345,7 +310,7 @@ void MmcMetaService::StartMetricsReportTask()
             MMC_LOG_WARN("Unable to build periodic metrics summary");
         }
     });
-    if (!started) {
+    if (ret != MMC_OK) {
         MMC_LOG_ERROR("Failed to start metrics report task");
     }
 }

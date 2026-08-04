@@ -21,6 +21,7 @@
 #include <vector>
 #include <spdlog/common.h>
 #include <spdlog/spdlog.h>
+#include "reopenable_rotating_file_sink.h"
 
 namespace ock::mmc::log {
 enum class LogLevel {
@@ -64,6 +65,7 @@ public:
     void AuditLogMessage(const char *message);
     static const char *GetLastErrorMessage();
     void Flush(void);
+    void CheckAndReopen();
 
 private:
     struct InitOptions {
@@ -76,17 +78,18 @@ private:
     static int ValidateLogLevel(int minLogLevel);
     static int ValidateParams(int minLogLevel, const std::string &path, int rotationFileSize, int rotationFileCount);
     static int ValidateInitialize(const InitOptions &options, bool &needFile, bool &needStdout);
-    static void BuildSinks(const InitOptions &options, bool needFile, bool needStdout,
-                           std::vector<spdlog::sink_ptr> &sinks);
+    void BuildSinks(const InitOptions &options, bool needFile, bool needStdout, std::vector<spdlog::sink_ptr> &sinks);
     void ConfigureLogger(int minLogLevel);
 
     static void BeforeOpenCallback(const std::string &filename);
     static void AfterOpenCallback(const std::string &filename, std::FILE *file_stream);
     static void AfterCloseCallback(const std::string &filename);
+    static void HandleSinkError(const std::string &msg);
 
     std::mutex mutex_;
     bool started_ = false;
     std::shared_ptr<spdlog::logger> mSPDLogger;
+    std::shared_ptr<ReopenableRotatingFileSinkMt> mFileSink;
     std::string mFilePath;
     int mRotationFileSize = 0;
     int mRotationFileCount = 0;

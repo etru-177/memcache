@@ -27,6 +27,7 @@
 
 #include "mmc_logger.h"
 #include "mmc_ptracer.h"
+#include "mmc_types.h"
 
 namespace ock {
 namespace mmc {
@@ -205,7 +206,7 @@ class MmcPeriodicTaskFactory {
 public:
     static std::shared_ptr<MmcPeriodicTask> GetInstance(const std::string &key = "")
     {
-        const std::string realKey = key.empty() ? kDefaultKey : key;
+        const std::string realKey = key.empty() ? std::string(kDefaultKey) : key;
         std::lock_guard<std::mutex> lock(instanceMutex_);
         const auto it = instances_.find(realKey);
         if (it == instances_.end()) {
@@ -222,7 +223,7 @@ public:
 
     static void DestroyInstance(const std::string &key = "")
     {
-        const std::string realKey = key.empty() ? kDefaultKey : key;
+        const std::string realKey = key.empty() ? std::string(kDefaultKey) : key;
         std::lock_guard<std::mutex> lock(instanceMutex_);
         const auto it = instances_.find(realKey);
         if (it != instances_.end()) {
@@ -234,8 +235,15 @@ public:
 private:
     inline static std::map<std::string, std::shared_ptr<MmcPeriodicTask>> instances_;
     inline static std::mutex instanceMutex_;
-    inline static const std::string kDefaultKey = "periodTask";
+    inline static constexpr const char *kDefaultKey = "periodTask";
 };
+
+// 注册并启动周期任务，所有模块共享同一个调度器，任务名全局唯一。
+// 同名注册会更新周期和回调。成功返回 MMC_OK，参数非法返回 MMC_INVALID_PARAM，其余失败返回 MMC_ERROR。
+Result RegisterPeriodicTask(const std::string &taskName, uint32_t intervalSeconds, MmcPeriodicTask::Task task);
+
+// 注销周期任务，等待当前正在执行的回调返回后移除。
+void UnregisterPeriodicTask(const std::string &taskName);
 
 } // namespace mmc
 } // namespace ock

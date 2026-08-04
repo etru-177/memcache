@@ -15,6 +15,7 @@
 #include "mmc_mem_obj_meta.h"
 #include "mmc_bm_proxy.h"
 #include "mmc_montotonic.h"
+#include "mmc_periodic_task.h"
 #include "mmc_ptracer.h"
 #include "mmc_client_metric_manager.h"
 #include "mmc_bandwidth_collector.h"
@@ -923,29 +924,6 @@ void MmcClientDefault::AsyncUpdateLease(BatchUpdateLeaseRequest &request)
     if (!future.valid()) {
         SyncUpdateLease(request);
     }
-}
-
-Result MmcClientDefault::RegisterPeriodicTask(const std::string &taskName, uint32_t intervalSeconds,
-                                              MmcPeriodicTask::Task task)
-{
-    if (intervalSeconds == 0 || !task) {
-        MMC_LOG_ERROR("Failed to start periodic task in client, invalid param: taskName="
-                      << taskName << ", intervalSeconds=" << intervalSeconds);
-        return MMC_INVALID_PARAM;
-    }
-
-    auto periodicTask = MmcPeriodicTaskFactory::GetInstance();
-    if (!periodicTask->RegisterTask(taskName, intervalSeconds, std::move(task))) {
-        MMC_LOG_ERROR("Failed to register periodic task: " << taskName << ", intervalSeconds=" << intervalSeconds);
-        return MMC_ERROR;
-    }
-    if (!periodicTask->IsRunning() && !periodicTask->Start()) {
-        MMC_LOG_ERROR("Failed to start periodic task scheduler in client");
-        return MMC_ERROR;
-    }
-
-    MMC_LOG_INFO("Registered periodic task in client: " << taskName << ", intervalSeconds=" << intervalSeconds);
-    return MMC_OK;
 }
 
 Result MmcClientDefault::InitMetricReporting()

@@ -185,3 +185,117 @@ TEST_F(TestMmcPeriodicTask, MultipleDueTasksExecuteInRegistrationOrder)
     EXPECT_EQ(firstOrder.load(), 1);
     EXPECT_EQ(secondOrder.load(), 2UL);
 }
+
+TEST_F(TestMmcPeriodicTask, FactoryGetInstanceReturnsSameInstanceForSameKey)
+{
+    const std::string key = "ut_factory_same_key";
+    auto first = MmcPeriodicTaskFactory::GetInstance(key);
+    auto second = MmcPeriodicTaskFactory::GetInstance(key);
+    ASSERT_NE(first, nullptr);
+    ASSERT_NE(second, nullptr);
+    EXPECT_EQ(first.get(), second.get());
+    MmcPeriodicTaskFactory::DestroyInstance(key);
+}
+
+TEST_F(TestMmcPeriodicTask, FactoryGetInstanceReturnsDifferentInstanceForDifferentKey)
+{
+    auto first = MmcPeriodicTaskFactory::GetInstance("ut_factory_key_a");
+    auto second = MmcPeriodicTaskFactory::GetInstance("ut_factory_key_b");
+    ASSERT_NE(first, nullptr);
+    ASSERT_NE(second, nullptr);
+    EXPECT_NE(first.get(), second.get());
+    MmcPeriodicTaskFactory::DestroyInstance("ut_factory_key_a");
+    MmcPeriodicTaskFactory::DestroyInstance("ut_factory_key_b");
+}
+
+TEST_F(TestMmcPeriodicTask, FactoryGetInstanceUsesDefaultKeyWhenArgumentEmpty)
+{
+    auto withEmpty = MmcPeriodicTaskFactory::GetInstance();
+    auto withDefault = MmcPeriodicTaskFactory::GetInstance("periodTask");
+    EXPECT_EQ(withEmpty.get(), withDefault.get());
+    // 不销毁默认 key，避免影响其它用例共享的调度器
+}
+
+TEST_F(TestMmcPeriodicTask, FactoryDestroyInstanceRemovesInstance)
+{
+    const std::string key = "ut_factory_destroy";
+    auto instance = MmcPeriodicTaskFactory::GetInstance(key);
+    ASSERT_NE(instance, nullptr);
+    ASSERT_TRUE(instance->RegisterTask("ut_destroy_task", 1, []() {}));
+    ASSERT_TRUE(instance->Start());
+
+    MmcPeriodicTaskFactory::DestroyInstance(key);
+    EXPECT_FALSE(instance->IsRunning());
+
+    // 销毁后再次获取应是新实例
+    auto recreated = MmcPeriodicTaskFactory::GetInstance(key);
+    ASSERT_NE(recreated, nullptr);
+    EXPECT_NE(instance.get(), recreated.get());
+    MmcPeriodicTaskFactory::DestroyInstance(key);
+}
+
+TEST_F(TestMmcPeriodicTask, FactoryDestroyInstanceOnAbsentKeyIsSafe)
+{
+    MmcPeriodicTaskFactory::DestroyInstance("ut_factory_absent_key");
+    SUCCEED();
+}
+
+TEST_F(TestMmcPeriodicTask, RegisterPeriodicTaskExecutesTask)
+{
+    std::atomic<int> counter{0};
+    ASSERT_EQ(RegisterPeriodicTask("ut_util_exec", 1, [&counter]() { ++counter; }), MMC_OK);
+
+    for (int i = 0; i < 20UL && counter.load() == 0; ++i) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100UL));
+    }
+    UnregisterPeriodicTask("ut_util_exec");
+    EXPECT_GE(counter.load(), 1);
+}
+
+TEST_F(TestMmcPeriodicTask, RegisterPeriodicTaskReturnsErrorWhenIntervalIsZero)
+{
+    EXPECT_NE(RegisterPeriodicTask("ut_util_zero_interval", 0, []() {}), MMC_OK);
+    UnregisterPeriodicTask("ut_util_zero_interval");
+}
+
+TEST_F(TestMmcPeriodicTask, RegisterPeriodicTaskReturnsErrorWhenTaskIsEmpty)
+{
+    MmcPeriodicTask::Task emptyTask;
+    EXPECT_NE(RegisterPeriodicTask("ut_util_empty_task", 1, emptyTask), MMC_OK);
+    UnregisterPeriodicTask("ut_util_empty_task");
+}
+
+TEST_F(TestMmcPeriodicTask, RegisterPeriodicTaskUpdatesExistingTask)
+{
+    std::atomic<int> oldCounter{0};
+    std::atomic<int> newCounter{0};
+    ASSERT_EQ(RegisterPeriodicTask("ut_util_update", 1, [&oldCounter]() { ++oldCounter; }), MMC_OK);
+    ASSERT_EQ(RegisterPeriodicTask("ut_util_update", 1, [&newCounter]() { ++newCounter; }), MMC_OK);
+
+    for (int i = 0; i < 20UL && newCounter.load() == 0; ++i) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100UL));
+    }
+    UnregisterPeriodicTask("ut_util_update");
+    EXPECT_EQ(oldCounter.load(), 0);
+    EXPECT_GE(newCounter.load(), 1);
+}
+
+TEST_F(TestMmcPeriodicTask, UnregisterPeriodicTaskRemovesTask)
+{
+    std::atomic<int> counter{0};
+    ASSERT_EQ(RegisterPeriodicTask("ut_util_unregister", 1, [&counter]() { ++counter; }), MMC_OK);
+
+    for (int i = 0; i < 20UL && counter.load() == 0; ++i) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100UL));
+    }
+    const int beforeUnregister = counter.load();
+    UnregisterPeriodicTask("ut_util_unregister");
+    std::this_thread::sleep_for(std::chrono::milliseconds(200UL));
+    EXPECT_EQ(counter.load(), beforeUnregister);
+}
+
+TEST_F(TestMmcPeriodicTask, UnregisterPeriodicTaskOnAbsentNameIsSafe)
+{
+    UnregisterPeriodicTask("ut_util_absent_name");
+    SUCCEED();
+}

@@ -34,6 +34,7 @@
 #include "mmc_env.h"
 #include "mmc_logger.h"
 #include "mmc_meta_service.h"
+#include "mmc_periodic_task.h"
 #include "mmc_ptracer.h"
 #include "mmc_ip_validator.h"
 
@@ -43,6 +44,7 @@ static volatile sig_atomic_t g_processExitRequested = 0;
 static volatile sig_atomic_t g_receivedExitSignal = 0;
 constexpr std::chrono::milliseconds PROCESS_EXIT_POLL_INTERVAL{100u};
 constexpr size_t kProtocolSuffixLen = 3; // "://"
+constexpr uint32_t LOG_FILE_REOPEN_INTERVAL_SECONDS = 5;
 
 int MmcMetaServiceProcess::MainForExecutable()
 {
@@ -82,6 +84,13 @@ int MmcMetaServiceProcess::MainForPython()
     if (InitLogger(config_)) {
         std::cerr << "Error, failed to init logger." << std::endl;
         return -1;
+    }
+    const auto reopenRet = RegisterPeriodicTask("log_file_reopen", LOG_FILE_REOPEN_INTERVAL_SECONDS, []() {
+        SPDLOG_CheckAndReopen();
+        SPDLOG_AuditCheckAndReopen();
+    });
+    if (reopenRet != MMC_OK) {
+        MMC_LOG_ERROR("Failed to register log reopen periodic task, ret: " << reopenRet);
     }
 
     if (config_.haEnable) {
@@ -441,6 +450,7 @@ int MmcMetaServiceProcess::StartHttpServer()
 
 void MmcMetaServiceProcess::Exit()
 {
+    UnregisterPeriodicTask("log_file_reopen");
     if (metaService_ != nullptr) {
         metaService_->Stop();
     }

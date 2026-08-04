@@ -70,6 +70,20 @@ void SPDLOG_AuditLogMessage(const char *msg);
 const char *SPDLOG_GetLastErrorMessage();
 
 int SPDLOG_ResetLogLevel(int logLevel);
+
+/**
+ * @brief check whether the log file has been deleted externally and reopen if so
+ *
+ * This function should be called periodically (e.g. in the main loop) to detect
+ * external deletion of the log file and restore it. It reuses the rotating file
+ * sink's internal mutex, so no extra locking is needed on the hot logging path.
+ */
+void SPDLOG_CheckAndReopen();
+
+/**
+ * @brief check whether the audit log file has been deleted externally and reopen if so
+ */
+void SPDLOG_AuditCheckAndReopen();
 } // namespace mmc
 } // namespace ock
 

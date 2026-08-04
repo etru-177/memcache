@@ -26,7 +26,6 @@
 #include "mmc_ubs_io_proxy.h"
 #include "mmc_thread_pool.h"
 #include "mmc_msg_client_meta.h"
-#include "mmc_periodic_task.h"
 #include "mmc_bandwidth_collector.h"
 
 namespace ock {
@@ -160,7 +159,6 @@ private:
                               int32_t direct);
     Result BatchCopyReadPath(std::vector<void *> &gvas, std::vector<void *> &buffers, std::vector<size_t> &sizes,
                              int32_t direct);
-    Result RegisterPeriodicTask(const std::string &taskName, uint32_t intervalSeconds, MmcPeriodicTask::Task task);
     Result InitMetricReporting();
     void ReportMetrics();
     void ProcessExpiredReadLeases();

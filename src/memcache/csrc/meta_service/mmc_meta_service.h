@@ -71,7 +71,6 @@ private:
     MetaNetServerPtr metaNetServer_;
     MmcMetaMgrProxyPtr metaMgrProxy_;
     MMCMetaBackUpMgrPtr metaBackUpMgrPtr_;
-    std::unique_ptr<MmcPeriodicTask> periodicTask_;
 
     std::mutex mutex_;
     bool started_ = false;
@@ -85,8 +84,6 @@ private:
     MmcKvEventRuntime kvEvents_;
     bool kvEventsPublishActive_{false};
 
-    bool StartPeriodicTask(const std::string &taskName, uint32_t intervalSeconds, MmcPeriodicTask::Task task);
-    void StopPeriodicTask();
     void StartMetricsReportTask();
 };
 inline const std::string &MmcMetaService::Name() const
