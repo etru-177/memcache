@@ -94,11 +94,8 @@ public:
         }
 
         {
-            std::lock_guard<std::mutex> lg(backupListLock_);
-            backupList_.push_back({META_BACKUP_ADD, key, blobDesc});
-        }
-        {
             std::lock_guard<std::mutex> lk(backupThreadLock_);
+            backupList_.push_back({META_BACKUP_ADD, key, blobDesc});
             backupThreadCv_.notify_all();
         }
         return MMC_OK;
@@ -110,11 +107,8 @@ public:
             return MMC_OK; // 未启动ha模式，不做备份
         }
         {
-            std::lock_guard<std::mutex> lg(backupListLock_);
-            backupList_.push_back({META_BACKUP_REMOVE, key, blobDesc});
-        }
-        {
             std::lock_guard<std::mutex> lk(backupThreadLock_);
+            backupList_.push_back({META_BACKUP_REMOVE, key, blobDesc});
             backupThreadCv_.notify_all();
         }
         return MMC_OK;
@@ -136,7 +130,6 @@ private:
     std::thread backupThread_;
     std::mutex backupThreadLock_;
     std::condition_variable backupThreadCv_;
-    std::mutex backupListLock_;
     std::list<MetaBackUpOperate> backupList_;
 };
 } // namespace mmc

@@ -51,7 +51,7 @@ void MMCMetaBackUpMgrDefault::SendBackup2Local()
     uint32_t rank;
     while (haveCount && started_) {
         {
-            std::lock_guard<std::mutex> lg(backupListLock_);
+            std::lock_guard<std::mutex> lg(backupThreadLock_);
             rank = PopMetas2Backup(ops, keys, blobs);
             haveCount = backupList_.size();
             MMC_LOG_DEBUG("BackupThreadFunc bm rank=" << rank);
