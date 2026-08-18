@@ -101,7 +101,7 @@ void DefineMmcStructModule(py::module_ &m)
                 },
                 R"pbdoc(
              Data transfer protocol: host_rdma, host_urma, host_tcp, host_shm, device_rdma, device_urma,
-             device_uboe, device_sdma.
+             device_uboe, device_sdma, host_device_urma.
          )pbdoc")
             .def_property(
                 "hcom_url", [](const local_config &cfg) { return std::string(cfg.hcom_url); },

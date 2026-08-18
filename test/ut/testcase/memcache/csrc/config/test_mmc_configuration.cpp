@@ -328,6 +328,18 @@ TEST_F(TestMmcConfiguration, SetupWithErrorHandlingTest)
     ASSERT_FALSE(ret);
 }
 
+TEST_F(TestMmcConfiguration, HostDeviceUrmaProtocolTest)
+{
+    ClientConfig clientConfig;
+    auto config = CreateLocalConfigWithCurrentDefaults();
+    SafeCopy("host_device_urma", config.protocol, sizeof(config.protocol));
+
+    ASSERT_TRUE(clientConfig.Setup(&config));
+    ASSERT_EQ(clientConfig.GetString(ConfConstant::OKC_MMC_LOCAL_SERVICE_PROTOCOL), "host_device_urma");
+    ASSERT_EQ(MmcSmemBmHelper::TransSmemBmDataOpType("host_device_urma"), SMEMB_DATA_OP_HOST_DEVICE_URMA);
+    ASSERT_EQ(static_cast<uint32_t>(SMEMB_DATA_OP_HOST_DEVICE_URMA), (1U << 8));
+}
+
 TEST_F(TestMmcConfiguration, SetupWithFullConfigTest)
 {
     ClientConfig clientConfig;

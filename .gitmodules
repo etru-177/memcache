@@ -8,8 +8,8 @@
 	branch = tags/v2.7
 [submodule "3rdparty/memfabric_hybrid"]
 	path = 3rdparty/memfabric_hybrid
-	url = https://gitcode.com/Ascend/memfabric_hybrid.git
-	branch = master
+	url = https://github.com/NoCoder0/memfabric_hybrid.git
+	branch = feat/aicpu-urma-design
 [submodule "3rdparty/log/spdlog"]
 	path = 3rdparty/log/spdlog
 	url = https://github.com/gabime/spdlog.git

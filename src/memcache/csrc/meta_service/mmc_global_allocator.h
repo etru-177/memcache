@@ -64,7 +64,7 @@ public:
 
         AllocOptions allocReq = allocOpt;
         if (allocReq.mediaType_ == MEDIA_NONE) {
-            allocReq.mediaType_ = static_cast<uint16_t>(GetTopLayerMediumType());
+            allocReq.mediaType_ = static_cast<uint16_t>(ResolveMediaTypeForRank(allocReq.preferredRank_));
         }
         std::unordered_set<uint32_t> excludeRanks;
         globalAllocLock_.LockRead();
@@ -403,6 +403,35 @@ private:
     {
         MediaType result = MEDIA_NONE;
         globalAllocLock_.LockRead();
+        for (const auto &[location, allocator] : allocators_) {
+            result = location.mediaType_;
+            break;
+        }
+        globalAllocLock_.UnlockRead();
+        return result;
+    }
+
+    // 未显式指定目标介质时，优先使用目标 rank 实际注册的池介质（如 Host rank 的 DRAM）。
+    // 未指定 preferred rank 时才回退到全局第一个分配器的介质。
+    MediaType ResolveMediaTypeForRank(const std::vector<uint32_t> &preferredRanks)
+    {
+        MediaType result = MEDIA_NONE;
+        globalAllocLock_.LockRead();
+        if (!preferredRanks.empty()) {
+            const uint32_t rank = preferredRanks[0];
+            for (const auto &[location, allocator] : allocators_) {
+                if (location.rank_ == rank) {
+                    result = location.mediaType_;
+                    break;
+                }
+            }
+            globalAllocLock_.UnlockRead();
+            if (result == MEDIA_NONE) {
+                MMC_LOG_ERROR("ResolveMediaTypeForRank: no allocator mounted for preferred rank "
+                              << rank << ", allocators count: " << allocators_.size());
+            }
+            return result;
+        }
         for (const auto &[location, allocator] : allocators_) {
             result = location.mediaType_;
             break;

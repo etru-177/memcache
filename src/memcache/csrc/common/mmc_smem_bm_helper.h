@@ -46,6 +46,9 @@ public:
         if (dataOpType == "host_shm") {
             return SMEMB_DATA_OP_HOST_SHM;
         }
+        if (dataOpType == "host_device_urma") {
+            return SMEMB_DATA_OP_HOST_DEVICE_URMA;
+        }
         return SMEMB_DATA_OP_BUTT;
     }
 

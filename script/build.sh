@@ -16,6 +16,12 @@ export BUILD_PYTHON=${4:-ON}
 export ENABLE_PTRACER=${5:-ON}
 export INCREMENTAL=${6:-OFF}
 export BUILD_UBSIO=${7:-ON}
+export BUILD_LOCAL_DRAM_VALIDATION=${8:-OFF}
+
+if [[ "${BUILD_LOCAL_DRAM_VALIDATION}" != "ON" && "${BUILD_LOCAL_DRAM_VALIDATION}" != "OFF" ]]; then
+    echo "Invalid BUILD_LOCAL_DRAM_VALIDATION value: ${BUILD_LOCAL_DRAM_VALIDATION} (expected ON or OFF)"
+    exit 1
+fi
 
 readonly SCRIPT_FULL_PATH=$(dirname $(readlink -f "$0"))
 readonly PROJECT_FULL_PATH=$(dirname "$SCRIPT_FULL_PATH")
@@ -103,6 +109,7 @@ cmake \
     -DBUILD_PYTHON="${BUILD_PYTHON}" \
     -DENABLE_PTRACER="${ENABLE_PTRACER}" \
     -DBUILD_UBSIO="${BUILD_UBSIO}" \
+    -DBUILD_LOCAL_DRAM_VALIDATION="${BUILD_LOCAL_DRAM_VALIDATION}" \
     -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
     -S . -B build/
 

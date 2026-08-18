@@ -49,7 +49,7 @@ constexpr int32_t LOG_OUTPUT_TARGET_SCREEN = 0;
 constexpr int32_t LOG_OUTPUT_TARGET_FILE = 1;
 constexpr int32_t LOG_OUTPUT_TARGET_BOTH = 2;
 const std::string LOCAL_SERVER_PROTOCAL_ENUM_STR =
-    "host_rdma||host_urma||host_tcp||device_rdma||device_urma||device_uboe||device_sdma||host_shm";
+    "host_rdma||host_urma||host_tcp||device_rdma||device_urma||device_uboe||device_sdma||host_shm||host_device_urma";
 
 // 定义单位与字节的转换关系
 enum class MemUnit { B, KB, MB, GB, TB, UNKNOWN };

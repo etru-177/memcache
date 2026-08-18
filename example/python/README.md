@@ -65,6 +65,9 @@ MetaService.main()
 
 ## 执行脚本
 
+四 client（2 个 DRAM 池 + 2 个 HBM 池）的 batch put、KeyInfo GVA 和 MemFabric offload 用例，参见
+[`README_batch_put_key_info_offload.md`](README_batch_put_key_info_offload.md)。
+
 选择脚本，直接执行，以test_mmc_start_meta_service_and_simple_test.py为例，会在一个进程里面启动meta服务和localService并且完成put，get等测试（不需要前面步骤单独的启动meta服务进程），如需修改参数，请调整MetaConfig、LocalConfig相关代码。
 
 ```shell
