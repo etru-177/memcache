@@ -131,7 +131,8 @@ def _make_local_config(role):
     """构造 MemCache LocalService 的本地配置。
 
     两种角色共享相同的 GVA 布局（max_dram/max_hbm 都为 1 GiB），
-    但只按角色分配实际本地池：Host 只建 DRAM，Device 只建 HBM。
+    但只按角色分配实际本地池：Host 只建 1 GiB DRAM 池，Device 不申请任何本地内存。
+    Device 的源/目标 tensor 由 torch 直接分配在 HBM，不经过 MemCache 池。
     """
     from memcache_hybrid import LocalConfig
 
@@ -145,7 +146,7 @@ def _make_local_config(role):
     config.max_dram_size = "1GB"
     config.max_hbm_size = "1GB"
     config.dram_size = "1GB" if role == ROLE_HOST else "0"
-    config.hbm_size = "0" if role == ROLE_HOST else "1GB"
+    config.hbm_size = "0"
     return config
 
 
