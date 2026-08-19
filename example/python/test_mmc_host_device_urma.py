@@ -24,6 +24,11 @@
   5. Device 在 GVA 上叠加一个偏移，把源地址/HBM 目标地址/长度交给 MemFabric
      sparse_copy_urma；AICPU 从 Host DRAM 复制片段到 HBM。
   6. 比较复制回来的 HBM 数据与原始对象对应切片。
+
+  也可以把第 5 步换成 MemFabric 的 npu_kvcache_scatter_copy：不再直接给地址列表，
+  而是给 [offload slot, src token id, dst token id] 三元组和两级 block table，
+  由 kernel 内部换算 Host DRAM 的源 GVA 与 HBM 的目标 token 地址后按 token 粒度
+  分散复制（本文件默认即使用 scatter_copy 路径）。
 """
 
 import argparse
@@ -240,8 +245,60 @@ def _sparse_copy_and_verify(torch, mf_acc_offload, device, host_gva, source_ckv,
         raise AssertionError("sparse_copy_urma KPE data mismatch")
 
 
-def _run_device(store, device_id, local_rank, host_rank):
-    """Device 进程主流程：造数据 -> put 到 Host DRAM -> 查 GVA -> sparse copy -> 校验 -> 清理。"""
+def _scatter_copy_and_verify(torch, mf_acc_offload, device, host_gva, source_ckv, source_kpe):
+    """调用 MemFabric npu_kvcache_scatter_copy 按 token 粒度从 Host DRAM 写回 HBM 并校验。
+
+    scatter_copy 与 sparse_copy_urma 的区别：不直接给地址列表，而是给
+    [offload slot, src token id, dst token id] 三元组 + 两级 block table，
+    由 kernel 内部换算源 GVA 和目标 HBM 地址：
+      - srcToken 的 block/offset 决定 DRAM 侧地址：blockGva = dramBlockTable[slot][srcBlock]，
+        再叠加 layerId*每层字节 + offset*每 token 字节
+      - dstToken 的 block/offset 决定 HBM 侧地址：physicalBlock = hbmBlockTable[batch][dstBlock]
+        映射到 HBM 线性 token 下标
+    每个复制项同时搬运 CKV（每 token 1024B）和 KPE（每 token 128B）两个片段。
+    """
+    # HBM 目标 KV cache：shape[0] 即 HBM 物理 block 数（hbmBlockCount），
+    # 每个 block 128 个 token，按 token 线性排布。
+    hbm_blocks = 1
+    hbm_kv_cache = torch.full(
+        (hbm_blocks, TOKENS_PER_BLOCK * CKV_WIDTH), SENTINEL, dtype=torch.bfloat16, device=device
+    )
+    hbm_k_rope = torch.full(
+        (hbm_blocks, TOKENS_PER_BLOCK * KPE_WIDTH), SENTINEL, dtype=torch.bfloat16, device=device
+    )
+    # HBM block table：batch 0 的 dst block 0 -> physical block 0
+    hbm_block_table = torch.tensor([[0]], dtype=torch.int32, device=device)
+    # DRAM block table：offload slot 0 的 block 0 -> 对象起始 GVA
+    dram_block_table = torch.tensor([[host_gva]], dtype=torch.int64, device=device)
+    # offload slot：batch 0 对应对象 slot 0
+    offload_slots = torch.tensor([0], dtype=torch.int32, device=device)
+    # 复制计划：每项 (layerId, [源 token], [目标 token])。
+    # layer0 复制 token 7/42，layer1 复制 token 11（对应原 sparse 版的两处偏移）。
+    scatter_plan = [(0, [7, 42], [3, 6]), (1, [11], [5])]
+    for layer_id, src_tokens, dst_tokens in scatter_plan:
+        src_token_ids = torch.tensor(src_tokens, dtype=torch.int32, device=device)
+        dst_slots = torch.tensor(dst_tokens, dtype=torch.int32, device=device)
+        copy_counts = torch.tensor([len(src_tokens)], dtype=torch.int32, device=device)
+        mf_acc_offload.npu_kvcache_scatter_copy(
+            hbm_k_rope, hbm_kv_cache, None, None,
+            hbm_block_table, dram_block_table,
+            offload_slots, src_token_ids, dst_slots, copy_counts,
+            ready_flag=None, layer_id=layer_id,
+        )
+    torch.npu.synchronize()
+    # 校验复制回来的数据与原始对象对应 token 切片一致
+    hbm_ckv = hbm_kv_cache.view(hbm_blocks * TOKENS_PER_BLOCK, CKV_WIDTH)
+    hbm_kpe = hbm_k_rope.view(hbm_blocks * TOKENS_PER_BLOCK, KPE_WIDTH)
+    checks = [(0, 7, 3), (0, 42, 6), (1, 11, 5)]
+    for layer_id, src_token, dst_token in checks:
+        if not torch.equal(hbm_ckv[dst_token], source_ckv[layer_id][src_token]):
+            raise AssertionError(f"scatter_copy layer{layer_id} token{src_token} CKV mismatch")
+        if not torch.equal(hbm_kpe[dst_token], source_kpe[layer_id][src_token]):
+            raise AssertionError(f"scatter_copy layer{layer_id} token{src_token} KPE mismatch")
+
+
+def _run_device(store, device_id, local_rank, host_rank, copy_mode):
+    """Device 进程主流程：造数据 -> put 到 Host DRAM -> 查 GVA -> 回读 -> 校验 -> 清理。"""
     import torch
     from memfabric_hybrid import offload as mf_acc_offload
 
@@ -263,8 +320,11 @@ def _run_device(store, device_id, local_rank, host_rank):
         if store.batch_add_lease([key]) != [0]:
             raise AssertionError("batch_add_lease failed")
         lease_added = True
-        # 5. sparse_copy_urma 从 Host GVA 读回 HBM 并校验
-        _sparse_copy_and_verify(torch, mf_acc_offload, device, host_gva, source_ckv, source_kpe)
+        # 5. 从 Host GVA 回读 HBM 并校验（按 --copy-mode 选择 sparse 或 scatter）
+        if copy_mode == "sparse":
+            _sparse_copy_and_verify(torch, mf_acc_offload, device, host_gva, source_ckv, source_kpe)
+        else:
+            _scatter_copy_and_verify(torch, mf_acc_offload, device, host_gva, source_ckv, source_kpe)
         copy_passed = True
     finally:
         # 无论成功失败都清理：释放 lease、删除 key
@@ -289,6 +349,8 @@ def _parse_args():
     parser.add_argument("--physical-device-id", type=int, help="Expected physical device id for EID validation")
     parser.add_argument("--host-eid", help="Host URMA EID; defaults to MF_HOST_URMA_EID")
     parser.add_argument("--device-eid", help="Device URMA EID; defaults to USE_LOCAL_EID")
+    parser.add_argument("--copy-mode", choices=("sparse", "scatter"), default="scatter",
+                        help="复制回读方式：sparse=sparse_copy_urma，scatter=npu_kvcache_scatter_copy")
     parser.add_argument("--provider-seconds", type=int, default=0, help="Host lifetime; 0 waits for Ctrl-C")
     return parser.parse_args()
 
@@ -322,7 +384,7 @@ def main():
         if args.role == ROLE_DEVICE:
             # world_size=2 时 Host rank = 1 - device rank（无论谁拿到 0/1）
             host_rank = WORLD_SIZE - 1 - actual_rank
-            _run_device(store, args.device_id, actual_rank, host_rank)
+            _run_device(store, args.device_id, actual_rank, host_rank, args.copy_mode)
             return
         # Host 角色：打印就绪后保持进程存活，维持 DRAM 池在线
         print(f"rank={actual_rank} HOST_READY", flush=True)
