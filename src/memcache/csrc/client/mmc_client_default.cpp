@@ -194,9 +194,14 @@ Result MmcClientDefault::Put(const char *key, mmc_buffer *buf, mmc_put_options &
 Result MmcClientDefault::PrepareAllocOpt(const uint64_t blobSize, const mmc_put_options &options, uint32_t flags,
                                          AllocOptions &allocOpt)
 {
+    const bool isGvaMalloc = (flags & ALLOC_FLAGS_GVA_MALLOC_MASK) != 0;
+    if (isGvaMalloc && options.mediaType >= MEDIA_NONE) {
+        MMC_LOG_ERROR("Invalid batch malloc media type: " << options.mediaType);
+        return MMC_INVALID_PARAM;
+    }
     allocOpt.blobSize_ = blobSize;
     allocOpt.numBlobs_ = std::max<uint16_t>(options.replicaNum, 1u);
-    allocOpt.mediaType_ = MEDIA_NONE;
+    allocOpt.mediaType_ = isGvaMalloc ? options.mediaType : MEDIA_NONE;
     allocOpt.flags_ = flags;
 
     std::copy_if(std::begin(options.preferredLocalServiceIDs), std::end(options.preferredLocalServiceIDs),
@@ -211,7 +216,7 @@ Result MmcClientDefault::PrepareAllocOpt(const uint64_t blobSize, const mmc_put_
     if (!allocOpt.preferredRank_.empty()) {
         allocOpt.flags_ = allocOpt.flags_ & ~0xFF; // 清除原设置
         allocOpt.flags_ |= ALLOC_FORCE_BY_RANK;
-    } else {
+    } else if (!isGvaMalloc) {
         allocOpt.preferredRank_.push_back(RankId(options.policy));
     }
     return MMC_OK;

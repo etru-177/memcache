@@ -393,6 +393,11 @@ TEST_F(TestMmcacheStore, BatchMalloc)
     std::vector<int32_t> writeOkResults(keys.size(), MMC_OK);
     auto finishResults = store->BatchWriteFinish(keys, writeOkResults);
     EXPECT_EQ(finishResults, std::vector<int>(keys.size(), MMC_OK));
+    auto keyInfos = store->BatchGetKeyInfo(keys);
+    ASSERT_EQ(keyInfos.size(), keys.size());
+    for (auto &keyInfo : keyInfos) {
+        EXPECT_EQ(keyInfo.GetTypes(), std::vector<int>{MEDIA_DRAM});
+    }
     ret = store->BatchCopy(gvas, buffer1, sizes, 0);
     EXPECT_EQ(ret, 0);
 
