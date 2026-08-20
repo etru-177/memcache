@@ -12,19 +12,19 @@
 
 """Host DRAM 常驻服务进程。
 
-本进程不依赖 torch，也不接收配置参数。MemCache 配置由 MMC_LOCAL_CONFIG_PATH
-指定的配置文件加载；Host URMA EID 由 MF_HOST_URMA_EID 提供。
+本进程不依赖 torch。MemCache 配置由 MMC_LOCAL_CONFIG_PATH 指定的配置文件加载；
+Host URMA EID 通过 --eid 参数提供。
 
 用法示例：
 
   export MMC_LOCAL_CONFIG_PATH=/path/to/mmc-local.conf
-  export MF_HOST_URMA_EID=0123456789abcdef0123456789abcdef
-  python3 host_dram_server.py
+  python3 host_dram_server.py --eid 0123456789abcdef0123456789abcdef
 
 配置文件至少应包含 meta_service_url、config_store_url、world_size、protocol、
 dram.size、max.dram.size、hbm.size 和 max.hbm.size 等 LocalService 配置。
 """
 
+import argparse
 import os
 import time
 
@@ -42,18 +42,18 @@ def _require_environment(name):
 def _validate_eid(value):
     """校验 Host URMA EID：必须是 32 位十六进制且非全零。"""
     if len(value) != 32 or any(character not in "0123456789abcdefABCDEF" for character in value):
-        raise ValueError("MF_HOST_URMA_EID must be exactly 32 hexadecimal characters")
+        raise ValueError("--eid must be exactly 32 hexadecimal characters")
     if int(value, 16) == 0:
-        raise ValueError("MF_HOST_URMA_EID must not be all zero")
+        raise ValueError("--eid must not be all zero")
     return value.lower()
 
 
-def _configure_host_environment():
+def _configure_host_environment(eid):
     """设置固定的 Host 角色环境，并返回配置路径和 Host EID。"""
     config_path = _require_environment("MMC_LOCAL_CONFIG_PATH")
     if not os.path.isfile(config_path):
         raise FileNotFoundError(f"MMC_LOCAL_CONFIG_PATH does not exist: {config_path}")
-    host_eid = _validate_eid(_require_environment("MF_HOST_URMA_EID"))
+    host_eid = _validate_eid(eid)
     os.environ["HCOMM_HOST_ONLY"] = "1"
     os.environ["MF_LOCAL_DRAM_VALIDATION_ROLE"] = "host"
     os.environ.setdefault("MF_HYBM_RDMA_SWAP_SPACE_SIZE", "0")
@@ -61,8 +61,15 @@ def _configure_host_environment():
     return config_path, host_eid
 
 
+def _parse_args():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--eid", required=True, help="Host URMA EID，必须为 32 位非零十六进制字符")
+    return parser.parse_args()
+
+
 def main():
-    config_path, host_eid = _configure_host_environment()
+    args = _parse_args()
+    config_path, host_eid = _configure_host_environment(args.eid)
     # 直接导入 C++ Python 扩展，避免 memcache_hybrid -> memfabric_hybrid -> torch 的导入链。
     from _pymmc import DistributedObjectStore
 
