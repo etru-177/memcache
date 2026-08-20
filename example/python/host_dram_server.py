@@ -28,6 +28,9 @@ dram.size、max.dram.size、hbm.size 和 max.hbm.size 等 LocalService 配置。
 import os
 import time
 
+ANSI_BOLD_GREEN = "\033[1;92m"
+ANSI_RESET = "\033[0m"
+
 
 def _require_environment(name):
     value = os.getenv(name)
@@ -73,9 +76,11 @@ def main():
         initialized = True
         actual_rank = store.get_local_service_id()
         print(
-            f"rank={actual_rank} HOST_READY: config={config_path} eid={host_eid}",
+            f"{ANSI_BOLD_GREEN}rank={actual_rank} HOST_READY: "
+            f"config={config_path} eid={host_eid}{ANSI_RESET}",
             flush=True,
         )
+        print("READY", flush=True)
         while True:
             time.sleep(3600)
     except KeyboardInterrupt:
