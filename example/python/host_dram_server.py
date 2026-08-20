@@ -70,8 +70,7 @@ def _parse_args():
 def main():
     args = _parse_args()
     config_path, host_eid = _configure_host_environment(args.eid)
-    # 直接导入 C++ Python 扩展，避免 memcache_hybrid -> memfabric_hybrid -> torch 的导入链。
-    from _pymmc import DistributedObjectStore
+    from memcache_hybrid import DistributedObjectStore
 
     store = DistributedObjectStore()
     initialized = False
