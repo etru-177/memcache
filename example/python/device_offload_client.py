@@ -24,7 +24,8 @@ Device 配置应使用 host_device_urma，保持与 Host 相同的 world_size/ma
 用法：
 
   export MMC_LOCAL_CONFIG_PATH=/path/to/mmc-device.conf
-  python3 device_offload_client.py --copy_mode scatter --peer_rank 0 --dev-id 0
+  python3 device_offload_client.py --copy-mode scatter --peer-rank 0 --dev-id 0 \
+    --copy-rounds 100 --copy-tokens 128
 """
 
 import argparse
@@ -44,6 +45,9 @@ LAYER_STRIDE_BYTES = TOKENS_PER_BLOCK * (CKV_TOKEN_BYTES + KPE_TOKEN_BYTES)
 OBJECT_BYTES = LAYER_COUNT * LAYER_STRIDE_BYTES
 SENTINEL = -1.0
 POOL_READY_WAIT_SECONDS = 10
+COPY_WARMUP_ROUNDS = 3
+DEFAULT_COPY_ROUNDS = 100
+DEFAULT_COPY_TOKENS = TOKENS_PER_BLOCK
 
 
 def _parse_args():
@@ -54,6 +58,10 @@ def _parse_args():
     parser.add_argument("--peer_rank", "--peer-rank", dest="peer_rank", type=int, default=0,
                         help="提供 Host DRAM 池的 peer rank，默认 0")
     parser.add_argument("--dev-id", type=int, default=0, help="NPU runtime device id，默认 0")
+    parser.add_argument("--copy-rounds", type=int, default=DEFAULT_COPY_ROUNDS,
+                        help=f"计入带宽统计的 copy 轮次，默认 {DEFAULT_COPY_ROUNDS}")
+    parser.add_argument("--copy-tokens", type=int, default=DEFAULT_COPY_TOKENS,
+                        help=f"每轮复制的 CKV+KPE token 数，范围 1-{TOKENS_PER_BLOCK}")
     return parser.parse_args()
 
 
@@ -133,48 +141,96 @@ def _query_peer_gva(store, key, peer_rank):
     return info.gva_list()[0]
 
 
-def _sparse_copy_and_verify(torch, offload, device, peer_gva, source_ckv, source_kpe):
-    destinations = [
-        torch.full((CKV_WIDTH,), SENTINEL, dtype=torch.bfloat16, device=device),
-        torch.full((KPE_WIDTH,), SENTINEL, dtype=torch.bfloat16, device=device),
-    ]
-    source_addresses = [
-        peer_gva + 7 * CKV_TOKEN_BYTES,
-        peer_gva + LAYER_STRIDE_BYTES + CKV_LAYER_BYTES + 11 * KPE_TOKEN_BYTES,
-    ]
-    src_ptrs = torch.tensor(source_addresses, dtype=torch.int64, device=device)
-    dst_ptrs = torch.tensor([tensor.data_ptr() for tensor in destinations], dtype=torch.int64, device=device)
-    len_ptrs = torch.tensor([CKV_TOKEN_BYTES, KPE_TOKEN_BYTES], dtype=torch.int64, device=device)
-    copy_start_ns = time.perf_counter_ns()
-    ret = offload.sparse_copy_urma(src_ptrs, dst_ptrs, len_ptrs, len(destinations), device)
-    if ret != 0:
-        raise AssertionError(f"sparse_copy_urma failed: ret={ret}")
+def _measure_copy(torch, copy_once, rounds):
+    for _ in range(COPY_WARMUP_ROUNDS):
+        copy_once()
     torch.npu.synchronize()
-    copy_elapsed_ms = (time.perf_counter_ns() - copy_start_ns) / 1_000_000
-    if not torch.equal(destinations[0], source_ckv[0][7]):
+    start_ns = time.perf_counter_ns()
+    for _ in range(rounds):
+        copy_once()
+    torch.npu.synchronize()
+    return time.perf_counter_ns() - start_ns
+
+
+def _make_copy_stats(mode, rounds, token_count, copied_bytes, elapsed_ns, checksum, expected_checksum):
+    bytes_per_round = copied_bytes
+    total_bytes = bytes_per_round * rounds
+    elapsed_ms = elapsed_ns / 1_000_000
+    bandwidth_gbps = total_bytes / (elapsed_ns / 1_000_000_000) / 1_000_000_000
+    return {
+        "mode": mode,
+        "rounds": rounds,
+        "tokens": token_count,
+        "bytes_per_round": bytes_per_round,
+        "total_bytes": total_bytes,
+        "elapsed_ms": elapsed_ms,
+        "bandwidth_gbps": bandwidth_gbps,
+        "checksum": f"0x{checksum:08x}",
+        "expected": f"0x{expected_checksum:08x}",
+    }
+
+
+def _print_copy_stats(stats):
+    headers = ("Mode", "Rounds", "Tokens/Round", "Bytes/Round", "Total Bytes", "Elapsed(ms)", "GB/s",
+               "Checksum", "Expected")
+    values = (
+        stats["mode"], str(stats["rounds"]), str(stats["tokens"]), str(stats["bytes_per_round"]),
+        str(stats["total_bytes"]), f"{stats['elapsed_ms']:.3f}", f"{stats['bandwidth_gbps']:.3f}",
+        stats["checksum"], stats["expected"],
+    )
+    widths = [max(len(header), len(value)) for header, value in zip(headers, values)]
+    border = "+-" + "-+-".join("-" * width for width in widths) + "-+"
+    print("COPY PERFORMANCE", flush=True)
+    print(border, flush=True)
+    print("| " + " | ".join(header.ljust(width) for header, width in zip(headers, widths)) + " |", flush=True)
+    print(border, flush=True)
+    print("| " + " | ".join(value.ljust(width) for value, width in zip(values, widths)) + " |", flush=True)
+    print(border, flush=True)
+
+
+def _sparse_copy_and_verify(torch, offload, device, peer_gva, source_ckv, source_kpe, token_count, rounds):
+    destination_ckv = torch.full((token_count, CKV_WIDTH), SENTINEL, dtype=torch.bfloat16, device=device)
+    destination_kpe = torch.full((token_count, KPE_WIDTH), SENTINEL, dtype=torch.bfloat16, device=device)
+    source_addresses = []
+    destination_addresses = []
+    lengths = []
+    for token_id in range(token_count):
+        source_addresses.extend((peer_gva + token_id * CKV_TOKEN_BYTES,
+                                 peer_gva + CKV_LAYER_BYTES + token_id * KPE_TOKEN_BYTES))
+        destination_addresses.extend((destination_ckv[token_id].data_ptr(), destination_kpe[token_id].data_ptr()))
+        lengths.extend((CKV_TOKEN_BYTES, KPE_TOKEN_BYTES))
+    src_ptrs = torch.tensor(source_addresses, dtype=torch.int64, device=device)
+    dst_ptrs = torch.tensor(destination_addresses, dtype=torch.int64, device=device)
+    len_ptrs = torch.tensor(lengths, dtype=torch.int64, device=device)
+
+    def copy_once():
+        ret = offload.sparse_copy_urma(src_ptrs, dst_ptrs, len_ptrs, len(source_addresses), device)
+        if ret != 0:
+            raise AssertionError(f"sparse_copy_urma failed: ret={ret}")
+
+    elapsed_ns = _measure_copy(torch, copy_once, rounds)
+    if not torch.equal(destination_ckv, source_ckv[0][:token_count]):
         raise AssertionError("sparse_copy_urma CKV data mismatch")
-    if not torch.equal(destinations[1], source_kpe[1][11]):
+    if not torch.equal(destination_kpe, source_kpe[0][:token_count]):
         raise AssertionError("sparse_copy_urma KPE data mismatch")
-    actual_checksum, copied_bytes = _checksum_tensors(torch, destinations)
-    expected_checksum, _ = _checksum_tensors(torch, [source_ckv[0][7], source_kpe[1][11]])
-    return actual_checksum, expected_checksum, copied_bytes, copy_elapsed_ms
+    actual_checksum, copied_bytes = _checksum_tensors(torch, [destination_ckv, destination_kpe])
+    expected_checksum, _ = _checksum_tensors(torch, [source_ckv[0][:token_count], source_kpe[0][:token_count]])
+    return _make_copy_stats("sparse", rounds, token_count, copied_bytes, elapsed_ns, actual_checksum,
+                            expected_checksum)
 
 
-def _scatter_copy_layer(torch, offload, hbm_kpe, hbm_ckv, tables, plan):
+def _scatter_copy_once(offload, hbm_kpe, hbm_ckv, tables, copy_params):
     hbm_block_table, dram_block_table, offload_slots = tables
-    layer_id, src_tokens, dst_tokens = plan
-    src_token_ids = torch.tensor(src_tokens, dtype=torch.int32, device=hbm_kpe.device)
-    dst_slots = torch.tensor(dst_tokens, dtype=torch.int32, device=hbm_kpe.device)
-    copy_counts = torch.tensor([len(src_tokens)], dtype=torch.int32, device=hbm_kpe.device)
+    src_token_ids, dst_slots, copy_counts = copy_params
     offload.npu_kvcache_scatter_copy(
         hbm_kpe, hbm_ckv, None, None,
         hbm_block_table, dram_block_table,
         offload_slots, src_token_ids, dst_slots, copy_counts,
-        ready_flag=None, layer_id=layer_id,
+        ready_flag=None, layer_id=0,
     )
 
 
-def _scatter_copy_and_verify(torch, offload, device, peer_gva, source_ckv, source_kpe):
+def _scatter_copy_and_verify(torch, offload, device, peer_gva, source_ckv, source_kpe, token_count, rounds):
     hbm_ckv_buffer = torch.full(
         (1, TOKENS_PER_BLOCK * CKV_WIDTH), SENTINEL, dtype=torch.bfloat16, device=device
     )
@@ -186,26 +242,29 @@ def _scatter_copy_and_verify(torch, offload, device, peer_gva, source_ckv, sourc
         torch.tensor([[peer_gva]], dtype=torch.int64, device=device),
         torch.tensor([0], dtype=torch.int32, device=device),
     )
-    plans = [(0, [7, 42], [3, 6]), (1, [11], [5])]
-    copy_start_ns = time.perf_counter_ns()
-    for plan in plans:
-        _scatter_copy_layer(torch, offload, hbm_kpe_buffer, hbm_ckv_buffer, tables, plan)
-    torch.npu.synchronize()
-    copy_elapsed_ms = (time.perf_counter_ns() - copy_start_ns) / 1_000_000
+    token_ids = list(range(token_count))
+    copy_params = (
+        torch.tensor(token_ids, dtype=torch.int32, device=device),
+        torch.tensor(token_ids, dtype=torch.int32, device=device),
+        torch.tensor([token_count], dtype=torch.int32, device=device),
+    )
+
+    def copy_once():
+        _scatter_copy_once(offload, hbm_kpe_buffer, hbm_ckv_buffer, tables, copy_params)
+
+    elapsed_ns = _measure_copy(torch, copy_once, rounds)
     hbm_ckv = hbm_ckv_buffer.view(TOKENS_PER_BLOCK, CKV_WIDTH)
     hbm_kpe = hbm_kpe_buffer.view(TOKENS_PER_BLOCK, KPE_WIDTH)
-    copied_tensors = []
-    expected_tensors = []
-    for layer_id, src_token, dst_token in ((0, 7, 3), (0, 42, 6), (1, 11, 5)):
-        if not torch.equal(hbm_ckv[dst_token], source_ckv[layer_id][src_token]):
-            raise AssertionError(f"scatter_copy layer{layer_id} token{src_token} CKV mismatch")
-        if not torch.equal(hbm_kpe[dst_token], source_kpe[layer_id][src_token]):
-            raise AssertionError(f"scatter_copy layer{layer_id} token{src_token} KPE mismatch")
-        copied_tensors.extend((hbm_ckv[dst_token], hbm_kpe[dst_token]))
-        expected_tensors.extend((source_ckv[layer_id][src_token], source_kpe[layer_id][src_token]))
+    copied_tensors = [hbm_ckv[:token_count], hbm_kpe[:token_count]]
+    expected_tensors = [source_ckv[0][:token_count], source_kpe[0][:token_count]]
+    if not torch.equal(copied_tensors[0], expected_tensors[0]):
+        raise AssertionError("scatter_copy CKV data mismatch")
+    if not torch.equal(copied_tensors[1], expected_tensors[1]):
+        raise AssertionError("scatter_copy KPE data mismatch")
     actual_checksum, copied_bytes = _checksum_tensors(torch, copied_tensors)
     expected_checksum, _ = _checksum_tensors(torch, expected_tensors)
-    return actual_checksum, expected_checksum, copied_bytes, copy_elapsed_ms
+    return _make_copy_stats("scatter", rounds, token_count, copied_bytes, elapsed_ns, actual_checksum,
+                            expected_checksum)
 
 
 def _run(store, args, torch, offload, l2g, replicate_config_cls):
@@ -229,16 +288,14 @@ def _run(store, args, torch, offload, l2g, replicate_config_cls):
             raise AssertionError("batch_add_lease failed")
         lease_added = True
         if args.copy_mode == "sparse":
-            copy_stats = _sparse_copy_and_verify(torch, offload, device, peer_gva, source_ckv, source_kpe)
+            copy_stats = _sparse_copy_and_verify(
+                torch, offload, device, peer_gva, source_ckv, source_kpe, args.copy_tokens, args.copy_rounds
+            )
         else:
-            copy_stats = _scatter_copy_and_verify(torch, offload, device, peer_gva, source_ckv, source_kpe)
-        actual_checksum, expected_checksum, copied_bytes, copy_elapsed_ms = copy_stats
-        print(
-            f"COPY_AFTER: mode={args.copy_mode} checksum=0x{actual_checksum:08x} "
-            f"expected_checksum=0x{expected_checksum:08x} bytes={copied_bytes} "
-            f"elapsed_ms={copy_elapsed_ms:.3f}",
-            flush=True,
-        )
+            copy_stats = _scatter_copy_and_verify(
+                torch, offload, device, peer_gva, source_ckv, source_kpe, args.copy_tokens, args.copy_rounds
+            )
+        _print_copy_stats(copy_stats)
         copy_passed = True
     finally:
         cleanup_errors = []
@@ -270,8 +327,10 @@ def _run(store, args, torch, offload, l2g, replicate_config_cls):
 
 def main():
     args = _parse_args()
-    if args.dev_id < 0 or args.peer_rank < 0:
-        raise ValueError("dev-id and peer_rank must be non-negative")
+    if args.dev_id < 0 or args.peer_rank < 0 or args.copy_rounds <= 0:
+        raise ValueError("dev-id and peer_rank must be non-negative; copy-rounds must be positive")
+    if args.copy_tokens <= 0 or args.copy_tokens > TOKENS_PER_BLOCK:
+        raise ValueError(f"copy-tokens must be in range 1-{TOKENS_PER_BLOCK}")
     config_path = _configure_environment()
 
     import torch
