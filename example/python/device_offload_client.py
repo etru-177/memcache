@@ -24,12 +24,13 @@ Device 配置应使用 host_device_urma，保持与 Host 相同的 world_size/ma
 用法：
 
   export MMC_LOCAL_CONFIG_PATH=/path/to/mmc-device.conf
-  python3 device_offload_client.py --copy_mode scatter --peer_rank 0 --dev-id 0
+  python3 device_offload_client.py --copy_mode scatter --peer_rank 0 --dev-id 0 --log-level 1
 """
 
 import argparse
 import os
 import time
+import zlib
 
 MEDIA_DRAM = 1
 LAYER_COUNT = 2
@@ -53,10 +54,17 @@ def _parse_args():
     parser.add_argument("--peer_rank", "--peer-rank", dest="peer_rank", type=int, default=0,
                         help="提供 Host DRAM 池的 peer rank，默认 0")
     parser.add_argument("--dev-id", type=int, default=0, help="NPU runtime device id，默认 0")
+    parser.add_argument(
+        "--log-level",
+        type=int,
+        choices=range(5),
+        default=None,
+        help="MemFabric 日志级别：0=DEBUG、1=INFO、2=WARN、3=ERROR、4=OFF",
+    )
     return parser.parse_args()
 
 
-def _configure_environment():
+def _configure_environment(log_level):
     config_path = os.getenv("MMC_LOCAL_CONFIG_PATH")
     if not config_path:
         raise RuntimeError("environment variable MMC_LOCAL_CONFIG_PATH is required")
@@ -67,6 +75,8 @@ def _configure_environment():
     os.environ.pop("HCOMM_HOST_ONLY", None)
     os.environ.pop("MF_LOCAL_DRAM_VALIDATION_ROLE", None)
     os.environ.pop("MF_HOST_URMA_EID", None)
+    if log_level is not None:
+        os.environ["MF_LOG_LEVEL"] = str(log_level)
     return config_path
 
 
@@ -91,6 +101,16 @@ def _make_source_layers(torch, device):
         source_kpe.append(kpe)
         source_layers.append(torch.cat((ckv.flatten(), kpe.flatten())))
     return source_ckv, source_kpe, source_layers
+
+
+def _checksum_tensors(torch, tensors):
+    checksum = 0
+    total_bytes = 0
+    for tensor in tensors:
+        data = tensor.detach().contiguous().cpu().view(torch.uint8).numpy().tobytes()
+        checksum = zlib.crc32(data, checksum)
+        total_bytes += len(data)
+    return checksum, total_bytes
 
 
 def _put_to_peer(store, key, source_layers, peer_rank, l2g, replicate_config_cls):
@@ -134,14 +154,19 @@ def _sparse_copy_and_verify(torch, offload, device, peer_gva, source_ckv, source
     src_ptrs = torch.tensor(source_addresses, dtype=torch.int64, device=device)
     dst_ptrs = torch.tensor([tensor.data_ptr() for tensor in destinations], dtype=torch.int64, device=device)
     len_ptrs = torch.tensor([CKV_TOKEN_BYTES, KPE_TOKEN_BYTES], dtype=torch.int64, device=device)
+    copy_start_ns = time.perf_counter_ns()
     ret = offload.sparse_copy_urma(src_ptrs, dst_ptrs, len_ptrs, len(destinations), device)
     if ret != 0:
         raise AssertionError(f"sparse_copy_urma failed: ret={ret}")
     torch.npu.synchronize()
+    copy_elapsed_ms = (time.perf_counter_ns() - copy_start_ns) / 1_000_000
     if not torch.equal(destinations[0], source_ckv[0][7]):
         raise AssertionError("sparse_copy_urma CKV data mismatch")
     if not torch.equal(destinations[1], source_kpe[1][11]):
         raise AssertionError("sparse_copy_urma KPE data mismatch")
+    actual_checksum, copied_bytes = _checksum_tensors(torch, destinations)
+    expected_checksum, _ = _checksum_tensors(torch, [source_ckv[0][7], source_kpe[1][11]])
+    return actual_checksum, expected_checksum, copied_bytes, copy_elapsed_ms
 
 
 def _scatter_copy_layer(torch, offload, hbm_kpe, hbm_ckv, tables, plan):
@@ -171,16 +196,25 @@ def _scatter_copy_and_verify(torch, offload, device, peer_gva, source_ckv, sourc
         torch.tensor([0], dtype=torch.int32, device=device),
     )
     plans = [(0, [7, 42], [3, 6]), (1, [11], [5])]
+    copy_start_ns = time.perf_counter_ns()
     for plan in plans:
         _scatter_copy_layer(torch, offload, hbm_kpe_buffer, hbm_ckv_buffer, tables, plan)
     torch.npu.synchronize()
+    copy_elapsed_ms = (time.perf_counter_ns() - copy_start_ns) / 1_000_000
     hbm_ckv = hbm_ckv_buffer.view(TOKENS_PER_BLOCK, CKV_WIDTH)
     hbm_kpe = hbm_kpe_buffer.view(TOKENS_PER_BLOCK, KPE_WIDTH)
+    copied_tensors = []
+    expected_tensors = []
     for layer_id, src_token, dst_token in ((0, 7, 3), (0, 42, 6), (1, 11, 5)):
         if not torch.equal(hbm_ckv[dst_token], source_ckv[layer_id][src_token]):
             raise AssertionError(f"scatter_copy layer{layer_id} token{src_token} CKV mismatch")
         if not torch.equal(hbm_kpe[dst_token], source_kpe[layer_id][src_token]):
             raise AssertionError(f"scatter_copy layer{layer_id} token{src_token} KPE mismatch")
+        copied_tensors.extend((hbm_ckv[dst_token], hbm_kpe[dst_token]))
+        expected_tensors.extend((source_ckv[layer_id][src_token], source_kpe[layer_id][src_token]))
+    actual_checksum, copied_bytes = _checksum_tensors(torch, copied_tensors)
+    expected_checksum, _ = _checksum_tensors(torch, expected_tensors)
+    return actual_checksum, expected_checksum, copied_bytes, copy_elapsed_ms
 
 
 def _run(store, args, torch, offload, l2g, replicate_config_cls):
@@ -192,6 +226,11 @@ def _run(store, args, torch, offload, l2g, replicate_config_cls):
     lease_added = False
     copy_passed = False
     try:
+        source_checksum, source_bytes = _checksum_tensors(torch, source_layers)
+        print(
+            f"PUT_BEFORE: key={key} checksum=0x{source_checksum:08x} bytes={source_bytes}",
+            flush=True,
+        )
         _put_to_peer(store, key, source_layers, args.peer_rank, l2g, replicate_config_cls)
         key_created = True
         peer_gva = _query_peer_gva(store, key, args.peer_rank)
@@ -199,9 +238,16 @@ def _run(store, args, torch, offload, l2g, replicate_config_cls):
             raise AssertionError("batch_add_lease failed")
         lease_added = True
         if args.copy_mode == "sparse":
-            _sparse_copy_and_verify(torch, offload, device, peer_gva, source_ckv, source_kpe)
+            copy_stats = _sparse_copy_and_verify(torch, offload, device, peer_gva, source_ckv, source_kpe)
         else:
-            _scatter_copy_and_verify(torch, offload, device, peer_gva, source_ckv, source_kpe)
+            copy_stats = _scatter_copy_and_verify(torch, offload, device, peer_gva, source_ckv, source_kpe)
+        actual_checksum, expected_checksum, copied_bytes, copy_elapsed_ms = copy_stats
+        print(
+            f"COPY_AFTER: mode={args.copy_mode} checksum=0x{actual_checksum:08x} "
+            f"expected_checksum=0x{expected_checksum:08x} bytes={copied_bytes} "
+            f"elapsed_ms={copy_elapsed_ms:.3f}",
+            flush=True,
+        )
         copy_passed = True
     finally:
         cleanup_errors = []
@@ -235,14 +281,17 @@ def main():
     args = _parse_args()
     if args.dev_id < 0 or args.peer_rank < 0:
         raise ValueError("dev-id and peer_rank must be non-negative")
-    config_path = _configure_environment()
+    config_path = _configure_environment(args.log_level)
 
     import torch
     import torch_npu  # noqa: F401
+    import memfabric_hybrid as mf
     from memcache_hybrid import DistributedObjectStore, L2G, ReplicateConfig
     from memfabric_hybrid import offload
 
     _set_runtime_device(torch, args.dev_id)
+    if args.log_level is not None and mf.set_log_level(args.log_level) != 0:
+        raise RuntimeError(f"failed to set MemFabric log level: {args.log_level}")
     store = DistributedObjectStore()
     initialized = False
     try:
@@ -250,7 +299,13 @@ def main():
         if init_ret != 0:
             raise RuntimeError(f"store.init failed: ret={init_ret}")
         initialized = True
-        print(f"DEVICE_READY: config={config_path} dev_id={args.dev_id}", flush=True)
+        if args.log_level is not None and mf.set_log_level(args.log_level) != 0:
+            raise RuntimeError(f"failed to restore MemFabric log level: {args.log_level}")
+        log_level_desc = args.log_level if args.log_level is not None else "config"
+        print(
+            f"DEVICE_READY: config={config_path} dev_id={args.dev_id} mf_log_level={log_level_desc}",
+            flush=True,
+        )
         # world join 完成不代表 peer 池已经注册到 MetaService，等待已验证的注册窗口。
         time.sleep(POOL_READY_WAIT_SECONDS)
         _run(store, args, torch, offload, L2G, ReplicateConfig)

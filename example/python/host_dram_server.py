@@ -18,7 +18,7 @@ Host URMA EID 通过 --eid 参数提供。
 用法示例：
 
   export MMC_LOCAL_CONFIG_PATH=/path/to/mmc-local.conf
-  python3 host_dram_server.py --eid 0123456789abcdef0123456789abcdef
+  python3 host_dram_server.py --eid 0123456789abcdef0123456789abcdef --log-level 1
 
 配置文件至少应包含 meta_service_url、config_store_url、world_size、protocol、
 dram.size、max.dram.size、hbm.size 和 max.hbm.size 等 LocalService 配置。
@@ -48,7 +48,7 @@ def _validate_eid(value):
     return value.lower()
 
 
-def _configure_host_environment(eid):
+def _configure_host_environment(eid, log_level):
     """设置固定的 Host 角色环境，并返回配置路径和 Host EID。"""
     config_path = _require_environment("MMC_LOCAL_CONFIG_PATH")
     if not os.path.isfile(config_path):
@@ -58,20 +58,32 @@ def _configure_host_environment(eid):
     os.environ["MF_LOCAL_DRAM_VALIDATION_ROLE"] = "host"
     os.environ.setdefault("MF_HYBM_RDMA_SWAP_SPACE_SIZE", "0")
     os.environ["MF_HOST_URMA_EID"] = host_eid
+    if log_level is not None:
+        os.environ["MF_LOG_LEVEL"] = str(log_level)
     return config_path, host_eid
 
 
 def _parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--eid", required=True, help="Host URMA EID，必须为 32 位非零十六进制字符")
+    parser.add_argument(
+        "--log-level",
+        type=int,
+        choices=range(5),
+        default=None,
+        help="MemFabric 日志级别：0=DEBUG、1=INFO、2=WARN、3=ERROR、4=OFF",
+    )
     return parser.parse_args()
 
 
 def main():
     args = _parse_args()
-    config_path, host_eid = _configure_host_environment(args.eid)
+    config_path, host_eid = _configure_host_environment(args.eid, args.log_level)
+    import memfabric_hybrid as mf
     from memcache_hybrid import DistributedObjectStore
 
+    if args.log_level is not None and mf.set_log_level(args.log_level) != 0:
+        raise RuntimeError(f"failed to set MemFabric log level: {args.log_level}")
     store = DistributedObjectStore()
     initialized = False
     try:
@@ -80,10 +92,13 @@ def main():
         if init_ret != 0:
             raise RuntimeError(f"store.init failed: ret={init_ret}")
         initialized = True
+        if args.log_level is not None and mf.set_log_level(args.log_level) != 0:
+            raise RuntimeError(f"failed to restore MemFabric log level: {args.log_level}")
         actual_rank = store.get_local_service_id()
+        log_level_desc = args.log_level if args.log_level is not None else "config"
         print(
             f"{ANSI_BOLD_GREEN}rank={actual_rank} HOST_READY: "
-            f"config={config_path} eid={host_eid}{ANSI_RESET}",
+            f"config={config_path} eid={host_eid} mf_log_level={log_level_desc}{ANSI_RESET}",
             flush=True,
         )
         print("READY", flush=True)
