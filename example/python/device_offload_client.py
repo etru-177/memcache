@@ -24,7 +24,7 @@ Device 配置应使用 host_device_urma，保持与 Host 相同的 world_size/ma
 用法：
 
   export MMC_LOCAL_CONFIG_PATH=/path/to/mmc-device.conf
-  python3 device_offload_client.py --copy_mode scatter --peer_rank 0 --dev-id 0 --log-level 1
+  python3 device_offload_client.py --copy_mode scatter --peer_rank 0 --dev-id 0
 """
 
 import argparse
@@ -54,17 +54,10 @@ def _parse_args():
     parser.add_argument("--peer_rank", "--peer-rank", dest="peer_rank", type=int, default=0,
                         help="提供 Host DRAM 池的 peer rank，默认 0")
     parser.add_argument("--dev-id", type=int, default=0, help="NPU runtime device id，默认 0")
-    parser.add_argument(
-        "--log-level",
-        type=int,
-        choices=range(5),
-        default=None,
-        help="MemFabric 日志级别：0=DEBUG、1=INFO、2=WARN、3=ERROR、4=OFF",
-    )
     return parser.parse_args()
 
 
-def _configure_environment(log_level):
+def _configure_environment():
     config_path = os.getenv("MMC_LOCAL_CONFIG_PATH")
     if not config_path:
         raise RuntimeError("environment variable MMC_LOCAL_CONFIG_PATH is required")
@@ -75,8 +68,6 @@ def _configure_environment(log_level):
     os.environ.pop("HCOMM_HOST_ONLY", None)
     os.environ.pop("MF_LOCAL_DRAM_VALIDATION_ROLE", None)
     os.environ.pop("MF_HOST_URMA_EID", None)
-    if log_level is not None:
-        os.environ["MF_LOG_LEVEL"] = str(log_level)
     return config_path
 
 
@@ -281,17 +272,14 @@ def main():
     args = _parse_args()
     if args.dev_id < 0 or args.peer_rank < 0:
         raise ValueError("dev-id and peer_rank must be non-negative")
-    config_path = _configure_environment(args.log_level)
+    config_path = _configure_environment()
 
     import torch
     import torch_npu  # noqa: F401
-    import memfabric_hybrid as mf
     from memcache_hybrid import DistributedObjectStore, L2G, ReplicateConfig
     from memfabric_hybrid import offload
 
     _set_runtime_device(torch, args.dev_id)
-    if args.log_level is not None and mf.set_log_level(args.log_level) != 0:
-        raise RuntimeError(f"failed to set MemFabric log level: {args.log_level}")
     store = DistributedObjectStore()
     initialized = False
     try:
@@ -299,13 +287,7 @@ def main():
         if init_ret != 0:
             raise RuntimeError(f"store.init failed: ret={init_ret}")
         initialized = True
-        if args.log_level is not None and mf.set_log_level(args.log_level) != 0:
-            raise RuntimeError(f"failed to restore MemFabric log level: {args.log_level}")
-        log_level_desc = args.log_level if args.log_level is not None else "config"
-        print(
-            f"DEVICE_READY: config={config_path} dev_id={args.dev_id} mf_log_level={log_level_desc}",
-            flush=True,
-        )
+        print(f"DEVICE_READY: config={config_path} dev_id={args.dev_id}", flush=True)
         # world join 完成不代表 peer 池已经注册到 MetaService，等待已验证的注册窗口。
         time.sleep(POOL_READY_WAIT_SECONDS)
         _run(store, args, torch, offload, L2G, ReplicateConfig)
