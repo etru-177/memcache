@@ -29,6 +29,7 @@ Device 配置应使用 host_device_urma，保持与 Host 相同的 world_size/ma
 """
 
 import argparse
+import math
 import os
 import time
 import zlib
@@ -59,7 +60,7 @@ def _parse_args():
                         help="提供 Host DRAM 池的 peer rank，默认 0")
     parser.add_argument("--dev-id", type=int, default=0, help="NPU runtime device id，默认 0")
     parser.add_argument("--copy-rounds", type=int, default=DEFAULT_COPY_ROUNDS,
-                        help=f"计入带宽统计的 copy 轮次，默认 {DEFAULT_COPY_ROUNDS}")
+                        help=f"计入带宽和延迟统计的 copy 轮次，默认 {DEFAULT_COPY_ROUNDS}")
     parser.add_argument("--copy-tokens", type=int, default=DEFAULT_COPY_TOKENS,
                         help=f"每轮复制的 CKV+KPE token 数，范围 1-{TOKENS_PER_BLOCK}")
     return parser.parse_args()
@@ -145,14 +146,33 @@ def _measure_copy(torch, copy_once, rounds):
     for _ in range(COPY_WARMUP_ROUNDS):
         copy_once()
     torch.npu.synchronize()
+
     start_ns = time.perf_counter_ns()
     for _ in range(rounds):
         copy_once()
     torch.npu.synchronize()
-    return time.perf_counter_ns() - start_ns
+    elapsed_ns = time.perf_counter_ns() - start_ns
+
+    latency_ms = []
+    for _ in range(rounds):
+        start_event = torch.npu.Event(enable_timing=True)
+        end_event = torch.npu.Event(enable_timing=True)
+        torch.npu.synchronize()
+        start_event.record()
+        copy_once()
+        end_event.record()
+        torch.npu.synchronize()
+        latency_ms.append(start_event.elapsed_time(end_event))
+    return elapsed_ns, latency_ms
 
 
-def _make_copy_stats(mode, rounds, token_count, copied_bytes, elapsed_ns, checksum, expected_checksum):
+def _percentile(values, percentile):
+    ordered = sorted(values)
+    index = max(0, math.ceil(percentile * len(ordered)) - 1)
+    return ordered[index]
+
+
+def _make_copy_stats(mode, rounds, token_count, copied_bytes, elapsed_ns, latency_ms, checksum, expected_checksum):
     bytes_per_round = copied_bytes
     total_bytes = bytes_per_round * rounds
     elapsed_ms = elapsed_ns / 1_000_000
@@ -165,6 +185,12 @@ def _make_copy_stats(mode, rounds, token_count, copied_bytes, elapsed_ns, checks
         "total_bytes": total_bytes,
         "elapsed_ms": elapsed_ms,
         "bandwidth_gbps": bandwidth_gbps,
+        "latency_min_ms": min(latency_ms),
+        "latency_avg_ms": sum(latency_ms) / len(latency_ms),
+        "latency_p95_ms": _percentile(latency_ms, 0.95),
+        "latency_p99_ms": _percentile(latency_ms, 0.99),
+        "latency_p9999_ms": _percentile(latency_ms, 0.9999),
+        "latency_max_ms": max(latency_ms),
         "checksum": f"0x{checksum:08x}",
         "expected": f"0x{expected_checksum:08x}",
     }
@@ -187,6 +213,23 @@ def _print_copy_stats(stats):
     print("| " + " | ".join(value.ljust(width) for value, width in zip(values, widths)) + " |", flush=True)
     print(border, flush=True)
 
+    latency_headers = ("Samples", "Min(ms)", "Avg(ms)", "P95(ms)", "P99(ms)", "P99.99(ms)", "Max(ms)")
+    latency_values = (
+        str(stats["rounds"]), f"{stats['latency_min_ms']:.3f}", f"{stats['latency_avg_ms']:.3f}",
+        f"{stats['latency_p95_ms']:.3f}", f"{stats['latency_p99_ms']:.3f}",
+        f"{stats['latency_p9999_ms']:.3f}", f"{stats['latency_max_ms']:.3f}",
+    )
+    latency_widths = [max(len(header), len(value)) for header, value in zip(latency_headers, latency_values)]
+    latency_border = "+-" + "-+-".join("-" * width for width in latency_widths) + "-+"
+    print("COPY LATENCY", flush=True)
+    print(latency_border, flush=True)
+    print("| " + " | ".join(header.ljust(width) for header, width in zip(latency_headers, latency_widths)) + " |",
+          flush=True)
+    print(latency_border, flush=True)
+    print("| " + " | ".join(value.ljust(width) for value, width in zip(latency_values, latency_widths)) + " |",
+          flush=True)
+    print(latency_border, flush=True)
+
 
 def _sparse_copy_and_verify(torch, offload, device, peer_gva, source_ckv, source_kpe, token_count, rounds):
     destination_ckv = torch.full((token_count, CKV_WIDTH), SENTINEL, dtype=torch.bfloat16, device=device)
@@ -208,14 +251,14 @@ def _sparse_copy_and_verify(torch, offload, device, peer_gva, source_ckv, source
         if ret != 0:
             raise AssertionError(f"sparse_copy_urma failed: ret={ret}")
 
-    elapsed_ns = _measure_copy(torch, copy_once, rounds)
+    elapsed_ns, latency_ms = _measure_copy(torch, copy_once, rounds)
     if not torch.equal(destination_ckv, source_ckv[0][:token_count]):
         raise AssertionError("sparse_copy_urma CKV data mismatch")
     if not torch.equal(destination_kpe, source_kpe[0][:token_count]):
         raise AssertionError("sparse_copy_urma KPE data mismatch")
     actual_checksum, copied_bytes = _checksum_tensors(torch, [destination_ckv, destination_kpe])
     expected_checksum, _ = _checksum_tensors(torch, [source_ckv[0][:token_count], source_kpe[0][:token_count]])
-    return _make_copy_stats("sparse", rounds, token_count, copied_bytes, elapsed_ns, actual_checksum,
+    return _make_copy_stats("sparse", rounds, token_count, copied_bytes, elapsed_ns, latency_ms, actual_checksum,
                             expected_checksum)
 
 
@@ -252,7 +295,7 @@ def _scatter_copy_and_verify(torch, offload, device, peer_gva, source_ckv, sourc
     def copy_once():
         _scatter_copy_once(offload, hbm_kpe_buffer, hbm_ckv_buffer, tables, copy_params)
 
-    elapsed_ns = _measure_copy(torch, copy_once, rounds)
+    elapsed_ns, latency_ms = _measure_copy(torch, copy_once, rounds)
     hbm_ckv = hbm_ckv_buffer.view(TOKENS_PER_BLOCK, CKV_WIDTH)
     hbm_kpe = hbm_kpe_buffer.view(TOKENS_PER_BLOCK, KPE_WIDTH)
     copied_tensors = [hbm_ckv[:token_count], hbm_kpe[:token_count]]
@@ -263,7 +306,7 @@ def _scatter_copy_and_verify(torch, offload, device, peer_gva, source_ckv, sourc
         raise AssertionError("scatter_copy KPE data mismatch")
     actual_checksum, copied_bytes = _checksum_tensors(torch, copied_tensors)
     expected_checksum, _ = _checksum_tensors(torch, expected_tensors)
-    return _make_copy_stats("scatter", rounds, token_count, copied_bytes, elapsed_ns, actual_checksum,
+    return _make_copy_stats("scatter", rounds, token_count, copied_bytes, elapsed_ns, latency_ms, actual_checksum,
                             expected_checksum)
 
 
