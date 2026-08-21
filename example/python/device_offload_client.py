@@ -15,7 +15,7 @@
 MemCache 配置由 MMC_LOCAL_CONFIG_PATH 指向的配置文件加载。进程绑定 --dev-id
 指定的 NPU，初始化 LocalService 后依次执行：
 
-  batch_put_from_layers -> batch_get_key_info -> sparse/scatter copy -> 数据校验。
+  put/alloc 数据准备 -> batch_get_key_info -> sparse/scatter copy -> 数据校验。
 
 Device EID 不使用 USE_LOCAL_EID 覆盖，MemFabric 会根据设备信息从 RootInfo 自动读取。
 Device 配置应使用 host_device_urma，保持与 Host 相同的 world_size/max DRAM/HBM
@@ -24,7 +24,7 @@ Device 配置应使用 host_device_urma，保持与 Host 相同的 world_size/ma
 用法：
 
   export MMC_LOCAL_CONFIG_PATH=/path/to/mmc-device.conf
-  python3 device_offload_client.py --copy-mode scatter --peer-rank 0 --dev-id 0 \
+  python3 device_offload_client.py --prepare-mode put --copy-mode scatter --peer-rank 0 --dev-id 0 \
     --copy-rounds 100 --copy-tokens 128
 """
 
@@ -55,6 +55,12 @@ def _parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--copy_mode", "--copy-mode", dest="copy_mode", choices=("scatter", "sparse"), default="scatter"
+    )
+    parser.add_argument(
+        "--prepare-mode",
+        choices=("put", "alloc"),
+        default="put",
+        help="远端数据准备方式：put=指定 peer；alloc=按 DRAM 介质随机选 rank 后写入",
     )
     parser.add_argument("--peer_rank", "--peer-rank", dest="peer_rank", type=int, default=0,
                         help="提供 Host DRAM 池的 peer rank，默认 0")
@@ -126,6 +132,30 @@ def _put_to_peer(store, key, source_layers, peer_rank, l2g, replicate_config_cls
     )
     if results != [0]:
         raise AssertionError(f"batch_put_from_layers failed: results={results}")
+
+
+def _alloc_to_peer(store, key, source_layers, l2g):
+    gvas = store.batch_alloc([key], [OBJECT_BYTES], media=MEDIA_DRAM)
+    if len(gvas) != 1 or gvas[0] == 0:
+        raise AssertionError(f"batch_alloc failed: gvas={gvas}")
+    copy_ret = store.batch_copy_layers(
+        gva_ptrs=gvas,
+        buffer_ptrs=[[layer.data_ptr() for layer in source_layers]],
+        sizes=[[LAYER_STRIDE_BYTES] * LAYER_COUNT],
+        direct=l2g,
+    )
+    finish_results = store.batch_write_finish(keys=[key], res=[copy_ret])
+    if copy_ret != 0:
+        raise AssertionError(f"batch_copy_layers failed: ret={copy_ret}, finish_results={finish_results}")
+    if finish_results != [0]:
+        raise AssertionError(f"batch_write_finish failed: results={finish_results}")
+
+
+def _prepare_peer_data(store, args, key, source_layers, l2g, replicate_config_cls):
+    if args.prepare_mode == "alloc":
+        _alloc_to_peer(store, key, source_layers, l2g)
+        return
+    _put_to_peer(store, key, source_layers, args.peer_rank, l2g, replicate_config_cls)
 
 
 def _query_peer_gva(store, key, peer_rank):
@@ -321,10 +351,11 @@ def _run(store, args, torch, offload, l2g, replicate_config_cls):
     try:
         source_checksum, source_bytes = _checksum_tensors(torch, source_layers)
         print(
-            f"PUT_BEFORE: key={key} checksum=0x{source_checksum:08x} bytes={source_bytes}",
+            f"PUT_BEFORE: mode={args.prepare_mode} key={key} "
+            f"checksum=0x{source_checksum:08x} bytes={source_bytes}",
             flush=True,
         )
-        _put_to_peer(store, key, source_layers, args.peer_rank, l2g, replicate_config_cls)
+        _prepare_peer_data(store, args, key, source_layers, l2g, replicate_config_cls)
         key_created = True
         peer_gva = _query_peer_gva(store, key, args.peer_rank)
         if store.batch_add_lease([key]) != [0]:
@@ -363,7 +394,7 @@ def _run(store, args, torch, offload, l2g, replicate_config_cls):
     local_rank = store.get_local_service_id()
     print(
         f"DEVICE PASS: rank={local_rank} peer_rank={args.peer_rank} "
-        f"copy_mode={args.copy_mode} peer_gva=0x{peer_gva:x}",
+        f"prepare_mode={args.prepare_mode} copy_mode={args.copy_mode} peer_gva=0x{peer_gva:x}",
         flush=True,
     )
 
