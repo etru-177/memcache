@@ -177,20 +177,12 @@ def _measure_copy(torch, copy_once, rounds):
         copy_once()
     torch.npu.synchronize()
 
-    events = []
-    start_ns = time.perf_counter_ns()
+    latency_ms = []
     for _ in range(rounds):
-        start_event = torch.npu.Event(enable_timing=True)
-        end_event = torch.npu.Event(enable_timing=True)
-        start_event.record()
+        start_ns = time.perf_counter_ns()
         copy_once()
-        end_event.record()
-        events.append((start_event, end_event))
-    torch.npu.synchronize()
-    elapsed_ns = time.perf_counter_ns() - start_ns
-
-    latency_ms = [start_event.elapsed_time(end_event) for start_event, end_event in events]
-    return elapsed_ns, latency_ms
+        latency_ms.append((time.perf_counter_ns() - start_ns) / 1_000_000)
+    return latency_ms
 
 
 def _percentile(values, percentile):
@@ -199,11 +191,11 @@ def _percentile(values, percentile):
     return ordered[index]
 
 
-def _make_copy_stats(mode, rounds, token_count, copied_bytes, elapsed_ns, latency_ms, checksum, expected_checksum):
+def _make_copy_stats(mode, rounds, token_count, copied_bytes, latency_ms, checksum, expected_checksum):
     bytes_per_round = copied_bytes
     total_bytes = bytes_per_round * rounds
-    elapsed_ms = elapsed_ns / 1_000_000
-    bandwidth_gbps = total_bytes / (elapsed_ns / 1_000_000_000) / 1_000_000_000
+    elapsed_ms = sum(latency_ms)
+    bandwidth_gbps = total_bytes / elapsed_ms / 1_000_000
     return {
         "mode": mode,
         "rounds": rounds,
@@ -278,14 +270,14 @@ def _sparse_copy_and_verify(torch, offload, device, peer_gva, source_ckv, source
         if ret != 0:
             raise AssertionError(f"sparse_copy_urma failed: ret={ret}")
 
-    elapsed_ns, latency_ms = _measure_copy(torch, copy_once, rounds)
+    latency_ms = _measure_copy(torch, copy_once, rounds)
     if not torch.equal(destination_ckv, source_ckv[0][:token_count]):
         raise AssertionError("sparse_copy_urma CKV data mismatch")
     if not torch.equal(destination_kpe, source_kpe[0][:token_count]):
         raise AssertionError("sparse_copy_urma KPE data mismatch")
     actual_checksum, copied_bytes = _checksum_tensors(torch, [destination_ckv, destination_kpe])
     expected_checksum, _ = _checksum_tensors(torch, [source_ckv[0][:token_count], source_kpe[0][:token_count]])
-    return _make_copy_stats("sparse", rounds, token_count, copied_bytes, elapsed_ns, latency_ms, actual_checksum,
+    return _make_copy_stats("sparse", rounds, token_count, copied_bytes, latency_ms, actual_checksum,
                             expected_checksum)
 
 
@@ -322,7 +314,7 @@ def _scatter_copy_and_verify(torch, offload, device, peer_gva, source_ckv, sourc
     def copy_once():
         _scatter_copy_once(offload, hbm_kpe_buffer, hbm_ckv_buffer, tables, copy_params)
 
-    elapsed_ns, latency_ms = _measure_copy(torch, copy_once, rounds)
+    latency_ms = _measure_copy(torch, copy_once, rounds)
     hbm_ckv = hbm_ckv_buffer.view(TOKENS_PER_BLOCK, CKV_WIDTH)
     hbm_kpe = hbm_kpe_buffer.view(TOKENS_PER_BLOCK, KPE_WIDTH)
     copied_tensors = [hbm_ckv[:token_count], hbm_kpe[:token_count]]
@@ -333,7 +325,7 @@ def _scatter_copy_and_verify(torch, offload, device, peer_gva, source_ckv, sourc
         raise AssertionError("scatter_copy KPE data mismatch")
     actual_checksum, copied_bytes = _checksum_tensors(torch, copied_tensors)
     expected_checksum, _ = _checksum_tensors(torch, expected_tensors)
-    return _make_copy_stats("scatter", rounds, token_count, copied_bytes, elapsed_ns, latency_ms, actual_checksum,
+    return _make_copy_stats("scatter", rounds, token_count, copied_bytes, latency_ms, actual_checksum,
                             expected_checksum)
 
 
