@@ -177,22 +177,19 @@ def _measure_copy(torch, copy_once, rounds):
         copy_once()
     torch.npu.synchronize()
 
+    events = []
     start_ns = time.perf_counter_ns()
-    for _ in range(rounds):
-        copy_once()
-    torch.npu.synchronize()
-    elapsed_ns = time.perf_counter_ns() - start_ns
-
-    latency_ms = []
     for _ in range(rounds):
         start_event = torch.npu.Event(enable_timing=True)
         end_event = torch.npu.Event(enable_timing=True)
-        torch.npu.synchronize()
         start_event.record()
         copy_once()
         end_event.record()
-        torch.npu.synchronize()
-        latency_ms.append(start_event.elapsed_time(end_event))
+        events.append((start_event, end_event))
+    torch.npu.synchronize()
+    elapsed_ns = time.perf_counter_ns() - start_ns
+
+    latency_ms = [start_event.elapsed_time(end_event) for start_event, end_event in events]
     return elapsed_ns, latency_ms
 
 
