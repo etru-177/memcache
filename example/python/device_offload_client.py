@@ -37,13 +37,14 @@ import zlib
 MEDIA_DRAM = 1
 LAYER_COUNT = 2
 TOKENS_PER_BLOCK = 128
+MAX_COPY_TOKENS = 16384
 CKV_WIDTH = 512
 KPE_WIDTH = 64
 CKV_TOKEN_BYTES = CKV_WIDTH * 2
 KPE_TOKEN_BYTES = KPE_WIDTH * 2
 CKV_LAYER_BYTES = TOKENS_PER_BLOCK * CKV_TOKEN_BYTES
 LAYER_STRIDE_BYTES = TOKENS_PER_BLOCK * (CKV_TOKEN_BYTES + KPE_TOKEN_BYTES)
-OBJECT_BYTES = LAYER_COUNT * LAYER_STRIDE_BYTES
+BLOCK_BYTES = LAYER_COUNT * LAYER_STRIDE_BYTES
 SENTINEL = -1.0
 POOL_READY_WAIT_SECONDS = 10
 COPY_WARMUP_ROUNDS = 3
@@ -68,7 +69,7 @@ def _parse_args():
     parser.add_argument("--copy-rounds", type=int, default=DEFAULT_COPY_ROUNDS,
                         help=f"计入带宽和延迟统计的 copy 轮次，默认 {DEFAULT_COPY_ROUNDS}")
     parser.add_argument("--copy-tokens", type=int, default=DEFAULT_COPY_TOKENS,
-                        help=f"每轮复制的 CKV+KPE token 数，范围 1-{TOKENS_PER_BLOCK}")
+                        help=f"每轮复制的 CKV+KPE token 数，范围 1-{MAX_COPY_TOKENS}")
     return parser.parse_args()
 
 
@@ -94,19 +95,29 @@ def _set_runtime_device(torch, device_id):
     return device
 
 
-def _make_source_layers(torch, device):
+def _make_source_layers(torch, device, block_count):
+    token_capacity = block_count * TOKENS_PER_BLOCK
     source_ckv = []
     source_kpe = []
-    source_layers = []
     for layer_index in range(LAYER_COUNT):
-        ckv = (torch.arange(TOKENS_PER_BLOCK * CKV_WIDTH) % 13 + layer_index * 16).to(torch.bfloat16)
-        kpe = (torch.arange(TOKENS_PER_BLOCK * KPE_WIDTH) % 7 + layer_index * 16 + 8).to(torch.bfloat16)
-        ckv = ckv.reshape(TOKENS_PER_BLOCK, CKV_WIDTH).to(device)
-        kpe = kpe.reshape(TOKENS_PER_BLOCK, KPE_WIDTH).to(device)
+        ckv = (torch.arange(token_capacity * CKV_WIDTH) % 13 + layer_index * 16).to(torch.bfloat16)
+        kpe = (torch.arange(token_capacity * KPE_WIDTH) % 7 + layer_index * 16 + 8).to(torch.bfloat16)
+        ckv = ckv.reshape(token_capacity, CKV_WIDTH).to(device)
+        kpe = kpe.reshape(token_capacity, KPE_WIDTH).to(device)
         source_ckv.append(ckv)
         source_kpe.append(kpe)
-        source_layers.append(torch.cat((ckv.flatten(), kpe.flatten())))
-    return source_ckv, source_kpe, source_layers
+
+    # scatter kernel按block GVA寻址，每个block内部依次存放所有layer的CKV和KPE。
+    source_blocks = []
+    for block_index in range(block_count):
+        begin = block_index * TOKENS_PER_BLOCK
+        end = begin + TOKENS_PER_BLOCK
+        block_layers = []
+        for layer_index in range(LAYER_COUNT):
+            block_layers.extend((source_ckv[layer_index][begin:end].flatten(),
+                                 source_kpe[layer_index][begin:end].flatten()))
+        source_blocks.append(torch.cat(block_layers))
+    return source_ckv, source_kpe, source_blocks
 
 
 def _checksum_tensors(torch, tensors):
@@ -119,14 +130,14 @@ def _checksum_tensors(torch, tensors):
     return checksum, total_bytes
 
 
-def _put_to_peer(store, key, source_layers, peer_rank, l2g, replicate_config_cls):
+def _put_to_peer(store, key, source_blocks, peer_rank, l2g, replicate_config_cls):
     replicate_config = replicate_config_cls()
     replicate_config.replicaNum = 1
     replicate_config.preferredLocalServiceIDs = [peer_rank]
     results = store.batch_put_from_layers(
         [key],
-        [[layer.data_ptr() for layer in source_layers]],
-        [[LAYER_STRIDE_BYTES] * LAYER_COUNT],
+        [[block.data_ptr() for block in source_blocks]],
+        [[BLOCK_BYTES] * len(source_blocks)],
         l2g,
         replicate_config,
     )
@@ -134,14 +145,14 @@ def _put_to_peer(store, key, source_layers, peer_rank, l2g, replicate_config_cls
         raise AssertionError(f"batch_put_from_layers failed: results={results}")
 
 
-def _alloc_to_peer(store, key, source_layers, l2g):
-    gvas = store.batch_alloc([key], [OBJECT_BYTES], media=MEDIA_DRAM)
+def _alloc_to_peer(store, key, source_blocks, l2g):
+    gvas = store.batch_alloc([key], [BLOCK_BYTES * len(source_blocks)], media=MEDIA_DRAM)
     if len(gvas) != 1 or gvas[0] == 0:
         raise AssertionError(f"batch_alloc failed: gvas={gvas}")
     copy_ret = store.batch_copy_layers(
         gva_ptrs=gvas,
-        buffer_ptrs=[[layer.data_ptr() for layer in source_layers]],
-        sizes=[[LAYER_STRIDE_BYTES] * LAYER_COUNT],
+        buffer_ptrs=[[block.data_ptr() for block in source_blocks]],
+        sizes=[[BLOCK_BYTES] * len(source_blocks)],
         direct=l2g,
     )
     finish_results = store.batch_write_finish(keys=[key], res=[copy_ret])
@@ -151,19 +162,19 @@ def _alloc_to_peer(store, key, source_layers, l2g):
         raise AssertionError(f"batch_write_finish failed: results={finish_results}")
 
 
-def _prepare_peer_data(store, args, key, source_layers, l2g, replicate_config_cls):
+def _prepare_peer_data(store, args, key, source_blocks, l2g, replicate_config_cls):
     if args.prepare_mode == "alloc":
-        _alloc_to_peer(store, key, source_layers, l2g)
+        _alloc_to_peer(store, key, source_blocks, l2g)
         return
-    _put_to_peer(store, key, source_layers, args.peer_rank, l2g, replicate_config_cls)
+    _put_to_peer(store, key, source_blocks, args.peer_rank, l2g, replicate_config_cls)
 
 
-def _query_peer_gva(store, key, peer_rank):
+def _query_peer_gva(store, key, peer_rank, expected_size):
     infos = store.batch_get_key_info([key], flag=0)
     if len(infos) != 1:
         raise AssertionError(f"batch_get_key_info returned {len(infos)} entries")
     info = infos[0]
-    if info.size() != OBJECT_BYTES:
+    if info.size() != expected_size:
         raise AssertionError(f"unexpected object size: {info.size()}")
     if info.loc_list() != [peer_rank] or info.type_list() != [MEDIA_DRAM]:
         raise AssertionError(f"unexpected location: ranks={info.loc_list()}, media={info.type_list()}")
@@ -257,8 +268,10 @@ def _sparse_copy_and_verify(torch, offload, device, peer_gva, source_ckv, source
     destination_addresses = []
     lengths = []
     for token_id in range(token_count):
-        source_addresses.extend((peer_gva + token_id * CKV_TOKEN_BYTES,
-                                 peer_gva + CKV_LAYER_BYTES + token_id * KPE_TOKEN_BYTES))
+        block_index, block_offset = divmod(token_id, TOKENS_PER_BLOCK)
+        block_gva = peer_gva + block_index * BLOCK_BYTES
+        source_addresses.extend((block_gva + block_offset * CKV_TOKEN_BYTES,
+                                 block_gva + CKV_LAYER_BYTES + block_offset * KPE_TOKEN_BYTES))
         destination_addresses.extend((destination_ckv[token_id].data_ptr(), destination_kpe[token_id].data_ptr()))
         lengths.extend((CKV_TOKEN_BYTES, KPE_TOKEN_BYTES))
     src_ptrs = torch.tensor(source_addresses, dtype=torch.int64, device=device)
@@ -293,15 +306,20 @@ def _scatter_copy_once(offload, hbm_kpe, hbm_ckv, tables, copy_params):
 
 
 def _scatter_copy_and_verify(torch, offload, device, peer_gva, source_ckv, source_kpe, token_count, rounds):
+    block_count = math.ceil(token_count / TOKENS_PER_BLOCK)
     hbm_ckv_buffer = torch.full(
-        (1, TOKENS_PER_BLOCK * CKV_WIDTH), SENTINEL, dtype=torch.bfloat16, device=device
+        (block_count, TOKENS_PER_BLOCK * CKV_WIDTH), SENTINEL, dtype=torch.bfloat16, device=device
     )
     hbm_kpe_buffer = torch.full(
-        (1, TOKENS_PER_BLOCK * KPE_WIDTH), SENTINEL, dtype=torch.bfloat16, device=device
+        (block_count, TOKENS_PER_BLOCK * KPE_WIDTH), SENTINEL, dtype=torch.bfloat16, device=device
     )
     tables = (
-        torch.tensor([[0]], dtype=torch.int32, device=device),
-        torch.tensor([[peer_gva]], dtype=torch.int64, device=device),
+        torch.arange(block_count, dtype=torch.int32, device=device).reshape(1, block_count),
+        torch.tensor(
+            [[peer_gva + block_index * BLOCK_BYTES for block_index in range(block_count)]],
+            dtype=torch.int64,
+            device=device,
+        ),
         torch.tensor([0], dtype=torch.int32, device=device),
     )
     token_ids = list(range(token_count))
@@ -315,8 +333,8 @@ def _scatter_copy_and_verify(torch, offload, device, peer_gva, source_ckv, sourc
         _scatter_copy_once(offload, hbm_kpe_buffer, hbm_ckv_buffer, tables, copy_params)
 
     latency_ms = _measure_copy(torch, copy_once, rounds)
-    hbm_ckv = hbm_ckv_buffer.view(TOKENS_PER_BLOCK, CKV_WIDTH)
-    hbm_kpe = hbm_kpe_buffer.view(TOKENS_PER_BLOCK, KPE_WIDTH)
+    hbm_ckv = hbm_ckv_buffer.view(block_count * TOKENS_PER_BLOCK, CKV_WIDTH)
+    hbm_kpe = hbm_kpe_buffer.view(block_count * TOKENS_PER_BLOCK, KPE_WIDTH)
     copied_tensors = [hbm_ckv[:token_count], hbm_kpe[:token_count]]
     expected_tensors = [source_ckv[0][:token_count], source_kpe[0][:token_count]]
     if not torch.equal(copied_tensors[0], expected_tensors[0]):
@@ -331,22 +349,23 @@ def _scatter_copy_and_verify(torch, offload, device, peer_gva, source_ckv, sourc
 
 def _run(store, args, torch, offload, l2g, replicate_config_cls):
     device = torch.device(f"npu:{args.dev_id}")
-    source_ckv, source_kpe, source_layers = _make_source_layers(torch, device)
+    block_count = math.ceil(args.copy_tokens / TOKENS_PER_BLOCK)
+    source_ckv, source_kpe, source_blocks = _make_source_layers(torch, device, block_count)
     torch.npu.synchronize()
     key = f"device-offload-{os.getpid()}-{time.time_ns()}"
     key_created = False
     lease_added = False
     copy_passed = False
     try:
-        source_checksum, source_bytes = _checksum_tensors(torch, source_layers)
+        source_checksum, source_bytes = _checksum_tensors(torch, source_blocks)
         print(
             f"PUT_BEFORE: mode={args.prepare_mode} key={key} "
             f"checksum=0x{source_checksum:08x} bytes={source_bytes}",
             flush=True,
         )
-        _prepare_peer_data(store, args, key, source_layers, l2g, replicate_config_cls)
+        _prepare_peer_data(store, args, key, source_blocks, l2g, replicate_config_cls)
         key_created = True
-        peer_gva = _query_peer_gva(store, key, args.peer_rank)
+        peer_gva = _query_peer_gva(store, key, args.peer_rank, block_count * BLOCK_BYTES)
         if store.batch_add_lease([key]) != [0]:
             raise AssertionError("batch_add_lease failed")
         lease_added = True
@@ -392,8 +411,8 @@ def main():
     args = _parse_args()
     if args.dev_id < 0 or args.peer_rank < 0 or args.copy_rounds <= 0:
         raise ValueError("dev-id and peer_rank must be non-negative; copy-rounds must be positive")
-    if args.copy_tokens <= 0 or args.copy_tokens > TOKENS_PER_BLOCK:
-        raise ValueError(f"copy-tokens must be in range 1-{TOKENS_PER_BLOCK}")
+    if args.copy_tokens <= 0 or args.copy_tokens > MAX_COPY_TOKENS:
+        raise ValueError(f"copy-tokens must be in range 1-{MAX_COPY_TOKENS}")
     config_path = _configure_environment()
 
     import torch
